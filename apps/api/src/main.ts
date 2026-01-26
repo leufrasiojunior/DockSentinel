@@ -71,31 +71,29 @@ async function bootstrap() {
    * - Ajuda o app a encerrar corretamente em Docker/Compose (SIGTERM).
    * - Importante quando a gente tiver scheduler, jobs, etc.
    */
+
+
   app.enableShutdownHooks();
-  const swaggerEnabled = process.env.SWAGGER_ENABLED === 'true';
-  if (swaggerEnabled) {
-    const config = new DocumentBuilder()
-      .setTitle('DockSentinel API')
-      .setDescription(
-        'API do DockSentinel (containers, updates, auth, setup, settings)',
-      )
-      .setVersion('1.0.0')
-      // Se quiser, você pode descrever o cookie de sessão na doc.
-      // (Nem sempre é necessário pro Postman, mas ajuda o humano.)
-      .build();
+const swaggerEnabled = config.get("SWAGGER_ENABLED", { infer: true });
+if (swaggerEnabled) {
+  const swaggerConfig = new DocumentBuilder()
+    .setTitle("DockSentinel API")
+    .setDescription("API do DockSentinel (containers, updates, auth, setup, settings)")
+    .setVersion("1.0.0")
+    .build();
 
-    const document = SwaggerModule.createDocument(app, config);
+  const document = SwaggerModule.createDocument(app, swaggerConfig);
 
-    SwaggerModule.setup('docs', app, document, {
-      // ✅ esses dois facilitam MUITO export/import:
-      jsonDocumentUrl: 'docs-json',
-      // se sua versão suportar:
-      // yamlDocumentUrl: "docs-yaml",
-      swaggerOptions: {
-        persistAuthorization: true,
-      },
-    });
-  }
+  SwaggerModule.setup("docs", app, document, {
+    jsonDocumentUrl: "docs-json",
+    swaggerOptions: { persistAuthorization: true },
+  });
+
+  logger.log("Swagger ENABLED at /docs");
+  logger.log("Import json schema in /docs-json")
+} else {
+  logger.log("Swagger DISABLED (set SWAGGER_ENABLED=true)");
+}
 
   await app.listen(port);
 
