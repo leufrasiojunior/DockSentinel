@@ -1,0 +1,41 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+}
+
+
+model GlobalSettings {
+  id Int @id @default(1)
+  /**
+   * authMode:
+   * - none | password | totp | both
+   *
+   * Por enquanto string simples.
+   * Depois podemos mudar pra enum.
+   */
+  authMode String @default("none")
+
+  /**
+   * Hash da senha do admin (argon2).
+   * Só existe se authMode exigir password.
+   */
+  adminPasswordHash String?
+
+  /**
+   * Secret do TOTP criptografado (vamos implementar no Item 5.3).
+   * Só existe se authMode exigir totp.
+   */
+  totpSecretEnc String?
+
+  /**
+   * Nível de log global do backend.
+   */
+  logLevel String @default("info")
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  setupCompletedAt DateTime?
+}
