@@ -1,52 +1,79 @@
-/**
- * RecreatePlan:
- * Representa exatamente o que precisamos para recriar um container:
- * - imagem nova
- * - env
- * - labels
- * - portas
- * - volumes/binds
- * - networks
- * - restart policy
- *
- * Esse objeto vira o input do método recreateContainer().
- */
+import { ApiProperty } from '@nestjs/swagger';
 
-export type PortBindings = Record<string, Array<{ HostIp?: string; HostPort?: string }>>
+export class PortBinding {
+  @ApiProperty({ required: false })
+  HostIp?: string;
 
-export type RestartPolicy = {
-  Name: string
-  MaximumRetryCount?: number
+  @ApiProperty({ required: false })
+  HostPort?: string;
 }
 
-export type MountBind = {
-  source: string
-  target: string
-  readOnly: boolean
+export class RestartPolicy {
+  @ApiProperty()
+  Name: string;
+
+  @ApiProperty({ required: false })
+  MaximumRetryCount?: number;
 }
 
-export type NetworkAttachment = {
-  name: string
-  ipv4Address?: string
-  ipv6Address?: string
+export class NetworkAttachment {
+  @ApiProperty()
+  name: string;
+
+  @ApiProperty({ required: false })
+  ipv4Address?: string;
+
+  @ApiProperty({ required: false })
+  ipv6Address?: string;
 }
 
-export type RecreatePlanDto = {
-  oldId: string
-  name: string
+export class RecreatePlanDto {
+  @ApiProperty()
+  oldId: string;
 
-  // imagem alvo (ex: nginx:latest)
-  image: string
+  @ApiProperty()
+  name: string;
 
-  env: string[]
-  labels: Record<string, string>
+  @ApiProperty({ description: 'Target image (e.g., nginx:latest)' })
+  image: string;
 
-  // Docker create API usa isso:
-  exposedPorts: Record<string, {}> // { "80/tcp": {} }
-  portBindings: PortBindings
+  @ApiProperty()
+  env: string[];
 
-  binds: string[] // formato Docker: ["hostPath:/containerPath:ro", ...]
-  restartPolicy?: RestartPolicy
+  @ApiProperty({ type: 'object', additionalProperties: { type: 'string' } })
+  labels: Record<string, string>;
 
-  networks: NetworkAttachment[]
+  @ApiProperty({
+    description: 'Exposed ports, e.g., { "80/tcp": {} }',
+    type: 'object',
+    additionalProperties: true,
+  })
+  exposedPorts: Record<string, {}>;
+
+  @ApiProperty({
+    description: 'Port bindings',
+    type: 'object',
+    additionalProperties: {
+      type: 'array',
+      items: {
+        type: 'object',
+        properties: {
+          HostIp: { type: 'string' },
+          HostPort: { type: 'string' },
+        },
+      },
+    },
+  })
+  portBindings: Record<string, Array<{ HostIp?: string; HostPort?: string }>>;
+
+  @ApiProperty({
+    description: 'Binds in Docker format: ["hostPath:/containerPath:ro", ...]',
+  })
+  binds: string[];
+
+  @ApiProperty({ type: RestartPolicy, required: false })
+  restartPolicy?: RestartPolicy;
+
+  @ApiProperty({ type: [NetworkAttachment] })
+  networks: NetworkAttachment[];
 }

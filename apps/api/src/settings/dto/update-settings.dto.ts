@@ -1,24 +1,40 @@
-import { z } from "zod"
+import { ApiProperty } from '@nestjs/swagger';
+import { IsEnum, IsOptional, IsString, MinLength } from 'class-validator';
 
-/**
- * Zod schema para atualizar settings globais.
- * - Todos são opcionais porque PUT pode mandar só parte.
- */
-export const UpdateSettingsSchema = z.object({
-  authMode: z.enum(["none", "password", "totp", "both"]).optional(),
-  logLevel: z.enum(["error", "warn", "info", "debug"]).optional(),
+export class UpdateSettingsDto {
+  @ApiProperty({
+    description: 'Authentication mode',
+    enum: ['none', 'password', 'totp', 'both'],
+    required: false,
+  })
+  @IsEnum(['none', 'password', 'totp', 'both'])
+  @IsOptional()
+  authMode?: 'none' | 'password' | 'totp' | 'both';
 
-  /**
-   * Atualização de password:
-   * - quando enviado, a gente vai hashear e salvar adminPasswordHash.
-   */
-  adminPassword: z.string().min(8).optional(),
+  @ApiProperty({
+    description: 'Log level',
+    enum: ['error', 'warn', 'info', 'debug'],
+    required: false,
+  })
+  @IsEnum(['error', 'warn', 'info', 'debug'])
+  @IsOptional()
+  logLevel?: 'error' | 'warn' | 'info' | 'debug';
 
-  /**
-   * Atualização de TOTP secret:
-   * - quando enviado, a gente criptografa e salva totpSecretEnc.
-   */
-  totpSecret: z.string().min(16).optional(),
-})
+  @ApiProperty({
+    description: 'Admin password (min 8 characters)',
+    required: false,
+  })
+  @IsString()
+  @MinLength(8)
+  @IsOptional()
+  adminPassword?: string;
 
-export type UpdateSettingsDto = z.infer<typeof UpdateSettingsSchema>
+  @ApiProperty({
+    description: 'TOTP secret (min 16 characters)',
+    required: false,
+  })
+  @IsString()
+  @MinLength(16)
+  @IsOptional()
+  totpSecret?: string;
+}
