@@ -1,17 +1,17 @@
-import { Injectable } from "@nestjs/common"
-import { PrismaService } from "../prisma/prisma.service"
+import { Injectable } from '@nestjs/common';
+import { PrismaService } from '../prisma/prisma.service';
 
 /**
  * Patch "plano": somente campos do modelo GlobalSettings.
  * (Nada de { update: {...}, create: {...} } aqui.)
  */
 export type SettingsPatch = {
-  authMode?: string
-  adminPasswordHash?: string | null
-  totpSecretEnc?: string | null
-  logLevel?: string
-  setupCompletedAt?: Date | null
-}
+  authMode?: string;
+  adminPasswordHash?: string | null;
+  totpSecretEnc?: string | null;
+  logLevel?: string;
+  setupCompletedAt?: Date | null;
+};
 
 @Injectable()
 export class SettingsRepository {
@@ -20,7 +20,7 @@ export class SettingsRepository {
   async get() {
     return this.prisma.client.globalSettings.findUnique({
       where: { id: 1 },
-    })
+    });
   }
 
   /**
@@ -28,15 +28,17 @@ export class SettingsRepository {
    * Prisma exige `create` e `update` no formato plano.
    */
   async upsert(patch: SettingsPatch) {
+    const { setupCompletedAt, ...rest } = patch;
+
+    
     return this.prisma.client.globalSettings.upsert({
       where: { id: 1 },
-      create: {
-        id: 1,
-        ...patch,
-      },
+      create: { id: 1, ...patch },
       update: {
-        ...patch,
+        ...rest,
+        // só atualiza setupCompletedAt se vier definido (e não null acidental)
+        ...(setupCompletedAt instanceof Date ? { setupCompletedAt } : {}),
       },
-    })
+    });
   }
 }

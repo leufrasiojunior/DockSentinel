@@ -23,10 +23,10 @@ export class AuthController {
     status: 200,
     description: 'Returns the authentication mode.',
   })
-  async getStatus() {
-    // getAuthMode() é async, então precisamos await
-    return { authMode: await this.settings.getAuthMode() };
-  }
+async getStatus() {
+  const authMode = await this.settings.getAuthMode()
+  return { authMode }
+}
 
   @Public()
   @Post('login')

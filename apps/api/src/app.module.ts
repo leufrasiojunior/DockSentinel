@@ -10,10 +10,11 @@ import { PrismaModule } from "./prisma/prisma.module"
 import { CryptoModule } from "./crypto/crypto.module"
 import { SetupModule } from "./setup/setup.module"
 import { DockerModule } from "./docker/docker.module"
+import { UpdatesModule } from "./updates/updates.module"
 
 
 @Module({
-  imports: [AppConfigModule, SettingsModule, AuthModule, HealthModule, PrismaModule, CryptoModule, SetupModule, DockerModule],
+  imports: [AppConfigModule, SettingsModule, AuthModule, HealthModule, PrismaModule, CryptoModule, SetupModule, DockerModule, UpdatesModule],
   providers: [
     {
       provide: APP_GUARD,
