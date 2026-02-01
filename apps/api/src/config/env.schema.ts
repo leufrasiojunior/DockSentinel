@@ -8,6 +8,16 @@ import { z } from 'zod';
  */
 export const envSchema = z
   .object({
+
+  AUTO_MIGRATE: z
+    .preprocess((v) => {
+      if (typeof v === "boolean") return v
+      if (typeof v !== "string") return false
+      const s = v.trim().toLowerCase()
+      return s === "true" || s === "1" || s === "yes"
+    }, z.boolean())
+    .default(true),
+
     SWAGGER_ENABLED: z
     .preprocess((v) => {
       if (typeof v === "boolean") return v

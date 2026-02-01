@@ -1,0 +1,19 @@
+docker tag sha256:a5c0867d7666d15bd3e728cf8ea48be60dd4542403d2d8bba69342fdb24a1361 \
+  ghcr.io/homarr-labs/homarr:latest
+
+
+Jeito 2: encontrar o “untagged” local e retagar
+
+Se você não quiser copiar o sha completo do Portainer:
+
+docker images --digests | grep -i homarr
+
+
+Ou listar dangling:
+
+docker images -f "dangling=true"
+
+
+Quando achar o IMAGE ID correspondente, faça:
+
+docker tag <IMAGE_ID> ghcr.io/homarr-labs/homarr:latest

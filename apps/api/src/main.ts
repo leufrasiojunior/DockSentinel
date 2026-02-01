@@ -5,6 +5,30 @@ import { ConfigService } from '@nestjs/config';
 import { Env } from './config/env.schema';
 import cookieParser from 'cookie-parser';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
+import { execSync } from 'node:child_process';
+import { mkdirSync } from 'node:fs';
+import { join } from 'node:path';
+
+function ensureMigrations(config: ConfigService<Env>, logger: Logger) {
+  const auto = config.get('AUTO_MIGRATE', { infer: true });
+  if (!auto) {
+    logger.log('AUTO_MIGRATE=false (skipping migrations)');
+    return;
+  }
+
+  // garante pasta do sqlite (você usa ./data/docksentinel.db)
+  mkdirSync(join(process.cwd(), 'data'), { recursive: true });
+
+  logger.log('AUTO_MIGRATE=true -> running Prisma migrations (deploy)...');
+
+  execSync('npx prisma migrate deploy --schema=prisma/schema.prisma', {
+    stdio: 'inherit',
+    cwd: process.cwd(),
+    env: process.env,
+  });
+
+  logger.log('Migrations applied (or already up-to-date).');
+}
 
 /**
  * Bootstrapping da API.
@@ -71,29 +95,35 @@ async function bootstrap() {
    * - Ajuda o app a encerrar corretamente em Docker/Compose (SIGTERM).
    * - Importante quando a gente tiver scheduler, jobs, etc.
    */
-
-
   app.enableShutdownHooks();
-const swaggerEnabled = config.get("SWAGGER_ENABLED", { infer: true });
-if (swaggerEnabled) {
-  const swaggerConfig = new DocumentBuilder()
-    .setTitle("DockSentinel API")
-    .setDescription("API do DockSentinel (containers, updates, auth, setup, settings)")
-    .setVersion("1.0.0")
-    .build();
+  const swaggerEnabled = config.get('SWAGGER_ENABLED', { infer: true });
+  if (swaggerEnabled) {
+    const swaggerConfig = new DocumentBuilder()
+      .setTitle('DockSentinel API')
+      .setDescription(
+        'API do DockSentinel (containers, updates, auth, setup, settings)',
+      )
+      .setVersion('1.0.0')
+      .build();
 
-  const document = SwaggerModule.createDocument(app, swaggerConfig);
+    //Verifricar as migrations
+    const config = app.get<ConfigService<Env>>(ConfigService);
 
-  SwaggerModule.setup("docs", app, document, {
-    jsonDocumentUrl: "docs-json",
-    swaggerOptions: { persistAuthorization: true },
-  });
+    ensureMigrations(config, logger);
 
-  logger.log("Swagger ENABLED at /docs");
-  logger.log("Import json schema in /docs-json")
-} else {
-  logger.log("Swagger DISABLED (set SWAGGER_ENABLED=true)");
-}
+    //Swagger
+    const document = SwaggerModule.createDocument(app, swaggerConfig);
+
+    SwaggerModule.setup('docs', app, document, {
+      jsonDocumentUrl: 'docs-json',
+      swaggerOptions: { persistAuthorization: true },
+    });
+
+    logger.log('Swagger ENABLED at /docs');
+    logger.log('Import json schema in /docs-json');
+  } else {
+    logger.log('Swagger DISABLED (set SWAGGER_ENABLED=true if you want)');
+  }
 
   await app.listen(port);
 

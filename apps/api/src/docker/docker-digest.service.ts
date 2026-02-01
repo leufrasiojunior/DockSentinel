@@ -34,7 +34,7 @@ export class DockerDigestService {
 
 
     // Estrutura típica: data.Descriptor.Digest
-    const digest = data?.Descriptor?.digest
+    const digest = data?.Descriptor?.digest ?? data?.Descriptor?.Digest;
     if (!digest || typeof digest !== "string") {
       throw new Error(`Remote digest not found for imageRef=${imageRef}`)
     }

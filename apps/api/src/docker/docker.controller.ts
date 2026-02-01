@@ -1,11 +1,13 @@
-import { Body, Controller, Get, Inject, Param, Post } from '@nestjs/common';
+import { BadRequestException, Body, Controller, Get, Inject, Param, Post, UsePipes } from '@nestjs/common';
 import { DockerService } from './docker.service';
 import { DockerUpdateService } from './docker-update.service';
 import Docker from 'dockerode';
 import { DockerDigestService } from './docker-digest.service';
 import { DOCKER_CLIENT } from './docker.constants';
-import { ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
-import { RecreateDto } from './dto/recreate.dto';
+import { ApiBody, ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
+import { ZodValidationPipe } from 'src/common/pipes/zod-validation.pipe';
+import { recreateBodySchema } from './docker.schema';
+import { RecreateDto} from './dto/recreate.dto';
 
 @ApiTags('Docker')
 @Controller('docker')
@@ -47,14 +49,60 @@ export class DockerController {
    * Recria o container preservando config, mas usando a imagem informada.
    * Isso é a base do "update engine" (manual primeiro; depois vira automático).
    */
-  @Post('containers/:name/recreate')
-  @ApiOperation({ summary: 'Recreate a container with a new image' })
-  @ApiResponse({ status: 201, description: 'Container recreated successfully.' })
-  @ApiResponse({ status: 404, description: 'Container not found.' })
-  async recreate(@Param('name') name: string, @Body() body: RecreateDto) {
-    return this.updater.recreateContainerWithImage(name, body.image);
-  }
+@Post("containers/:name/recreate")
+@ApiOperation({ summary: "Recreate a container with a new image" })
+@ApiResponse({ status: 201, description: "Container recreated successfully." })
+@ApiResponse({ status: 404, description: "Container not found." })
+@ApiBody({ type: RecreateDto }) // Swagger continua usando class
+async recreate(
+  @Param("name") name: string,
+  @Body(new ZodValidationPipe(recreateBodySchema)) body: RecreateDto, // Zod valida o body
+) {
+    const targetFromBody = body.image?.trim();
+    const force = body.force ?? false;
+    const pull = body.pull ?? true;
 
+    // 1) Descobre targetImage (se não veio no body, usa a do container)
+    let targetImage = targetFromBody;
+    if (!targetImage) {
+      const c = this.docker.getContainer(name);
+      const inspect = await c.inspect();
+      targetImage = inspect?.Config?.Image;
+    }
+
+    if (!targetImage) {
+      throw new BadRequestException("Unable to determine target image.");
+    }
+
+    // 2) Regra simples do MVP:
+    //    - Se o user tentou trocar a imagem manualmente (body.image diferente),
+    //      exige force=true (porque o hasUpdate é calculado sobre a imagem atual do container).
+    const check = await this.updater.canUpdateContainer(name);
+
+    const isChangingImage = targetFromBody && targetFromBody !== check.imageRef;
+    if (isChangingImage && !force) {
+      throw new BadRequestException(
+        `Changing container image requires force=true (current=${check.imageRef}, requested=${targetFromBody}).`,
+      );
+    }
+
+    // 3) Se NÃO está trocando imagem e a engine consegue checar local+remoto,
+    //    e não tem update, retorna NOOP (não puxa, não recria)
+    if (!isChangingImage && check.canCheckRemote && check.canCheckLocal && check.hasUpdate === false && !force) {
+      return {
+        status: "noop",
+        reason: "already_up_to_date",
+        container: name,
+        imageRef: check.imageRef,
+        remoteDigest: check.remoteDigest,
+        repoDigests: check.repoDigests,
+        hasUpdate: false,
+      };
+    }
+
+    // 4) Se chegou aqui: tem update OU force OU troca de imagem
+    return this.updater.recreateContainerWithImage(name, targetImage, { force, pull });
+  }
   /**
    * GET /docker/containers/:name/update-check
    *
@@ -73,90 +121,43 @@ export class DockerController {
     description: 'Returns update check status.',
   })
   @ApiResponse({ status: 404, description: 'Container not found.' })
-  async updateCheck(@Param('name') name: string) {
-    const c = this.docker.getContainer(name);
-    const inspect = await c.inspect();
+async updateCheck(@Param('name') name: string) {
+  const c = this.docker.getContainer(name)
+  const inspect = await c.inspect()
 
-    const imageRef = inspect?.Config?.Image as string; // ex "localhost:5000/docksentinel-nginx:stable"
-    const localImageId = inspect?.Image as string; // ex "sha256:...."
+  const imageRef = inspect?.Config?.Image as string
+  const localImageId = inspect?.Image as string
 
-    const remoteDigest = await this.digests.getRemoteDigest(imageRef);
+  const remoteDigest = await this.digests.getRemoteDigest(imageRef)
 
-    if (!remoteDigest) {
-      return {
-        container: name,
-        imageRef,
-        localImageId,
-        canCheckRemote: false,
-        canCheckLocal: true,
-        hasUpdate: false,
-        reason: 'remote_digest_not_found',
-      };
-    }
-
-    let repoDigests: string[] = [];
-    try {
-      const imgInspect = await this.docker.getImage(localImageId).inspect();
-      repoDigests = imgInspect?.RepoDigests ?? [];
-    } catch (err: any) {
-      const status = err?.statusCode ?? err?.status;
-      if (status === 404) {
-        return {
-          container: name,
-          imageRef,
-          localImageId,
-          remoteDigest,
-          canCheckRemote: true,
-          canCheckLocal: false,
-          hasUpdate: null, // <= importante: “desconhecido”
-          reason: 'local_image_not_found_for_container_image_id',
-          hint: 'O container está rodando, mas o Docker Engine não tem mais metadata da imagem. Recrie o container ou faça pull da tag original.',
-        };
-      }
-      throw err;
-    }
-    let localImageMissing = false;
-
-    try {
-      const img = this.docker.getImage(localImageId);
-      const imgInspect = await img.inspect();
-      repoDigests = imgInspect?.RepoDigests ?? [];
-    } catch (err: any) {
-      const status = err?.statusCode ?? err?.status;
-      if (status === 404) {
-        localImageMissing = true;
-      } else {
-        throw err;
-      }
-    }
-
-    if (localImageMissing) {
-      return {
-        container: name,
-        imageRef,
-        localImageId,
-        remoteDigest,
-        repoDigests: [],
-        canCheckRemote: true,
-        canCheckLocal: false,
-        hasUpdate: false,
-        reason: 'local_image_not_found_for_container_image_id',
-        hint: 'A imagem local do ID usado pelo container não está disponível no Docker Engine. Verifique se a API está usando o mesmo docker.sock do host.',
-      };
-    }
-
-    // ✅ use o método centralizado (não use !matches)
-    const hasUpdate = this.updater.hasUpdate(repoDigests, remoteDigest);
-
+  if (!remoteDigest) {
     return {
       container: name,
       imageRef,
       localImageId,
-      remoteDigest,
-      repoDigests,
-      canCheckRemote: true,
+      canCheckRemote: false,
       canCheckLocal: true,
-      hasUpdate,
-    };
+      hasUpdate: false,
+      reason: "remote_digest_not_found",
+    }
   }
+
+  const img = this.docker.getImage(localImageId)
+  const imgInspect = await img.inspect()
+
+  const repoDigests: string[] = imgInspect?.RepoDigests ?? []
+
+  const hasUpdate = this.updater.hasUpdate(repoDigests, remoteDigest)
+
+  return {
+    container: name,
+    imageRef,
+    localImageId,
+    remoteDigest,
+    repoDigests,
+    canCheckRemote: true,
+    canCheckLocal: true,
+    hasUpdate,
+  }
+}
 }
