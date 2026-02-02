@@ -6,13 +6,11 @@ datasource db {
   provider = "sqlite"
 }
 
-
 model GlobalSettings {
-  id Int @id @default(1)
+  id       Int    @id @default(1)
   /**
    * authMode:
    * - none | password | totp | both
-   *
    * Por enquanto string simples.
    * Depois podemos mudar pra enum.
    */
@@ -35,7 +33,29 @@ model GlobalSettings {
    */
   logLevel String @default("info")
 
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
   setupCompletedAt DateTime?
+}
+
+model UpdateJob {
+  id        String  @id @default(cuid())
+  status    String // queued | running | success | failed
+  container String
+  image     String?
+  force     Boolean @default(false)
+  pull      Boolean @default(true)
+
+  createdAt  DateTime  @default(now())
+  startedAt  DateTime?
+  finishedAt DateTime?
+
+  resultJson String?
+  error      String?
+
+  lockedAt DateTime?
+  lockedBy String? // ✅ ADICIONAR
+
+  @@index([status, createdAt])
+  @@index([lockedAt])
 }

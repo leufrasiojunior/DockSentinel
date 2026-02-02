@@ -1,6 +1,8 @@
-import { Injectable, Logger } from "@nestjs/common";
-import { DockerUpdateService } from "../docker/docker-update.service";
-import { UpdateJob, UpdateJobPayload } from "./updates.types";
+import { Injectable, Logger } from '@nestjs/common';
+import { DockerUpdateService } from '../docker/docker-update.service';
+import { UpdateJob, UpdateJobPayload } from './updates.types';
+import { UpdatesRepository } from './updates.repository';
+import { UpdatesWorkerService } from './updates.worker.service';
 
 @Injectable()
 export class UpdatesQueueService {
@@ -10,14 +12,18 @@ export class UpdatesQueueService {
   private queue: string[] = [];
   private jobs = new Map<string, UpdateJob>();
 
-  constructor(private readonly updater: DockerUpdateService) {}
+  constructor(
+    private readonly updater: DockerUpdateService,
+    private readonly repo: UpdatesRepository,
+    private readonly worker: UpdatesWorkerService,
+  ) {}
 
   createJob(payload: UpdateJobPayload): UpdateJob {
     const id = `job_${Date.now()}_${Math.random().toString(16).slice(2)}`;
 
     const job: UpdateJob = {
       id,
-      status: "queued",
+      status: 'queued',
       createdAt: new Date().toISOString(),
       payload,
     };
@@ -50,7 +56,7 @@ export class UpdatesQueueService {
         const job = this.jobs.get(id);
         if (!job) continue;
 
-        job.status = "running";
+        job.status = 'running';
         job.startedAt = new Date().toISOString();
 
         try {
@@ -58,7 +64,7 @@ export class UpdatesQueueService {
 
           // se image não vier, seu service já sabe descobrir no controller,
           // mas aqui a gente exige mandar (ou você pode replicar a lógica aqui)
-          const targetImage = image ?? "";
+          const targetImage = image ?? '';
 
           const result = await this.updater.recreateContainerWithImage(
             container,
@@ -67,10 +73,10 @@ export class UpdatesQueueService {
           );
 
           job.result = result;
-          job.status = "success";
+          job.status = 'success';
         } catch (err: any) {
           job.error = err?.message ?? String(err);
-          job.status = "failed";
+          job.status = 'failed';
           this.logger.error(`[${job.id}] failed: ${job.error}`);
         } finally {
           job.finishedAt = new Date().toISOString();
@@ -79,5 +85,26 @@ export class UpdatesQueueService {
     } finally {
       this.running = false;
     }
+  }
+
+  async enqueueBatch(payload: {
+    containers: string[];
+    image?: string;
+    force?: boolean;
+    pull?: boolean;
+  }) {
+    const items = payload.containers.map((c) => ({
+      container: c,
+      image: payload.image ?? null,
+      force: payload.force,
+      pull: payload.pull,
+    }));
+
+    const res = await this.repo.enqueueMany(items);
+
+    // ✅ liga o worker imediatamente (sem travar request)
+    this.worker.kick();
+
+    return res;
   }
 }
