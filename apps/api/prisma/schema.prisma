@@ -89,6 +89,12 @@ model UpdateSchedulerConfig {
   scanLabelKey   String @default("docksentinel.scan")
   updateLabelKey String @default("docksentinel.update")
 
+   // ✅ controle de execução (recomendado)
+  lastRunAt   DateTime?
+  running     Boolean  @default(false)
+  lockedAt    DateTime?
+  lockedBy    String?
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 }

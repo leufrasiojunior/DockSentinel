@@ -9,10 +9,11 @@ import { UpdatesSchedulerService } from "./updates.scheduler.service";
 import { UpdatesQueueService } from "./updates.queue.service";
 import { UpdatesSchedulerRepository } from "./updates.scheduler.repository";
 import { UpdatesOrchestratorService } from "./updates.orchestrator.service";
+import { UpdatesSchedulerController } from "./updates.scheduler.controller";
 
 @Module({
   imports: [DockerModule, PrismaModule],
-  controllers: [UpdatesController],
+  controllers: [UpdatesController, UpdatesSchedulerController],
   providers: [
     UpdatesRepository,
     UpdatesQueueService,
@@ -21,7 +22,7 @@ import { UpdatesOrchestratorService } from "./updates.orchestrator.service";
     UpdatesSchedulerService,
     UpdatesOrchestratorService,
   ],
-  exports: [UpdatesWorkerService],
+  exports: [UpdatesWorkerService, UpdatesSchedulerService],
 })
 
 export class UpdatesModule {}

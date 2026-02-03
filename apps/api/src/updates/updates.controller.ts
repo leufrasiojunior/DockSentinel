@@ -14,7 +14,8 @@ import {
 } from './dto/updates.dto';
 import { UpdatesSchedulerService } from './updates.scheduler.service';
 import { UpdatesOrchestratorService } from './updates.orchestrator.service';
-import { UpdateSchedulerDto, updateSchedulerSchema } from './dto/UpdateSchedulerDto.dto';
+import { SchedulerConfigDto, schedulerPatchSchema } from './dto/updates-scheduler.dto';
+
 
 @ApiTags('updates')
 @Controller('updates')
@@ -22,7 +23,7 @@ export class UpdatesController {
   constructor(
     private readonly repo: UpdatesRepository,
     private readonly worker: UpdatesWorkerService,
-private readonly scheduler: UpdatesSchedulerService,
+    private readonly scheduler: UpdatesSchedulerService,
     private readonly orchestrator: UpdatesOrchestratorService,
   ) {}
 
@@ -94,59 +95,58 @@ private readonly scheduler: UpdatesSchedulerService,
    * - Enfileira SOMENTE os que hasUpdate=true
    * - Dispara worker.kick() sem await (assíncrono)
    */
-  @Get("scheduler")
-  @ApiOperation({ summary: "Get scheduler config (DB)" })
+  @Get('scheduler')
+  @ApiOperation({ summary: 'Get scheduler config (DB)' })
   async getScheduler() {
-    return this.scheduler.getConfig()
+    return this.scheduler.getConfig();
   }
 
-  @Put("scheduler")
-  @ApiOperation({ summary: "Update scheduler config (DB) and apply immediately" })
-  @ApiBody({ type: UpdateSchedulerDto })
-  async updateScheduler(
-    @Body(new ZodValidationPipe(updateSchedulerSchema)) body: UpdateSchedulerDto,
-  ) {
-    return this.scheduler.updateConfig(body)
-  }
-
-@Post("scan-and-enqueue")
-@ApiOperation({
-  summary:
-    "Scan containers and optionally enqueue update jobs (DB config by default). " +
-    "Auto-update is skipped when container has label docksentinel.update=false",
-})
-async scanAndEnqueue(
-  @Body()
-  body?: Partial<{
-    mode: "scan_only" | "scan_and_update"
-    updateLabelKey: string
-  }>,
-) {
-  // ✅ 1) body vazio ou não enviado -> usa DB
-  if (!body || Object.keys(body).length === 0) {
-    return this.orchestrator.scanAndEnqueueFromDb()
-  }
-
-  // ✅ 2) valida o mode se veio (evita "string qualquer" no Postman)
-  if (body.mode && body.mode !== "scan_only" && body.mode !== "scan_and_update") {
-    // use BadRequestException se quiser status 400 bonitinho
-    throw new Error(`Invalid mode: ${String(body.mode)}`)
-  }
-
-  // ✅ 3) override manual (útil pra Postman)
-  // - mode default: scan_only
-  // - updateLabelKey default: docksentinel.update
-  return this.orchestrator.scanAndEnqueue({
-    mode: body.mode ?? "scan_only",
-    updateLabelKey: (body.updateLabelKey?.trim() || "docksentinel.update"),
+  @Put('scheduler')
+  @ApiOperation({
+    summary: 'Update scheduler config (DB) and apply immediately',
   })
-}
+  @ApiBody({ type: SchedulerConfigDto })
+  async updateScheduler(
+    @Body(new ZodValidationPipe(schedulerPatchSchema))
+    body: SchedulerConfigDto,
+  ) {
+    return this.scheduler.updateConfig(body);
+  }
 
+  @Post('scan-and-enqueue')
+  @ApiOperation({
+    summary:
+      'Scan containers and optionally enqueue update jobs (DB config by default). ' +
+      'Auto-update is skipped when container has label docksentinel.update=false',
+  })
+  async scanAndEnqueue(
+    @Body()
+    body?: Partial<{
+      mode: 'scan_only' | 'scan_and_update';
+      updateLabelKey: string;
+    }>,
+  ) {
+    // ✅ 1) body vazio ou não enviado -> usa DB
+    if (!body || Object.keys(body).length === 0) {
+      return this.orchestrator.scanAndEnqueueFromDb();
+    }
 
+    // ✅ 2) valida o mode se veio (evita "string qualquer" no Postman)
+    if (
+      body.mode &&
+      body.mode !== 'scan_only' &&
+      body.mode !== 'scan_and_update'
+    ) {
+      // use BadRequestException se quiser status 400 bonitinho
+      throw new Error(`Invalid mode: ${String(body.mode)}`);
+    }
 
-
-
-
-
-
+    // ✅ 3) override manual (útil pra Postman)
+    // - mode default: scan_only
+    // - updateLabelKey default: docksentinel.update
+    return this.orchestrator.scanAndEnqueue({
+      mode: body.mode ?? 'scan_only',
+      updateLabelKey: body.updateLabelKey?.trim() || 'docksentinel.update',
+    });
+  }
 }

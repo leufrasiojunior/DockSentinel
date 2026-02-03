@@ -1,15 +1,20 @@
-import { Injectable, Logger, OnModuleInit } from "@nestjs/common"
+import { BadRequestException, Injectable, Logger, OnModuleInit } from "@nestjs/common"
 import { SchedulerRegistry } from "@nestjs/schedule"
-import { CronJob } from "cron"
+import { CronJob, CronTime } from "cron"
 import { UpdatesSchedulerRepository } from "./updates.scheduler.repository"
 import { UpdatesOrchestratorService } from "./updates.orchestrator.service"
-
 
 const JOB_NAME = "updates_scan_job"
 
 @Injectable()
 export class UpdatesSchedulerService implements OnModuleInit {
   private readonly logger = new Logger(UpdatesSchedulerService.name)
+
+  // evita concorrência (updateConfig chamando apply enquanto outro apply roda)
+  private applying = false
+
+  // evita sobreposição (scan longo + cron batendo de novo)
+  private ticking = false
 
   constructor(
     private readonly repo: UpdatesSchedulerRepository,
@@ -18,7 +23,6 @@ export class UpdatesSchedulerService implements OnModuleInit {
   ) {}
 
   async onModuleInit() {
-    // garante que existe a row singleton
     await this.repo.upsert({})
     await this.applyFromDb()
   }
@@ -28,59 +32,100 @@ export class UpdatesSchedulerService implements OnModuleInit {
   }
 
   async updateConfig(patch: any) {
-    // validações extras aqui (cron, coerência, etc)
     if (patch.cronExpr) this.assertCronValid(patch.cronExpr)
-
     const saved = await this.repo.upsert(patch)
     await this.applyFromDb()
     return saved
   }
 
   async applyFromDb() {
-    const cfg = await this.repo.get()
-    if (!cfg) return
+    if (this.applying) return
+    this.applying = true
 
-    // remove job antigo se existir
-    this.stop()
+    try {
+      const cfg = await this.repo.get()
+      if (!cfg) return
 
-    if (!cfg.enabled) {
-      this.logger.log("Scheduler disabled (db)")
-      return
-    }
+      const job = this.getOrCreateJob()
 
-    this.logger.log(`Scheduler enabled (db). cron=${cfg.cronExpr} mode=${cfg.mode} scope=${cfg.scope}`)
+      // sempre para antes de reaplicar
+      job.stop()
 
-    const job = new CronJob(cfg.cronExpr, async () => {
+      if (!cfg.enabled) {
+        this.logger.log("Scheduler disabled (db)")
+        return
+      }
+
+      // valida de verdade (mais forte que split em 5 campos)
+      const cronTime = new CronTime(cfg.cronExpr)
+
+      // troca o cron sem recriar job (ponto principal!)
+      job.setTime(cronTime)
+
+      job.start()
+
+      let next: any
       try {
-        // scan-and-enqueue usa a config do DB
+        next = job.nextDate()?.toJSDate?.() ?? job.nextDate()
+      } catch {}
+      this.logger.log(
+        `Scheduler enabled (db). cron=${cfg.cronExpr} mode=${cfg.mode} scope=${cfg.scope} next=${next ?? "?"}`,
+      )
+    } finally {
+      this.applying = false
+    }
+  }
+
+  stop() {
+    const job = this.tryGetJob()
+    if (!job) return
+    job.stop()
+    this.logger.log("Scheduler job stopped")
+  }
+
+  // -------------------------
+  // Helpers
+  // -------------------------
+
+  private tryGetJob(): CronJob | null {
+    try {
+      return this.schedule.getCronJob(JOB_NAME)
+    } catch {
+      return null
+    }
+  }
+
+  private getOrCreateJob(): CronJob {
+    const existing = this.tryGetJob()
+    if (existing) return existing
+
+    // cria uma vez com qualquer cron “placeholder” (vai ser substituído por setTime)
+    const job = new CronJob("*/5 * * * *", async () => {
+      if (this.ticking) return
+      this.ticking = true
+
+      try {
         await this.orchestrator.scanAndEnqueueFromDb()
       } catch (err: any) {
         this.logger.error(`Scheduled scan failed: ${err?.message ?? err}`)
+      } finally {
+        this.ticking = false
       }
     })
 
     this.schedule.addCronJob(JOB_NAME, job)
-    job.start()
+    this.logger.log("Scheduler job registered (created once)")
+    return job
   }
 
-  stop() {
-    try {
-      const job = this.schedule.getCronJob(JOB_NAME)
-      job.stop()
-      this.schedule.deleteCronJob(JOB_NAME)
-      this.logger.log("Scheduler job removed")
-    } catch {
-      // não existia, ok
-    }
+private assertCronValid(expr: string) {
+  try {
+    // Se for inválida, o cron lib tende a lançar aqui
+    // onTick vazio só pra validar
+    const job = new CronJob(expr, () => {})
+    job.stop()
+  } catch (e: any) {
+    throw new BadRequestException(`Invalid cronExpr: ${expr}. ${e?.message ?? e}`)
   }
-
-  private assertCronValid(expr: string) {
-    // Validação mínima sem depender de libs extras:
-    // - 5 campos
-    // - não vazio
-    const parts = expr.trim().split(/\s+/)
-    if (parts.length !== 5) {
-      throw new Error(`Invalid cronExpr: expected 5 fields, got ${parts.length}`)
-    }
-  }
+}
 }
