@@ -59,3 +59,37 @@ model UpdateJob {
   @@index([status, createdAt])
   @@index([lockedAt])
 }
+
+model UpdateSchedulerConfig {
+  id Int @id @default(1)
+
+  enabled Boolean @default(false)
+
+  /**
+   * Cron no formato padrão (5 campos):
+   * ex: "*\/5 * * * *"
+   */
+  cronExpr String @default("*/5 * * * *")
+
+  /**
+   * scan_only | scan_and_update
+   */
+  mode String @default("scan_only")
+
+  /**
+   * all | labeled
+   */
+  scope String @default("all")
+
+  /**
+   * Seleção por labels (quando scope=labeled)
+   * Ex.: docksentinel.scan=true para entrar no scan
+   * Ex.: docksentinel.update=true para permitir update automático
+   */
+  scanLabelKey   String @default("docksentinel.scan")
+  updateLabelKey String @default("docksentinel.update")
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+

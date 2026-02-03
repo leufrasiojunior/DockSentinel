@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Param, Post, Query } from '@nestjs/common';
+import { Body, Controller, Get, Param, Post, Put, Query } from '@nestjs/common';
 import { ApiBody, ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
 import { UpdatesRepository } from './updates.repository';
 import { UpdatesWorkerService } from './updates.worker.service';
@@ -12,8 +12,9 @@ import {
   jobsQuerySchema,
   type JobsQuery,
 } from './dto/updates.dto';
-import { DockerService } from '../docker/docker.service';
-import { DockerUpdateService } from '../docker/docker-update.service';
+import { UpdatesSchedulerService } from './updates.scheduler.service';
+import { UpdatesOrchestratorService } from './updates.orchestrator.service';
+import { UpdateSchedulerDto, updateSchedulerSchema } from './dto/UpdateSchedulerDto.dto';
 
 @ApiTags('updates')
 @Controller('updates')
@@ -21,8 +22,8 @@ export class UpdatesController {
   constructor(
     private readonly repo: UpdatesRepository,
     private readonly worker: UpdatesWorkerService,
-    private readonly dockerService: DockerService,
-    private readonly updater: DockerUpdateService,
+private readonly scheduler: UpdatesSchedulerService,
+    private readonly orchestrator: UpdatesOrchestratorService,
   ) {}
 
   @Post('enqueue')
@@ -93,94 +94,59 @@ export class UpdatesController {
    * - Enfileira SOMENTE os que hasUpdate=true
    * - Dispara worker.kick() sem await (assíncrono)
    */
-  @Post('scan-and-enqueue')
-  @ApiOperation({
-    summary: 'Scan containers and enqueue update jobs for those with updates',
-  })
-  @ApiResponse({
-    status: 201,
-    description: 'Scan completed and jobs enqueued (if any).',
-  })
-  async scanAndEnqueue(
-    @Body()
-    body?: {
-      force?: boolean;
-      pull?: boolean;
-      // opcional: se quiser filtrar por nomes (bom pra testes)
-      only?: string[];
-    },
-  ) {
-    const force = body?.force ?? false;
-    const pull = body?.pull ?? true;
-    const only = body?.only?.length ? new Set(body.only) : null;
-
-    // 1) lista containers
-    const containers = await this.dockerService.listContainers();
-    // normalize nome (docker normalmente devolve ["\/name"])
-    const names = containers
-      .map((c: any) => {
-        const raw = Array.isArray(c.name) ? c.name[0] : c.name;
-        if (!raw) return null;
-        return String(raw).replace(/^\//, '');
-      })
-      .filter(Boolean) as string[];
-    const scanned: any[] = [];
-    const toEnqueue: {
-      container: string;
-      image?: string | null;
-      force?: boolean;
-      pull?: boolean;
-    }[] = [];
-    const errors: any[] = [];
-
-    // 2) checa update container a container
-    for (const name of names) {
-      if (only && !only.has(name)) continue;
-
-      try {
-        const check = await this.updater.canUpdateContainer(name);
-
-        scanned.push({
-          container: name,
-          imageRef: check.imageRef,
-          canCheckRemote: check.canCheckRemote,
-          canCheckLocal: check.canCheckLocal,
-          hasUpdate: check.hasUpdate,
-          reason: (check as any).reason,
-        });
-
-        // Só enfileira se dá pra checar e tem update de verdade
-        if (check.canCheckRemote && check.canCheckLocal && check.hasUpdate) {
-          toEnqueue.push({
-            container: name,
-            image: check.imageRef, // ✅ importante: salva a tag atual do container (ex: ghcr.io/...:latest)
-            force,
-            pull,
-          });
-        }
-      } catch (err: any) {
-        errors.push({
-          container: name,
-          error: err?.message ?? String(err),
-        });
-      }
-    }
-
-    // 3) enqueue (com idempotência)
-    const enqueueResult = await this.repo.enqueueMany(toEnqueue);
-
-    // 4) dispara o worker sem travar request
-    this.worker.kick().catch((err) => {
-      console.error('[UpdatesWorker] kick failed', err);
-    });
-
-    return {
-      scannedCount: scanned.length,
-      candidatesCount: toEnqueue.length,
-      queued: enqueueResult.queued,
-      skipped: enqueueResult.skipped,
-      errors,
-      scanned,
-    };
+  @Get("scheduler")
+  @ApiOperation({ summary: "Get scheduler config (DB)" })
+  async getScheduler() {
+    return this.scheduler.getConfig()
   }
+
+  @Put("scheduler")
+  @ApiOperation({ summary: "Update scheduler config (DB) and apply immediately" })
+  @ApiBody({ type: UpdateSchedulerDto })
+  async updateScheduler(
+    @Body(new ZodValidationPipe(updateSchedulerSchema)) body: UpdateSchedulerDto,
+  ) {
+    return this.scheduler.updateConfig(body)
+  }
+
+@Post("scan-and-enqueue")
+@ApiOperation({
+  summary:
+    "Scan containers and optionally enqueue update jobs (DB config by default). " +
+    "Auto-update is skipped when container has label docksentinel.update=false",
+})
+async scanAndEnqueue(
+  @Body()
+  body?: Partial<{
+    mode: "scan_only" | "scan_and_update"
+    updateLabelKey: string
+  }>,
+) {
+  // ✅ 1) body vazio ou não enviado -> usa DB
+  if (!body || Object.keys(body).length === 0) {
+    return this.orchestrator.scanAndEnqueueFromDb()
+  }
+
+  // ✅ 2) valida o mode se veio (evita "string qualquer" no Postman)
+  if (body.mode && body.mode !== "scan_only" && body.mode !== "scan_and_update") {
+    // use BadRequestException se quiser status 400 bonitinho
+    throw new Error(`Invalid mode: ${String(body.mode)}`)
+  }
+
+  // ✅ 3) override manual (útil pra Postman)
+  // - mode default: scan_only
+  // - updateLabelKey default: docksentinel.update
+  return this.orchestrator.scanAndEnqueue({
+    mode: body.mode ?? "scan_only",
+    updateLabelKey: (body.updateLabelKey?.trim() || "docksentinel.update"),
+  })
+}
+
+
+
+
+
+
+
+
 }

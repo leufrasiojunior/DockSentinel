@@ -3,20 +3,32 @@ import Docker from "dockerode"
 import type { ContainerDetailsDto } from "./dto/container-details.dto"
 import { RecreatePlanDto } from "./dto/recreate-plan.dto"
 
+export type ContainerSummary = {
+  id: string
+  name: string
+  image: string
+  state: string
+  status: string
+  labels: Record<string, string>
+}
+
+
 @Injectable()
 export class DockerService {
   private readonly docker = new Docker({ socketPath: "/var/run/docker.sock" })
 
-  async listContainers() {
-    const items = await this.docker.listContainers({ all: true })
-    return items.map((c) => ({
-      id: c.Id,
-      name: c.Names?.[0]?.replace(/^\//, "") ?? c.Id.slice(0, 12),
-      image: c.Image,
-      state: c.State,
-      status: c.Status,
-    }))
-  }
+async listContainers(): Promise<ContainerSummary[]> {
+  const items = await this.docker.listContainers({ all: true })
+  return items.map((c) => ({
+    id: c.Id,
+    name: c.Names?.[0]?.replace(/^\//, "") ?? c.Id.slice(0, 12),
+    image: c.Image,
+    state: c.State,
+    status: c.Status,
+    labels: c.Labels ?? {},
+  }))
+}
+
 
   /**
    * Faz "docker inspect" do container e extrai os campos que vamos precisar
