@@ -34,7 +34,7 @@ describe("AuthService (unit)", () => {
      * Dependendo da versão, `authenticator.generate(secret)` pode dar typing estranho.
      * Então fazemos cast seguro aqui porque no runtime funciona.
      */
-    const token = (authenticator as any).generate(secret) as string
+    const token = authenticator.generate(secret)
 
     await expect(auth.validateLogin({ totp: token })).resolves.toBeUndefined()
     await expect(auth.validateLogin({ totp: "000000" })).rejects.toBeTruthy()

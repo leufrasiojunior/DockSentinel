@@ -2,6 +2,10 @@ import { Inject, Injectable, Logger } from "@nestjs/common"
 import Docker from "dockerode"
 import { DOCKER_CLIENT } from "./docker.constants"
 
+type DistributionDescriptor = { Digest?: string; digest?: string }
+type DistributionResponse = { Descriptor?: DistributionDescriptor }
+type ErrorWithStatus = { statusCode?: number; status?: number; message?: string }
+
 @Injectable()
 export class DockerDigestService {
   private readonly logger = new Logger(DockerDigestService.name)
@@ -18,11 +22,11 @@ export class DockerDigestService {
     const encoded = encodeURIComponent(imageRef)
     const path = `/distribution/${encoded}/json`
 
-    let data: any
+    let data: unknown
     try {
       data = await this.dialEngineJson(path)
-    } catch (err: any) {
-      const status = err?.statusCode ?? err?.status
+    } catch (err: unknown) {
+      const status = this.getErrorStatus(err)
       if (status === 404) {
         this.logger.warn(
           `Distribution not found for ${imageRef} (404). Provavelmente é uma tag só local.`,
@@ -32,10 +36,8 @@ export class DockerDigestService {
       throw err
     }
 
-
-    // Estrutura típica: data.Descriptor.Digest
-    const digest = data?.Descriptor?.digest ?? data?.Descriptor?.Digest;
-    if (!digest || typeof digest !== "string") {
+    const digest = this.extractDigest(data)
+    if (!digest) {
       throw new Error(`Remote digest not found for imageRef=${imageRef}`)
     }
     return digest
@@ -45,7 +47,7 @@ export class DockerDigestService {
    * Chamada raw na Docker Engine API via modem.
    * IMPORTANTE: passar statusCodes, senão o docker-modem pode quebrar ao receber 404.
    */
-  private dialEngineJson(path: string): Promise<any> {
+  private dialEngineJson(path: string): Promise<unknown> {
     return new Promise((resolve, reject) => {
       this.docker.modem.dial(
         {
@@ -58,7 +60,7 @@ export class DockerDigestService {
             404: "not found",
           },
         },
-        (err: any, body: any) => {
+        (err: unknown, body: unknown) => {
           if (err) return reject(err)
 
           try {
@@ -70,5 +72,18 @@ export class DockerDigestService {
         },
       )
     })
+  }
+
+  private extractDigest(data: unknown): string | null {
+    if (!data || typeof data !== "object") return null
+    const maybe = data as DistributionResponse
+    const digest = maybe.Descriptor?.digest ?? maybe.Descriptor?.Digest
+    return typeof digest === "string" ? digest : null
+  }
+
+  private getErrorStatus(err: unknown): number | undefined {
+    if (!err || typeof err !== "object") return undefined
+    const maybe = err as ErrorWithStatus
+    return maybe.statusCode ?? maybe.status
   }
 }

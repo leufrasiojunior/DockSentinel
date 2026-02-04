@@ -1,5 +1,6 @@
 import { Injectable, Logger } from "@nestjs/common";
 import { DockerService } from "../docker/docker.service";
+import type { ContainerSummary } from "../docker/docker.service";
 import { DockerUpdateService } from "../docker/docker-update.service";
 import { UpdatesRepository } from "./updates.repository";
 import { UpdatesWorkerService } from "./updates.worker.service";
@@ -32,17 +33,11 @@ export class UpdatesScanService {
 
     const containers = await this.dockerService.listContainers();
 
-    // escolha “Name” do jeito que sua listContainers retorna.
-    // dockerode listContainers costuma dar Names[0] tipo "/homarr"
-    const names = containers
-      .map((c: any) => (c?.Names?.[0] ?? "").replace(/^\//, ""))
-      .filter(Boolean);
+    const filtered: ContainerSummary[] = onlyRunning
+      ? containers.filter((c) => c.state === "running")
+      : containers;
 
-    const filtered = onlyRunning
-      ? names.filter((_, idx) => containers[idx]?.state === "running")
-      : names;
-
-    const targets = filtered.slice(0, limit);
+    const targets = filtered.map((c) => c.name).slice(0, limit);
 
     const itemsToEnqueue: {
       container: string;
@@ -51,7 +46,11 @@ export class UpdatesScanService {
       pull?: boolean;
     }[] = [];
 
-    const skipped: any[] = [];
+    const skipped: Array<{
+      container: string;
+      reason: "cannot_check" | "up_to_date" | "scan_error";
+      error?: string;
+    }> = [];
 
     // v0: sequencial (mais simples e confiável).
     // Depois a gente coloca concorrência limitada (p-limit).
@@ -75,8 +74,9 @@ export class UpdatesScanService {
           pull,
           force,
         });
-      } catch (e: any) {
-        skipped.push({ container: name, reason: "scan_error", error: e?.message ?? String(e) });
+      } catch (e: unknown) {
+        const msg = e instanceof Error ? e.message : String(e);
+        skipped.push({ container: name, reason: "scan_error", error: msg });
       }
     }
 

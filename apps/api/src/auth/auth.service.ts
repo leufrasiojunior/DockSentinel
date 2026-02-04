@@ -57,8 +57,9 @@ async validateLogin(input: { password?: string; totp?: string }): Promise<void> 
     try {
       secret = this.crypto.decrypt(row.totpSecretEnc)
       this.logger.debug(`[validateLogin] decrypt_ok=true secretLen=${secret.length}`)
-    } catch (e: any) {
-      this.logger.error(`[validateLogin] decrypt_ok=false err=${e?.message ?? e}`)
+    } catch (e: unknown) {
+      const msg = e instanceof Error ? e.message : String(e)
+      this.logger.error(`[validateLogin] decrypt_ok=false err=${msg}`)
       throw new UnauthorizedException("Invalid credentials")
     }
 

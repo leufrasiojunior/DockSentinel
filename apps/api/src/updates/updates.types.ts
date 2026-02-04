@@ -1,3 +1,5 @@
+import type { ContainerUpdateResult } from "../docker/docker-update.service";
+
 export type UpdateJobStatus = "queued" | "running" | "success" | "failed";
 
 export type UpdateJobPayload = {
@@ -16,6 +18,6 @@ export type UpdateJob = {
 
   payload: UpdateJobPayload;
 
-  result?: any; // depois tipa com o retorno do recreateContainerWithImage
+  result?: ContainerUpdateResult;
   error?: string;
 };

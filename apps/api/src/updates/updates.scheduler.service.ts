@@ -6,8 +6,14 @@ import {
 } from '@nestjs/common';
 import { SchedulerRegistry } from '@nestjs/schedule';
 import { CronJob, CronTime } from 'cron';
-import { UpdatesSchedulerRepository } from './updates.scheduler.repository';
-import { UpdatesOrchestratorService } from './updates.orchestrator.service';
+import {
+  UpdatesSchedulerRepository,
+  type SchedulerPatch,
+} from './updates.scheduler.repository';
+import {
+  UpdatesOrchestratorService,
+  type ScanAndEnqueueResult,
+} from './updates.orchestrator.service';
 
 const JOB_NAME = 'updates_scan_job';
 
@@ -16,6 +22,7 @@ export class UpdatesSchedulerService implements OnModuleInit {
   private readonly logger = new Logger(UpdatesSchedulerService.name);
 
   private applying = false;
+  private applyQueued = false;
   private ticking = false;
 
   // observabilidade simples (memória)
@@ -23,7 +30,7 @@ export class UpdatesSchedulerService implements OnModuleInit {
   private lastRunAt: Date | null = null;
   private lastFinishedAt: Date | null = null;
   private lastError: string | null = null;
-  private lastResult: any | null = null;
+  private lastResult: ScanAndEnqueueResult | null = null;
 
   constructor(
     private readonly repo: UpdatesSchedulerRepository,
@@ -64,7 +71,7 @@ export class UpdatesSchedulerService implements OnModuleInit {
     };
   }
 
-  async updateConfig(patch: any) {
+  async updateConfig(patch: SchedulerPatch) {
     // valida cron se veio
     if (patch.cronExpr !== undefined) {
       this.assertCronValid(patch.cronExpr);
@@ -76,7 +83,10 @@ export class UpdatesSchedulerService implements OnModuleInit {
   }
 
   async applyFromDb() {
-    if (this.applying) return;
+    if (this.applying) {
+      this.applyQueued = true;
+      return;
+    }
     this.applying = true;
 
     try {
@@ -102,12 +112,16 @@ export class UpdatesSchedulerService implements OnModuleInit {
       this.logger.log(
         `Scheduler enabled (db). cron=${cfg.cronExpr} mode=${cfg.mode} scope=${cfg.scope} next=${next ?? '?'}`,
       );
-    } catch (err: any) {
+    } catch (err: unknown) {
       // se algo der errado ao aplicar cron, loga (e não derruba app)
-      this.logger.error(`applyFromDb failed: ${err?.message ?? err}`);
+      this.logger.error(`applyFromDb failed: ${this.getErrorMessage(err)}`);
       throw err;
     } finally {
       this.applying = false;
+      if (this.applyQueued) {
+        this.applyQueued = false;
+        await this.applyFromDb();
+      }
     }
   }
 
@@ -163,8 +177,8 @@ export class UpdatesSchedulerService implements OnModuleInit {
         this.logger.log(
           `[scheduler] tick ok mode=${mode} scanned=${scanned} queued=${queuedCount}`,
         );
-      } catch (err: any) {
-        const msg = err?.message ?? String(err);
+      } catch (err: unknown) {
+        const msg = this.getErrorMessage(err);
         this.lastError = msg;
         this.logger.error(`[scheduler] tick failed: ${msg}`);
       } finally {
@@ -194,10 +208,7 @@ export class UpdatesSchedulerService implements OnModuleInit {
     if (!job) return null;
     try {
       const next = job.nextDate?.();
-      // cron lib às vezes retorna Luxon-like; às vezes Date
-      // aqui tentamos converter com segurança
-      // @ts-ignore
-      return next?.toJSDate?.() ?? next ?? null;
+      return this.toDate(next);
     } catch {
       return null;
     }
@@ -210,37 +221,49 @@ export class UpdatesSchedulerService implements OnModuleInit {
     try {
       // ✅ isso valida mesmo (diferente do split em 5 campos)
       new CronTime(s);
-    } catch (err: any) {
+    } catch (err: unknown) {
       throw new BadRequestException(`Invalid cronExpr: ${s}`);
     }
   }
-private safeNextScan(job: CronJob): Date | null {
-  try {
-    const next = job.nextDate?.();
-    if (!next) return null;
-
-    // cron costuma retornar Luxon/Dayjs-like com toJSDate
-    if (typeof (next as any).toJSDate === "function") return (next as any).toJSDate();
-    if (next instanceof Date) return next;
-
-    // fallback: tenta converter
-    return new Date(String(next));
-  } catch {
-    return null;
+  private safeNextScan(job: CronJob): Date | null {
+    try {
+      const next = job.nextDate?.();
+      return this.toDate(next);
+    } catch {
+      return null;
+    }
   }
-}
 
-private logTickSummary(result: any) {
-  const scanned = result?.scanned ?? 0;
-  const mode = result?.mode ?? "?";
+  private logTickSummary(result: ScanAndEnqueueResult) {
+    const scanned = result?.scanned ?? 0;
+    const mode = result?.mode ?? '?';
 
-  // quando scan_only, queued costuma ser null
-  const queuedCount = result?.queued?.queued?.length ?? 0;
-  const skippedCount = result?.queued?.skipped?.length ?? 0;
+    // quando scan_only, queued costuma ser null
+    const queuedCount = result?.queued?.queued?.length ?? 0;
+    const skippedCount = result?.queued?.skipped?.length ?? 0;
 
-  this.logger.log(
-    `[SchedulerTick] mode=${mode} scanned=${scanned} queued=${queuedCount} skipped=${skippedCount}`,
-  );
-}
+    this.logger.log(
+      `[SchedulerTick] mode=${mode} scanned=${scanned} queued=${queuedCount} skipped=${skippedCount}`,
+    );
+  }
+
+  private toDate(value: unknown): Date | null {
+    if (!value) return null;
+    if (value instanceof Date) return value;
+    if (typeof value === 'object') {
+      const maybe = value as { toJSDate?: () => Date };
+      if (typeof maybe.toJSDate === 'function') return maybe.toJSDate();
+    }
+    const asString = String(value);
+    const parsed = new Date(asString);
+    return Number.isNaN(parsed.getTime()) ? null : parsed;
+  }
+
+  private getErrorMessage(err: unknown): string {
+    if (err instanceof Error) return err.message;
+    if (!err || typeof err !== 'object') return String(err);
+    const maybe = err as { message?: unknown };
+    return typeof maybe.message === 'string' ? maybe.message : String(err);
+  }
   
 }

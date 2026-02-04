@@ -1,5 +1,5 @@
 import { NestFactory } from '@nestjs/core';
-import { Logger } from '@nestjs/common';
+import { Logger, type LogLevel } from '@nestjs/common';
 import { AppModule } from './app.module';
 import { ConfigService } from '@nestjs/config';
 import { Env } from './config/env.schema';
@@ -79,7 +79,7 @@ async function bootstrap() {
   const level = config.getOrThrow('LOG_LEVEL', { infer: true });
 
   // Mapeia seu padrão (error|warn|info|debug) para níveis do Nest.
-  const nestLevels =
+  const nestLevels: LogLevel[] =
     level === 'error'
       ? ['error']
       : level === 'warn'
@@ -88,7 +88,7 @@ async function bootstrap() {
           ? ['error', 'warn', 'log', 'debug', 'verbose']
           : ['error', 'warn', 'log']; // "info" (default)
 
-  app.useLogger(nestLevels as any);
+  app.useLogger(nestLevels);
 
   /**
    * shutdown hooks:

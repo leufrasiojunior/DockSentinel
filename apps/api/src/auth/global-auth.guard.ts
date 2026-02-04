@@ -1,6 +1,7 @@
 import { CanActivate, ExecutionContext, Injectable, Logger } from "@nestjs/common"
 import { Reflector } from "@nestjs/core"
 import { IS_PUBLIC_KEY } from "../auth/public.decorator"
+import type { Request } from "express"
 
 import { SessionService } from "../auth/session.service"
 import { SettingsService } from "../settings/settings.service"
@@ -33,7 +34,7 @@ export class GlobalAuthGuard implements CanActivate {
     const authMode = await this.settings.getAuthMode()
     if (authMode === "none") return true
 
-    const req = context.switchToHttp().getRequest<any>()
+    const req = context.switchToHttp().getRequest<Request>()
     const sessionId = req.signedCookies?.ds_session
 
     const ok = this.sessions.validate(sessionId)

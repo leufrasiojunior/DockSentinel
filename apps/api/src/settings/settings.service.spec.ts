@@ -1,5 +1,8 @@
 import { SettingsService } from "./settings.service"
 import { CryptoService } from "../crypto/crypto.service"
+import type { SettingsRepository, SettingsPatch } from "./settings.repository"
+import type { ConfigService } from "@nestjs/config"
+import type { Env } from "../config/env.schema"
 
 describe("SettingsService (unit)", () => {
   beforeAll(() => {
@@ -12,12 +15,12 @@ describe("SettingsService (unit)", () => {
      * - upsert grava em `db`
      * - get devolve o que está em `db`
      */
-    const db: { value: any } = { value: null }
+    const db: { value: (SettingsPatch & { id: number }) | null } = { value: null }
 
 
-    const repo = {
+    const repo: Pick<SettingsRepository, "get" | "upsert"> = {
       get: jest.fn().mockImplementation(async () => db.value ?? null),
-      upsert: jest.fn().mockImplementation(async (patch: any) => {
+      upsert: jest.fn().mockImplementation(async (patch: SettingsPatch) => {
         // cria/atualiza o registro como Prisma faria
         db.value = {
           id: 1,
@@ -31,7 +34,15 @@ describe("SettingsService (unit)", () => {
     }
 
     const crypto = new CryptoService()
-    const svc = new SettingsService(repo as any, crypto)
+    const config = {
+      get: jest.fn().mockReturnValue("none"),
+      getOrThrow: jest.fn().mockReturnValue("none"),
+    } as unknown as ConfigService<Env>
+    const svc = new SettingsService(
+      repo as SettingsRepository,
+      crypto,
+      config,
+    )
 
     const result = await svc.updateSettings({
       authMode: "both",

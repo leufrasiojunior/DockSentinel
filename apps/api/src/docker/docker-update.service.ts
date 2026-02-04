@@ -4,6 +4,62 @@ import type { ContainerCreateOptions } from 'dockerode';
 import { DOCKER_CLIENT } from './docker.constants';
 import { DockerDigestService } from './docker-digest.service';
 
+type PortBinding = { HostPort?: string };
+type PortBindings = Record<string, Array<PortBinding> | null>;
+type NetworkAttachment = { IPAddress?: string; GlobalIPv6Address?: string };
+type NetworkMap = Record<string, NetworkAttachment>;
+type ProgressEvent = { status?: string; id?: string; progress?: string };
+type ErrorWithStatus = { statusCode?: number; status?: number; message?: string };
+
+export type ContainerUpdateCheckReason =
+  | 'registry_auth_required'
+  | 'remote_digest_error'
+  | 'remote_digest_not_found'
+  | 'local_image_missing'
+  | 'local_digest_error'
+  | 'local_repo_digests_empty'
+  | 'ok';
+
+export type ContainerUpdateCheck = {
+  container: string;
+  imageRef: string;
+  localImageId: string;
+  canCheckRemote: boolean;
+  canCheckLocal: boolean;
+  hasUpdate: boolean;
+  reason: ContainerUpdateCheckReason;
+  remoteDigest?: string;
+  repoDigests?: string[];
+  error?: string;
+};
+
+export type PullResult = { imageRef: string; pulledImageId?: string };
+export type PullInfo = PullResult | { skipped: true };
+export type ContainerUpdateInfo = {
+  containerId: string;
+  imageRef: string;
+  localImageId: string;
+};
+
+export type HealthReason = 'no-healthcheck' | 'healthy' | 'unhealthy' | 'timeout';
+
+export type ContainerUpdateResult =
+  | {
+      status: 'success';
+      pull: PullInfo;
+      old: ContainerUpdateInfo;
+      new: ContainerUpdateInfo;
+      health: HealthReason;
+      didChangeImageId: boolean;
+    }
+  | {
+      status: 'rolled_back';
+      pull: PullInfo;
+      old: ContainerUpdateInfo;
+      attemptedImage: string;
+      error: string;
+    };
+
 @Injectable()
 export class DockerUpdateService {
   private readonly logger = new Logger(DockerUpdateService.name);
@@ -18,10 +74,10 @@ export class DockerUpdateService {
    * - se o container usa bind de porta (HostPort), não dá pra subir outro em paralelo
    * - então paramos o antigo antes (downtime curto)
    */
-  private hasHostPorts(portBindings: Record<string, any> | undefined): boolean {
+  private hasHostPorts(portBindings: PortBindings | undefined): boolean {
     if (!portBindings) return false;
     return Object.values(portBindings).some(
-      (arr: any) => Array.isArray(arr) && arr.some((b) => b?.HostPort),
+      (arr) => Array.isArray(arr) && arr.some((b) => b?.HostPort),
     );
   }
 
@@ -29,9 +85,9 @@ export class DockerUpdateService {
    * Se o container tem IP fixo em alguma rede, geralmente você precisa parar o antigo
    * antes de criar o novo, senão o IP fica “ocupado”.
    */
-  private hasStaticIps(networks: Record<string, any> | undefined): boolean {
+  private hasStaticIps(networks: NetworkMap | undefined): boolean {
     if (!networks) return false;
-    return Object.values(networks).some((n: any) => {
+    return Object.values(networks).some((n) => {
       const ipv4 = (n?.IPAddress ?? '').trim();
       const ipv6 = (n?.GlobalIPv6Address ?? '').trim();
       return Boolean(ipv4 || ipv6);
@@ -42,7 +98,10 @@ export class DockerUpdateService {
    * Espera health ficar healthy (se existir).
    * Se a imagem não tem HEALTHCHECK, consideramos "ok" quando estiver running.
    */
-  private async waitForHealthy(container: Docker.Container, timeoutMs: number) {
+  private async waitForHealthy(
+    container: Docker.Container,
+    timeoutMs: number,
+  ): Promise<{ ok: boolean; reason: HealthReason }> {
     const start = Date.now();
 
     while (Date.now() - start < timeoutMs) {
@@ -66,7 +125,7 @@ export class DockerUpdateService {
     return { ok: false, reason: 'timeout' as const };
   }
 
-async canUpdateContainer(containerName: string) {
+async canUpdateContainer(containerName: string): Promise<ContainerUpdateCheck> {
   const c = this.docker.getContainer(containerName);
   const inspect = await c.inspect();
 
@@ -80,8 +139,8 @@ async canUpdateContainer(containerName: string) {
 
   try {
     remoteDigest = await this.digests.getRemoteDigest(imageRef);
-  } catch (err: any) {
-    const status = err?.statusCode ?? err?.status;
+  } catch (err: unknown) {
+    const status = this.getErrorStatus(err);
 
     // 401/403 normalmente = registry privado / precisa auth
     if (status === 401 || status === 403) {
@@ -105,7 +164,7 @@ async canUpdateContainer(containerName: string) {
       canCheckLocal: true,
       hasUpdate: false,
       reason: "remote_digest_error" as const,
-      error: err?.message ?? String(err),
+      error: this.getErrorMessage(err),
     };
   }
 
@@ -131,8 +190,8 @@ async canUpdateContainer(containerName: string) {
     const img = this.docker.getImage(localImageId);
     const imgInspect = await img.inspect();
     repoDigests = imgInspect?.RepoDigests ?? [];
-  } catch (err: any) {
-    const status = err?.statusCode ?? err?.status;
+  } catch (err: unknown) {
+    const status = this.getErrorStatus(err);
 
     // às vezes o engine responde "no such image" se imagem foi removida
     if (status === 404) {
@@ -159,7 +218,7 @@ async canUpdateContainer(containerName: string) {
       canCheckLocal: false,
       hasUpdate: false,
       reason: "local_digest_error" as const,
-      error: err?.message ?? String(err),
+      error: this.getErrorMessage(err),
     };
   }
 
@@ -204,7 +263,7 @@ async canUpdateContainer(containerName: string) {
    */
   async pullImage(
     imageRef: string,
-  ): Promise<{ imageRef: string; pulledImageId?: string }> {
+  ): Promise<PullResult> {
     this.logger.log(`Pulling image: ${imageRef}`);
 
     const stream = await this.docker.pull(imageRef);
@@ -212,8 +271,8 @@ async canUpdateContainer(containerName: string) {
     await new Promise<void>((resolve, reject) => {
       this.docker.modem.followProgress(
         stream,
-        (err: any) => (err ? reject(err) : resolve()),
-        (event: any) => {
+        (err: unknown) => (err ? reject(err) : resolve()),
+        (event: ProgressEvent) => {
           if (event?.status) {
             const id = event?.id ? ` (${event.id})` : '';
             const prog = event?.progress ? ` ${event.progress}` : '';
@@ -264,13 +323,15 @@ async canUpdateContainer(containerName: string) {
     containerName: string,
     targetImage: string,
     opts?: { force?: boolean; pull?: boolean },
-  ) {
+  ): Promise<ContainerUpdateResult> {
     // 0) PULL ANTES DE QUALQUER COISA (sem downtime se falhar)
   const force = opts?.force ?? false;
   const pull = opts?.pull ?? true;
 
   // ✅ Só faz pull se pull=true
-  const pullInfo = pull ? await this.pullImage(targetImage) : { skipped: true };
+  const pullInfo: PullInfo = pull
+    ? await this.pullImage(targetImage)
+    : { skipped: true };
 
     // 1) pega container atual
     const current = this.docker.getContainer(containerName);
@@ -382,10 +443,10 @@ async canUpdateContainer(containerName: string) {
         health: health.reason,
         didChangeImageId: oldLocalImageId !== newLocalImageId,
       };
-    } catch (err: any) {
+    } catch (err: unknown) {
       // rollback
       this.logger.error(
-        `Update failed. Rolling back... Reason: ${err?.message ?? err}`,
+        `Update failed. Rolling back... Reason: ${this.getErrorMessage(err)}`,
       );
 
       // remove o novo (se existir)
@@ -419,8 +480,21 @@ async canUpdateContainer(containerName: string) {
           localImageId: oldLocalImageId,
         },
         attemptedImage: targetImage,
-        error: err?.message ?? String(err),
+        error: this.getErrorMessage(err),
       };
     }
+  }
+
+  private getErrorStatus(err: unknown): number | undefined {
+    if (!err || typeof err !== 'object') return undefined;
+    const maybe = err as ErrorWithStatus;
+    return maybe.statusCode ?? maybe.status;
+  }
+
+  private getErrorMessage(err: unknown): string {
+    if (err instanceof Error) return err.message;
+    if (!err || typeof err !== 'object') return String(err);
+    const maybe = err as { message?: unknown };
+    return typeof maybe.message === 'string' ? maybe.message : String(err);
   }
 }

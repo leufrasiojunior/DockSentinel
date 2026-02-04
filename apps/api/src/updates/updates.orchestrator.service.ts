@@ -1,9 +1,37 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { DockerService } from 'src/docker/docker.service';
-import { DockerUpdateService } from 'src/docker/docker-update.service';
+import {
+  DockerUpdateService,
+  type ContainerUpdateCheck,
+} from 'src/docker/docker-update.service';
 import { UpdatesRepository } from './updates.repository';
 import { UpdatesWorkerService } from './updates.worker.service';
 import { UpdatesSchedulerRepository } from './updates.scheduler.repository';
+
+export type ScanMode = 'scan_only' | 'scan_and_update';
+export type ScanScope = 'all' | 'labeled';
+export type EnqueueManyResult = {
+  queued: Array<{ container: string; jobId: string }>;
+  skipped: Array<{ container: string; reason: 'already_queued' }>;
+};
+export type ScanResult =
+  | (ContainerUpdateCheck & {
+      name: string;
+      autoUpdateDisabled: boolean;
+      allowAutoUpdate: boolean;
+    })
+  | {
+      name: string;
+      error: string;
+      autoUpdateDisabled: boolean;
+      allowAutoUpdate: boolean;
+    };
+export type ScanAndEnqueueResult = {
+  scanned: number;
+  mode: ScanMode;
+  queued: EnqueueManyResult | null;
+  results: ScanResult[];
+};
 
 @Injectable()
 export class UpdatesOrchestratorService {
@@ -17,30 +45,46 @@ export class UpdatesOrchestratorService {
     private readonly schedRepo: UpdatesSchedulerRepository,
   ) {}
 
-  async scanAndEnqueueFromDb() {
+  async scanAndEnqueueFromDb(): Promise<ScanAndEnqueueResult> {
     const cfg = await this.schedRepo.get();
     if (!cfg) throw new Error('Scheduler config missing');
 
     return this.scanAndEnqueue({
-      mode: cfg.mode as any,
+      mode: this.normalizeMode(cfg.mode),
+      scope: this.normalizeScope(cfg.scope),
+      scanLabelKey: cfg.scanLabelKey ?? 'docksentinel.scan',
       updateLabelKey: cfg.updateLabelKey ?? 'docksentinel.update',
     });
   }
 
   private isAutoUpdateDisabled(labels: Record<string, string>, key: string) {
-  const v = (labels?.[key] ?? "").trim().toLowerCase()
-  return v === "false" || v === "0" || v === "no" || v === "off"
-}
+    const v = (labels?.[key] ?? '').trim().toLowerCase();
+    return v === 'false' || v === '0' || v === 'no' || v === 'off';
+  }
 
+  private isScanEnabled(labels: Record<string, string>, key: string) {
+    const v = (labels?.[key] ?? '').trim().toLowerCase();
+    if (!v) return false;
+    return v === 'true' || v === '1' || v === 'yes' || v === 'on';
+  }
 
   async scanAndEnqueue(input: {
-    mode: 'scan_only' | 'scan_and_update';
+    mode: ScanMode;
+    scope?: ScanScope;
+    scanLabelKey?: string;
     updateLabelKey: string;
-  }) {
+  }): Promise<ScanAndEnqueueResult> {
     const all = await this.dockerService.listContainers();
-    const selected = all; // ✅ SEMPRE SCAN EM TODOS
+    const scope = input.scope ?? 'all';
+    const scanLabelKey = input.scanLabelKey ?? 'docksentinel.scan';
+    const selected =
+      scope === 'labeled'
+        ? all.filter((c) =>
+            this.isScanEnabled(c.labels ?? {}, scanLabelKey),
+          )
+        : all;
 
-    const results: any[] = [];
+    const results: ScanResult[] = [];
     const toQueue: {
       container: string;
       image?: string | null;
@@ -83,10 +127,10 @@ export class UpdatesOrchestratorService {
             force: false,
           });
         }
-      } catch (err: any) {
+      } catch (err: unknown) {
         results.push({
           name,
-          error: err?.message ?? String(err),
+          error: this.getErrorMessage(err),
           autoUpdateDisabled,
           allowAutoUpdate,
         });
@@ -99,7 +143,9 @@ export class UpdatesOrchestratorService {
       // ✅ não esperar o worker terminar
       this.worker
         .kick()
-        .catch((e) => this.logger.error(`worker kick failed: ${e}`));
+        .catch((e: unknown) =>
+          this.logger.error(`worker kick failed: ${this.getErrorMessage(e)}`),
+        );
 
       return {
         scanned: results.length,
@@ -110,5 +156,20 @@ export class UpdatesOrchestratorService {
     }
 
     return { scanned: results.length, mode: input.mode, queued: null, results };
+  }
+
+  private normalizeMode(value: unknown): ScanMode {
+    return value === 'scan_and_update' ? 'scan_and_update' : 'scan_only';
+  }
+
+  private normalizeScope(value: unknown): ScanScope {
+    return value === 'labeled' ? 'labeled' : 'all';
+  }
+
+  private getErrorMessage(err: unknown): string {
+    if (err instanceof Error) return err.message;
+    if (!err || typeof err !== 'object') return String(err);
+    const maybe = err as { message?: unknown };
+    return typeof maybe.message === 'string' ? maybe.message : String(err);
   }
 }

@@ -1,5 +1,7 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from 'src/prisma/prisma.service';
+import type { Prisma } from '@prisma/client';
+import type { ContainerUpdateResult } from '../docker/docker-update.service';
 import { JobsQuery } from './dto/updates.dto';
 
 type EnqueueInput = {
@@ -13,8 +15,8 @@ type EnqueueInput = {
 export class UpdatesRepository {
   constructor(private readonly prisma: PrismaService) {}
 
-    async listJobs(query: JobsQuery) {
-    const where: any = {}
+  async listJobs(query: JobsQuery) {
+    const where: Prisma.UpdateJobWhereInput = {}
 
     if (query.container) where.container = query.container
     if (query.status) where.status = query.status
@@ -129,7 +131,7 @@ export class UpdatesRepository {
     return null;
   }
 
-  async markSuccess(id: string, result: any) {
+  async markSuccess(id: string, result: ContainerUpdateResult) {
     await this.prisma.client.updateJob.update({
       where: { id },
       data: {
@@ -161,8 +163,8 @@ export class UpdatesRepository {
    * - se já existe job queued/running para o container, pula
    */
   async enqueueMany(items: EnqueueInput[]) {
-    const queued: any[] = [];
-    const skipped: any[] = [];
+    const queued: Array<{ container: string; jobId: string }> = [];
+    const skipped: Array<{ container: string; reason: 'already_queued' }> = [];
 
     for (const it of items) {
       const exists = await this.prisma.client.updateJob.findFirst({

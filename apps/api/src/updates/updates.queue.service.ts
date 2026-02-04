@@ -74,8 +74,9 @@ export class UpdatesQueueService {
 
           job.result = result;
           job.status = 'success';
-        } catch (err: any) {
-          job.error = err?.message ?? String(err);
+        } catch (err: unknown) {
+          const msg = err instanceof Error ? err.message : String(err);
+          job.error = msg;
           job.status = 'failed';
           this.logger.error(`[${job.id}] failed: ${job.error}`);
         } finally {

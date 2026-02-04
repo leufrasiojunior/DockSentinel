@@ -42,8 +42,8 @@ export class UpdatesWorkerService implements OnModuleInit {
           )
 
           await this.repo.markSuccess(job.id, result)
-        } catch (err: any) {
-          const msg = err?.message ?? String(err)
+        } catch (err: unknown) {
+          const msg = err instanceof Error ? err.message : String(err)
           this.logger.error(`[${job.id}] failed: ${msg}`)
           await this.repo.markFailed(job.id, msg)
         }
