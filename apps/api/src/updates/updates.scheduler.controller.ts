@@ -1,30 +1,43 @@
-import { Body, Controller, Get, Patch } from "@nestjs/common"
-import { ApiBody, ApiOperation, ApiResponse, ApiTags } from "@nestjs/swagger"
-import { ZodValidationPipe } from "../common/pipes/zod-validation.pipe" // ajuste caminho
+import { Body, Controller, Get, Patch } from '@nestjs/common';
+import { ApiBody, ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
+import { ZodValidationPipe } from '../common/pipes/zod-validation.pipe'; // ajuste caminho
 
-import { UpdatesSchedulerService } from "./updates.scheduler.service"
-import { SchedulerConfigDto, schedulerPatchSchema, UpdateSchedulerConfigPatchDto } from "./dto/updates-scheduler.dto"
+import { UpdatesSchedulerService } from './updates.scheduler.service';
+import {
+  SchedulerConfigDto,
+  schedulerPatchSchema,
+  UpdateSchedulerConfigPatchDto,
+} from './dto/updates-scheduler.dto';
 
-@ApiTags("updates")
-@Controller("updates/scheduler")
+@ApiTags('updates')
+@Controller('updates/scheduler')
 export class UpdatesSchedulerController {
   constructor(private readonly scheduler: UpdatesSchedulerService) {}
 
-  @Get("config")
-  @ApiOperation({ summary: "Get updates scheduler config (DB singleton)" })
+  @Get('config')
+  @ApiOperation({ summary: 'Get updates scheduler config (DB singleton)' })
   @ApiResponse({ status: 200, type: SchedulerConfigDto })
   async getConfig() {
-    return this.scheduler.getConfig()
+    return this.scheduler.getConfig();
   }
 
-  @Patch("config")
-  @ApiOperation({ summary: "Update updates scheduler config (DB) and apply immediately" })
+  @Patch('config')
+  @ApiOperation({
+    summary: 'Update updates scheduler config (DB) and apply immediately',
+  })
   @ApiBody({ type: UpdateSchedulerConfigPatchDto })
   @ApiResponse({ status: 200, type: SchedulerConfigDto })
   async updateConfig(
-    @Body(new ZodValidationPipe(schedulerPatchSchema)) body: UpdateSchedulerConfigPatchDto,
+    @Body(new ZodValidationPipe(schedulerPatchSchema))
+    body: UpdateSchedulerConfigPatchDto,
   ) {
     // body já validado pelo ZodValidationPipe
-    return this.scheduler.updateConfig(body)
+    return this.scheduler.updateConfig(body);
+  }
+
+  @Get('scheduler')
+  @ApiOperation({ summary: 'Get scheduler config + runtime status (DB)' })
+  async getScheduler() {
+    return this.scheduler.getStatus();
   }
 }

@@ -1,20 +1,29 @@
-import { BadRequestException, Injectable, Logger, OnModuleInit } from "@nestjs/common"
-import { SchedulerRegistry } from "@nestjs/schedule"
-import { CronJob, CronTime } from "cron"
-import { UpdatesSchedulerRepository } from "./updates.scheduler.repository"
-import { UpdatesOrchestratorService } from "./updates.orchestrator.service"
+import {
+  BadRequestException,
+  Injectable,
+  Logger,
+  OnModuleInit,
+} from '@nestjs/common';
+import { SchedulerRegistry } from '@nestjs/schedule';
+import { CronJob, CronTime } from 'cron';
+import { UpdatesSchedulerRepository } from './updates.scheduler.repository';
+import { UpdatesOrchestratorService } from './updates.orchestrator.service';
 
-const JOB_NAME = "updates_scan_job"
+const JOB_NAME = 'updates_scan_job';
 
 @Injectable()
 export class UpdatesSchedulerService implements OnModuleInit {
-  private readonly logger = new Logger(UpdatesSchedulerService.name)
+  private readonly logger = new Logger(UpdatesSchedulerService.name);
 
-  // evita concorrência (updateConfig chamando apply enquanto outro apply roda)
-  private applying = false
+  private applying = false;
+  private ticking = false;
 
-  // evita sobreposição (scan longo + cron batendo de novo)
-  private ticking = false
+  // observabilidade simples (memória)
+  private nextScanAt: Date | null = null;
+  private lastRunAt: Date | null = null;
+  private lastFinishedAt: Date | null = null;
+  private lastError: string | null = null;
+  private lastResult: any | null = null;
 
   constructor(
     private readonly repo: UpdatesSchedulerRepository,
@@ -23,109 +32,215 @@ export class UpdatesSchedulerService implements OnModuleInit {
   ) {}
 
   async onModuleInit() {
-    await this.repo.upsert({})
-    await this.applyFromDb()
+    // garante singleton
+    await this.repo.upsert({});
+    await this.applyFromDb();
   }
 
   async getConfig() {
-    return this.repo.get()
+    return this.repo.get();
+  }
+
+  /**
+   * ✅ Retorna config + runtime status (para UI)
+   */
+  async getStatus() {
+    const cfg = await this.repo.get();
+    const job = this.tryGetJob();
+    const nextScanAt = this.getNextDateSafe(job);
+
+    return {
+      config: cfg,
+      runtime: {
+        hasJob: Boolean(job),
+        enabled: Boolean(cfg?.enabled),
+        ticking: this.ticking,
+        nextScanAt,
+        lastRunAt: this.lastRunAt,
+        lastFinishedAt: this.lastFinishedAt,
+        lastError: this.lastError,
+        lastResult: this.lastResult,
+      },
+    };
   }
 
   async updateConfig(patch: any) {
-    if (patch.cronExpr) this.assertCronValid(patch.cronExpr)
-    const saved = await this.repo.upsert(patch)
-    await this.applyFromDb()
-    return saved
+    // valida cron se veio
+    if (patch.cronExpr !== undefined) {
+      this.assertCronValid(patch.cronExpr);
+    }
+
+    const saved = await this.repo.upsert(patch);
+    await this.applyFromDb();
+    return saved;
   }
 
   async applyFromDb() {
-    if (this.applying) return
-    this.applying = true
+    if (this.applying) return;
+    this.applying = true;
 
     try {
-      const cfg = await this.repo.get()
-      if (!cfg) return
+      const cfg = await this.repo.get();
+      if (!cfg) return;
 
-      const job = this.getOrCreateJob()
+      const job = this.getOrCreateJob();
 
       // sempre para antes de reaplicar
-      job.stop()
+      job.stop();
 
       if (!cfg.enabled) {
-        this.logger.log("Scheduler disabled (db)")
-        return
+        this.logger.log('Scheduler disabled (db)');
+        return;
       }
 
-      // valida de verdade (mais forte que split em 5 campos)
-      const cronTime = new CronTime(cfg.cronExpr)
+      // ✅ valida cron de verdade
+      const cronTime = new CronTime(cfg.cronExpr);
+      job.setTime(cronTime);
+      job.start();
 
-      // troca o cron sem recriar job (ponto principal!)
-      job.setTime(cronTime)
-
-      job.start()
-
-      let next: any
-      try {
-        next = job.nextDate()?.toJSDate?.() ?? job.nextDate()
-      } catch {}
+      const next = this.getNextDateSafe(job);
       this.logger.log(
-        `Scheduler enabled (db). cron=${cfg.cronExpr} mode=${cfg.mode} scope=${cfg.scope} next=${next ?? "?"}`,
-      )
+        `Scheduler enabled (db). cron=${cfg.cronExpr} mode=${cfg.mode} scope=${cfg.scope} next=${next ?? '?'}`,
+      );
+    } catch (err: any) {
+      // se algo der errado ao aplicar cron, loga (e não derruba app)
+      this.logger.error(`applyFromDb failed: ${err?.message ?? err}`);
+      throw err;
     } finally {
-      this.applying = false
+      this.applying = false;
     }
   }
 
   stop() {
-    const job = this.tryGetJob()
-    if (!job) return
-    job.stop()
-    this.logger.log("Scheduler job stopped")
-  }
-
-  // -------------------------
-  // Helpers
-  // -------------------------
-
-  private tryGetJob(): CronJob | null {
     try {
-      return this.schedule.getCronJob(JOB_NAME)
+      const job = this.schedule.getCronJob(JOB_NAME);
+      job.stop();
+      this.schedule.deleteCronJob(JOB_NAME);
+      this.logger.log('Scheduler job removed');
     } catch {
-      return null
+      // ok, não existia
     }
   }
 
+  /**
+   * ✅ Job criado UMA vez. Cron real vem do DB via setTime().
+   */
   private getOrCreateJob(): CronJob {
-    const existing = this.tryGetJob()
-    if (existing) return existing
+    const existing = this.tryGetJob();
+    if (existing) return existing;
 
-    // cria uma vez com qualquer cron “placeholder” (vai ser substituído por setTime)
-    const job = new CronJob("*/5 * * * *", async () => {
-      if (this.ticking) return
-      this.ticking = true
+    // placeholder (vai ser substituído por setTime)
+    const job = new CronJob('*/5 * * * *', async () => {
+      if (this.ticking) return;
+      this.ticking = true;
+      
+      this.lastRunAt = new Date();
+      this.lastFinishedAt = null;
+      this.lastError = null;
+      this.lastResult = null;
 
       try {
-        await this.orchestrator.scanAndEnqueueFromDb()
-      } catch (err: any) {
-        this.logger.error(`Scheduled scan failed: ${err?.message ?? err}`)
-      } finally {
-        this.ticking = false
-      }
-    })
+        this.logger.log('[scheduler] tick start');
 
-    this.schedule.addCronJob(JOB_NAME, job)
-    this.logger.log("Scheduler job registered (created once)")
-    return job
+        const result = await this.orchestrator.scanAndEnqueueFromDb();
+        this.lastResult = result;
+
+        // ✅ loga também quando for scan_only (antes você “não via nada”)
+        const scanned = result?.scanned ?? '?';
+        const mode = result?.mode ?? '?';
+        const queuedCount = Array.isArray(result?.queued?.queued)
+          ? result.queued.queued.length
+          : 0;
+
+        const skippedCount = Array.isArray(result?.queued?.skipped)
+          ? result.queued.skipped.length
+          : 0;
+
+        this.logger.log(
+          `[scheduler] tick ok mode=${mode} scanned=${scanned} queued=${queuedCount} skipped=${skippedCount}`,
+        );
+
+        this.logger.log(
+          `[scheduler] tick ok mode=${mode} scanned=${scanned} queued=${queuedCount}`,
+        );
+      } catch (err: any) {
+        const msg = err?.message ?? String(err);
+        this.lastError = msg;
+        this.logger.error(`[scheduler] tick failed: ${msg}`);
+      } finally {
+        this.lastFinishedAt = new Date();
+        this.nextScanAt = this.safeNextScan(job);
+        this.logger.log(
+        `[scheduler] tick done finishedAt=${this.lastFinishedAt.toISOString()} next=${this.nextScanAt ? this.nextScanAt.toString() : "?"}`,
+      );
+        this.ticking = false;
+      }
+    });
+
+    this.schedule.addCronJob(JOB_NAME, job);
+    this.logger.log('Scheduler job registered (created once)');
+    return job;
   }
 
-private assertCronValid(expr: string) {
+  private tryGetJob(): CronJob | null {
+    try {
+      return this.schedule.getCronJob(JOB_NAME);
+    } catch {
+      return null;
+    }
+  }
+
+  private getNextDateSafe(job: CronJob | null): Date | null {
+    if (!job) return null;
+    try {
+      const next = job.nextDate?.();
+      // cron lib às vezes retorna Luxon-like; às vezes Date
+      // aqui tentamos converter com segurança
+      // @ts-ignore
+      return next?.toJSDate?.() ?? next ?? null;
+    } catch {
+      return null;
+    }
+  }
+
+  private assertCronValid(expr: string) {
+    const s = String(expr ?? '').trim();
+    if (!s) throw new BadRequestException('cronExpr is required');
+
+    try {
+      // ✅ isso valida mesmo (diferente do split em 5 campos)
+      new CronTime(s);
+    } catch (err: any) {
+      throw new BadRequestException(`Invalid cronExpr: ${s}`);
+    }
+  }
+private safeNextScan(job: CronJob): Date | null {
   try {
-    // Se for inválida, o cron lib tende a lançar aqui
-    // onTick vazio só pra validar
-    const job = new CronJob(expr, () => {})
-    job.stop()
-  } catch (e: any) {
-    throw new BadRequestException(`Invalid cronExpr: ${expr}. ${e?.message ?? e}`)
+    const next = job.nextDate?.();
+    if (!next) return null;
+
+    // cron costuma retornar Luxon/Dayjs-like com toJSDate
+    if (typeof (next as any).toJSDate === "function") return (next as any).toJSDate();
+    if (next instanceof Date) return next;
+
+    // fallback: tenta converter
+    return new Date(String(next));
+  } catch {
+    return null;
   }
 }
+
+private logTickSummary(result: any) {
+  const scanned = result?.scanned ?? 0;
+  const mode = result?.mode ?? "?";
+
+  // quando scan_only, queued costuma ser null
+  const queuedCount = result?.queued?.queued?.length ?? 0;
+  const skippedCount = result?.queued?.skipped?.length ?? 0;
+
+  this.logger.log(
+    `[SchedulerTick] mode=${mode} scanned=${scanned} queued=${queuedCount} skipped=${skippedCount}`,
+  );
+}
+  
 }
