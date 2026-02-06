@@ -6,8 +6,8 @@ import { Card, CardHeader } from "../../layouts/ui/Card";
 import { Button } from "../../layouts/ui/Button";
 import { Badge } from "../../layouts/ui/Badge";
 import { useToast } from "../../layouts/ui/ToastProvider";
-
-import { getAuthStatus, type AuthMode } from "../../api/auth";
+import { getAuthStatus, logout, type AuthMode } from "../../api/auth";
+import { useNavigate } from "react-router-dom";
 import {
   getSettings,
   updateSettings,
@@ -28,6 +28,8 @@ function modeHasTotp(mode: AuthMode) {
 
 export function SettingsPage() {
   const toast = useToast();
+  const qc = useQueryClient();
+  const nav = useNavigate();
 
   const statusQuery = useQuery({
     queryKey: ["auth", "status"],
@@ -38,9 +40,9 @@ export function SettingsPage() {
     queryKey: ["settings", "safe"],
     queryFn: getSettings,
   });
-  const qc = useQueryClient();
   const currentMode = (statusQuery.data?.authMode ?? "password") as AuthMode;
   const safe = (settingsQuery.data ?? null) as SafeSettings | null;
+  const hasPassword = safe?.hasPassword ?? false;
   const setupCompletedAt = safe?.setupCompletedAt ?? null;
   const setupDone = setupCompletedAt !== null;
 
@@ -73,12 +75,11 @@ export function SettingsPage() {
     () => modeHasTotp(currentMode),
     [currentMode],
   );
+  const isChangingPassword = newPassword.length > 0 || newPassword2.length > 0;
+
   const canSaveMode =
     (!wantTotp || totpAlreadyEnabled || totpConfirmed) &&
-    (!wantPassword ||
-      newPassword.length >= 8 ||
-      currentMode === "password" ||
-      currentMode === "both");
+    (!wantPassword || hasPassword || isChangingPassword);
 
   useEffect(() => {
     if (!totp || totpConfirmed) return;
@@ -98,30 +99,57 @@ export function SettingsPage() {
 
   const saveMutation = useMutation({
     mutationFn: async () => {
-      // Quando estiver mudando modo, a regra segura é:
-      // - se inclui password, peça uma senha nova (pelo menos no primeiro toggle)
-      // - se inclui totp e não era enabled, exige confirm antes
       const body: any = {
         authMode: desiredMode,
         logLevel,
       };
 
-      // Se modo requer password e usuário digitou uma nova senha, manda junto.
-      // (Se você quiser obrigar sempre quando trocar para password/both, deixe hard)
+      // === PASSWORD RULES (sem exigir sempre)
+      const isChangingPassword =
+        newPassword.length > 0 || newPassword2.length > 0;
+
       if (wantPassword) {
-        if (newPassword !== newPassword2)
-          throw new Error("As senhas não conferem.");
-        if (newPassword.length < 8 && !totpAlreadyEnabled) {
-          // se você quer ser mais permissivo, remova esse bloco
-          throw new Error("Senha precisa ter pelo menos 8 caracteres.");
+        // Se usuário tentou trocar senha, valida e envia
+        if (isChangingPassword) {
+          if (newPassword !== newPassword2) {
+            throw new Error("As senhas não conferem.");
+          }
+          if (newPassword.length < 8) {
+            throw new Error("Senha precisa ter pelo menos 8 caracteres.");
+          }
+          body.adminPassword = newPassword;
+        } else {
+          // Se modo precisa de senha, mas ainda não existe senha no backend, obriga
+          if (!hasPassword) {
+            throw new Error(
+              "Defina uma senha (mínimo 8 caracteres) para este modo.",
+            );
+          }
+          // Caso contrário, mantém a senha atual (não manda adminPassword)
         }
-        if (newPassword.length >= 8) body.adminPassword = newPassword;
       }
 
       return updateSettings(body);
     },
-    onSuccess: () => {
+    onSuccess: async () => {
       toast.success("Configurações salvas.", "Settings");
+
+      // Atualiza estado global
+      await qc.invalidateQueries({ queryKey: ["settings", "safe"] });
+      await qc.invalidateQueries({ queryKey: ["auth", "status"] });
+
+      // ✅ Se for modo "somente senha", desloga completamente
+      if (desiredMode === "password") {
+        try {
+          await logout();
+        } catch {
+          // ok: mesmo se falhar, força o fluxo a relogar
+        } finally {
+          // limpar cache ajuda a evitar UI “meio logada”
+          qc.removeQueries({ queryKey: ["auth", "me"] });
+          nav("/login", { replace: true });
+        }
+      }
     },
     onError: (e: any) =>
       toast.error(e?.message ?? "Erro ao salvar", "Settings"),
@@ -144,16 +172,24 @@ export function SettingsPage() {
       return totpConfirm({ challengeId: totp.challengeId, token: totpToken });
     },
     onSuccess: (resp) => {
-      if (resp.ok) {
-        setTotpConfirmed(true);
-        toast.success(
-          `TOTP confirmado (authMode final: ${resp.authMode}).`,
-          "TOTP",
-        );
-      } else {
+      if (!resp.ok) {
         toast.error("Resposta inesperada do confirm.", "TOTP");
+        return;
+      }
+
+      setTotpConfirmed(true);
+      toast.success(
+        `TOTP confirmado (authMode final: ${resp.authMode}).`,
+        "TOTP",
+      );
+
+      // ✅ Para totp ou both: ao confirmar, já salva automaticamente
+      if (desiredMode === "totp" || desiredMode === "both") {
+        // Dispara o save usando a mesma lógica (authMode/logLevel/senha se preciso)
+        saveMutation.mutate();
       }
     },
+
     onError: (e: any) =>
       toast.error(e?.message ?? "Falha ao confirmar", "TOTP"),
   });
@@ -441,7 +477,9 @@ export function SettingsPage() {
                       variant="primary"
                       type="button"
                       onClick={() => totpConfirmMutation.mutate()}
-                      disabled={totpConfirmMutation.isPending || totpExpiresInSec === 0}
+                      disabled={
+                        totpConfirmMutation.isPending || totpExpiresInSec === 0
+                      }
                     >
                       Confirmar
                     </Button>

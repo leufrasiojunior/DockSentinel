@@ -7,9 +7,10 @@ services:
       dockerfile: Dockerfile
     ports:
       - "8080:80"
+      - "3000:3000" #Exposing port 3000 for docksentinel API
     environment:
       PORT: "3000"
-      LOG_LEVEL: "info"
+      LOG_LEVEL: "debug"
       DATABASE_URL: "file:/data/docksentinel.db"
       SCHEDULER_INTERVAL_MIN: "5"
       DOCKSENTINEL_SECRET: "CHANGE_ME_CHANGE_ME_CHANGE_ME_32CHARS_MIN"

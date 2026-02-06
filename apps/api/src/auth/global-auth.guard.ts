@@ -1,10 +1,15 @@
-import { CanActivate, ExecutionContext, Injectable, Logger } from "@nestjs/common"
-import { Reflector } from "@nestjs/core"
-import { IS_PUBLIC_KEY } from "../auth/public.decorator"
-import type { Request } from "express"
+import {
+  CanActivate,
+  ExecutionContext,
+  Injectable,
+  Logger,
+} from '@nestjs/common';
+import { Reflector } from '@nestjs/core';
+import { IS_PUBLIC_KEY } from '../auth/public.decorator';
+import type { Request } from 'express';
 
-import { SessionService } from "../auth/session.service"
-import { SettingsService } from "../settings/settings.service"
+import { SessionService } from '../auth/session.service';
+import { SettingsService } from '../settings/settings.service';
 
 /**
  * GlobalAuthGuard:
@@ -16,7 +21,7 @@ import { SettingsService } from "../settings/settings.service"
  */
 @Injectable()
 export class GlobalAuthGuard implements CanActivate {
-  private readonly logger = new Logger(GlobalAuthGuard.name)
+  private readonly logger = new Logger(GlobalAuthGuard.name);
 
   constructor(
     private readonly reflector: Reflector,
@@ -28,17 +33,21 @@ export class GlobalAuthGuard implements CanActivate {
     const isPublic = this.reflector.getAllAndOverride<boolean>(IS_PUBLIC_KEY, [
       context.getHandler(),
       context.getClass(),
-    ])
-    if (isPublic) return true
+    ]);
+    if (isPublic) return true;
 
-    const authMode = await this.settings.getAuthMode()
-    if (authMode === "none") return true
+    const authMode = await this.settings.getAuthMode();
+    if (authMode === 'none') return true;
 
-    const req = context.switchToHttp().getRequest<Request>()
-    const sessionId = req.signedCookies?.ds_session
+    const req = context.switchToHttp().getRequest<Request>();
 
-    const ok = this.sessions.validate(sessionId)
-    if (!ok) this.logger.warn("Unauthorized request (invalid or missing session)")
-    return ok
+    const sessionId =
+      (req as any).signedCookies?.ds_session ??
+      (req as any).cookies?.ds_session;
+
+    const ok = this.sessions.validate(sessionId);
+    if (!ok)
+      this.logger.warn('Unauthorized request (invalid or missing session)');
+    return ok;
   }
 }

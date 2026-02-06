@@ -63,10 +63,11 @@ export class AuthController {
     // ✅ cookie assinado HttpOnly
     res.cookie('ds_session', sessionId, {
       httpOnly: true,
+      path: "/",
       sameSite: 'lax',
       signed: true,
       expires: new Date(expiresAt),
-      secure: process.env.NODE_ENV === 'production',
+      secure: false
     });
 
     return { ok: true };
