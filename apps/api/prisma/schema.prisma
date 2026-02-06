@@ -98,4 +98,3 @@ model UpdateSchedulerConfig {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 }
-

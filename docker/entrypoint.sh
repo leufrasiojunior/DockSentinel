@@ -4,7 +4,7 @@ set -eu
 mkdir -p /data
 
 cd /app/apps/api
-node dist/main.js &
+node dist/src/main.js &
 api_pid=$!
 
 term_handler() {

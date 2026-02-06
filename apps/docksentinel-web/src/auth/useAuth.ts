@@ -1,12 +1,12 @@
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { authMe } from "../api/auth";
+import { me, type AuthMeResponse } from "../api/auth";
 
 export function useAuth() {
   const queryClient = useQueryClient();
 
-  const meQuery = useQuery({
+  const meQuery = useQuery<AuthMeResponse>({
     queryKey: ["auth", "me"],
-    queryFn: authMe,
+    queryFn: me,
     retry: false,
     refetchOnWindowFocus: false,
     staleTime: 15_000,

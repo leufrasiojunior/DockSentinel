@@ -9,6 +9,10 @@ export type AuthStatusResponse = {
   [key: string]: unknown;
 };
 
+export type AuthMeResponse = {
+  authenticated: boolean;
+};
+
 export async function getAuthStatus(): Promise<AuthStatusResponse> {
   // Swagger: GET /auth/status :contentReference[oaicite:5]{index=5}
   const data = await http<any>("/auth/status");
@@ -35,7 +39,7 @@ export async function login(body: { password?: string; totp?: string }) {
 
 export async function me() {
   // Swagger: GET /auth/me :contentReference[oaicite:7]{index=7}
-  return http<any>("/auth/me");
+  return http<AuthMeResponse>("/auth/me");
 }
 
 export async function logout() {
