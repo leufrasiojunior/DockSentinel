@@ -11,7 +11,6 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 COPY package.json package-lock.json ./
 COPY apps/api/package.json apps/api/package.json
 COPY apps/docksentinel-web/package.json apps/docksentinel-web/package.json
-COPY apps/web_old/package.json apps/web_old/package.json
 COPY packages/shared/package.json packages/shared/package.json
 
 RUN npm ci
@@ -19,7 +18,7 @@ RUN npm ci
 COPY . .
 
 # Prisma client
-RUN npx prisma generate --schema=apps/api/prisma/schema.prisma
+RUN cd /app/apps/api && npx prisma generate --config=prisma.config.ts
 
 # Build backend + frontend
 RUN npm --workspace apps/api run build
@@ -32,7 +31,8 @@ WORKDIR /app
 RUN apt-get update && apt-get install -y --no-install-recommends \
   nginx \
   ca-certificates \
-  && rm -rf /var/lib/apt/lists/*
+  && rm -rf /var/lib/apt/lists/* \
+  && rm -f /etc/nginx/sites-enabled/default /etc/nginx/sites-available/default
 
 ENV NODE_ENV=production \
   PORT=3000 \
@@ -47,6 +47,7 @@ ENV NODE_ENV=production \
 COPY --from=build /app/node_modules /app/node_modules
 COPY --from=build /app/package.json /app/package-lock.json /app/
 COPY --from=build /app/apps/api/package.json /app/apps/api/package.json
+COPY --from=build /app/apps/api/prisma.config.ts /app/apps/api/prisma.config.ts
 COPY --from=build /app/apps/api/dist /app/apps/api/dist
 COPY --from=build /app/apps/api/prisma /app/apps/api/prisma
 COPY --from=build /app/apps/docksentinel-web/dist /app/apps/docksentinel-web/dist

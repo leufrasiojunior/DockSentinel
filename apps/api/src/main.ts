@@ -21,7 +21,7 @@ function ensureMigrations(config: ConfigService<Env>, logger: Logger) {
 
   logger.log('AUTO_MIGRATE=true -> running Prisma migrations (deploy)...');
 
-  execSync('npx prisma migrate deploy --schema=prisma/schema.prisma', {
+  execSync('npx prisma migrate deploy --config=prisma.config.ts', {
     stdio: 'inherit',
     cwd: process.cwd(),
     env: process.env,
