@@ -1,0 +1,24 @@
+version: "3.9"
+
+services:
+  docksentinel:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    ports:
+      - "8080:80"
+    environment:
+      PORT: "3000"
+      LOG_LEVEL: "info"
+      DATABASE_URL: "file:/data/docksentinel.db"
+      SCHEDULER_INTERVAL_MIN: "5"
+      DOCKSENTINEL_SECRET: "CHANGE_ME_CHANGE_ME_CHANGE_ME_32CHARS_MIN"
+      AUTO_MIGRATE: "true"
+      SWAGGER_ENABLED: "true"
+      CORS_ORIGINS: "*"
+    volumes:
+      - docksentinel_data:/data
+      - /var/run/docker.sock:/var/run/docker.sock
+
+volumes:
+  docksentinel_data:
