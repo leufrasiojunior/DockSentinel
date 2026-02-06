@@ -1,5 +1,14 @@
 import { z } from 'zod';
 
+const isValidTimeZone = (tz: string) => {
+  try {
+    Intl.DateTimeFormat('en-US', { timeZone: tz });
+    return true;
+  } catch {
+    return false;
+  }
+};
+
 /**
  * Schema de validação do ENV.
  * A regra: se o ENV estiver inválido, o app NÃO sobe.
@@ -50,6 +59,18 @@ export const envSchema = z
      * Default: 5
      */
     SCHEDULER_INTERVAL_MIN: z.coerce.number().int().min(1).max(1440).default(5),
+
+    /**
+     * Timezone (IANA) para cron/scheduler.
+     * Ex: "America/Sao_Paulo"
+     */
+    TZ: z
+      .string()
+      .min(1)
+      .optional()
+      .refine((tz) => !tz || isValidTimeZone(tz), {
+        message: 'TZ must be a valid IANA timezone (e.g. America/Sao_Paulo)',
+      }),
 
     /**
      * Secret master para criptografar campos sensíveis (registry password, smtp password, totp secret).

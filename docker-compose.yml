@@ -16,6 +16,7 @@ services:
       AUTO_MIGRATE: "true"
       SWAGGER_ENABLED: "true"
       CORS_ORIGINS: "*"
+      TZ: "America/Sao_Paulo"
     volumes:
       - docksentinel_data:/data
       - /var/run/docker.sock:/var/run/docker.sock

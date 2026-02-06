@@ -4,8 +4,10 @@ import {
   Logger,
   OnModuleInit,
 } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import { SchedulerRegistry } from '@nestjs/schedule';
 import { CronJob, CronTime } from 'cron';
+import { Env } from '../config/env.schema';
 import {
   UpdatesSchedulerRepository,
   type SchedulerPatch,
@@ -31,12 +33,22 @@ export class UpdatesSchedulerService implements OnModuleInit {
   private lastFinishedAt: Date | null = null;
   private lastError: string | null = null;
   private lastResult: ScanAndEnqueueResult | null = null;
+  private readonly timeZone?: string;
 
   constructor(
     private readonly repo: UpdatesSchedulerRepository,
     private readonly schedule: SchedulerRegistry,
     private readonly orchestrator: UpdatesOrchestratorService,
-  ) {}
+    private readonly config: ConfigService<Env>,
+  ) {
+    this.timeZone = this.normalizeTimeZone(
+      this.config.get('TZ', { infer: true }),
+    );
+
+    if (this.timeZone) {
+      this.logger.log(`Scheduler timezone set to ${this.timeZone} (ENV TZ)`);
+    }
+  }
 
   async onModuleInit() {
     // garante singleton
@@ -104,13 +116,13 @@ export class UpdatesSchedulerService implements OnModuleInit {
       }
 
       // ✅ valida cron de verdade
-      const cronTime = new CronTime(cfg.cronExpr);
+      const cronTime = new CronTime(cfg.cronExpr, this.timeZone);
       job.setTime(cronTime);
       job.start();
 
       const next = this.getNextDateSafe(job);
       this.logger.log(
-        `Scheduler enabled (db). cron=${cfg.cronExpr} mode=${cfg.mode} scope=${cfg.scope} next=${next ?? '?'}`,
+        `Scheduler enabled (db). cron=${cfg.cronExpr} mode=${cfg.mode} scope=${cfg.scope} tz=${this.timeZone ?? 'system'} next=${next ?? '?'}`,
       );
     } catch (err: unknown) {
       // se algo der errado ao aplicar cron, loga (e não derruba app)
@@ -144,52 +156,58 @@ export class UpdatesSchedulerService implements OnModuleInit {
     if (existing) return existing;
 
     // placeholder (vai ser substituído por setTime)
-    const job = new CronJob('*/5 * * * *', async () => {
-      if (this.ticking) return;
-      this.ticking = true;
-      
-      this.lastRunAt = new Date();
-      this.lastFinishedAt = null;
-      this.lastError = null;
-      this.lastResult = null;
+    const job = new CronJob(
+      '*/5 * * * *',
+      async () => {
+        if (this.ticking) return;
+        this.ticking = true;
 
-      try {
-        this.logger.log('[scheduler] tick start');
+        this.lastRunAt = new Date();
+        this.lastFinishedAt = null;
+        this.lastError = null;
+        this.lastResult = null;
 
-        const result = await this.orchestrator.scanAndEnqueueFromDb();
-        this.lastResult = result;
+        try {
+          this.logger.log('[scheduler] tick start');
 
-        // ✅ loga também quando for scan_only (antes você “não via nada”)
-        const scanned = result?.scanned ?? '?';
-        const mode = result?.mode ?? '?';
-        const queuedCount = Array.isArray(result?.queued?.queued)
-          ? result.queued.queued.length
-          : 0;
+          const result = await this.orchestrator.scanAndEnqueueFromDb();
+          this.lastResult = result;
 
-        const skippedCount = Array.isArray(result?.queued?.skipped)
-          ? result.queued.skipped.length
-          : 0;
+          // ✅ loga também quando for scan_only (antes você “não via nada”)
+          const scanned = result?.scanned ?? '?';
+          const mode = result?.mode ?? '?';
+          const queuedCount = Array.isArray(result?.queued?.queued)
+            ? result.queued.queued.length
+            : 0;
 
-        this.logger.log(
-          `[scheduler] tick ok mode=${mode} scanned=${scanned} queued=${queuedCount} skipped=${skippedCount}`,
-        );
+          const skippedCount = Array.isArray(result?.queued?.skipped)
+            ? result.queued.skipped.length
+            : 0;
 
-        this.logger.log(
-          `[scheduler] tick ok mode=${mode} scanned=${scanned} queued=${queuedCount}`,
-        );
-      } catch (err: unknown) {
-        const msg = this.getErrorMessage(err);
-        this.lastError = msg;
-        this.logger.error(`[scheduler] tick failed: ${msg}`);
-      } finally {
-        this.lastFinishedAt = new Date();
-        this.nextScanAt = this.safeNextScan(job);
-        this.logger.log(
-        `[scheduler] tick done finishedAt=${this.lastFinishedAt.toISOString()} next=${this.nextScanAt ? this.nextScanAt.toString() : "?"}`,
-      );
-        this.ticking = false;
-      }
-    });
+          this.logger.log(
+            `[scheduler] tick ok mode=${mode} scanned=${scanned} queued=${queuedCount} skipped=${skippedCount}`,
+          );
+
+          this.logger.log(
+            `[scheduler] tick ok mode=${mode} scanned=${scanned} queued=${queuedCount}`,
+          );
+        } catch (err: unknown) {
+          const msg = this.getErrorMessage(err);
+          this.lastError = msg;
+          this.logger.error(`[scheduler] tick failed: ${msg}`);
+        } finally {
+          this.lastFinishedAt = new Date();
+          this.nextScanAt = this.safeNextScan(job);
+          this.logger.log(
+            `[scheduler] tick done finishedAt=${this.lastFinishedAt.toISOString()} next=${this.nextScanAt ? this.nextScanAt.toString() : '?'}`,
+          );
+          this.ticking = false;
+        }
+      },
+      null,
+      false,
+      this.timeZone,
+    );
 
     this.schedule.addCronJob(JOB_NAME, job);
     this.logger.log('Scheduler job registered (created once)');
@@ -220,7 +238,7 @@ export class UpdatesSchedulerService implements OnModuleInit {
 
     try {
       // ✅ isso valida mesmo (diferente do split em 5 campos)
-      new CronTime(s);
+      new CronTime(s, this.timeZone);
     } catch (err: unknown) {
       throw new BadRequestException(`Invalid cronExpr: ${s}`);
     }
@@ -265,5 +283,9 @@ export class UpdatesSchedulerService implements OnModuleInit {
     const maybe = err as { message?: unknown };
     return typeof maybe.message === 'string' ? maybe.message : String(err);
   }
-  
+
+  private normalizeTimeZone(raw?: string | null): string | undefined {
+    const tz = String(raw ?? '').trim();
+    return tz ? tz : undefined;
+  }
 }
