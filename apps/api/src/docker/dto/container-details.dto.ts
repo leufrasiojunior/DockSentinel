@@ -6,18 +6,18 @@ import { ApiProperty } from '@nestjs/swagger';
  */
 
 export class ContainerPortBinding {
-  @ApiProperty({ description: 'Container port', example: '80/tcp' })
+  @ApiProperty({ description: 'Porta exposta no container', example: '80/tcp' })
   containerPort: string;
 
   @ApiProperty({
-    description: 'Host IP address',
+    description: 'IP do host',
     example: '0.0.0.0',
     required: false,
   })
   hostIp?: string;
 
   @ApiProperty({
-    description: 'Host port',
+    description: 'Porta publicada no host',
     example: '8080',
     required: false,
   })
@@ -26,87 +26,91 @@ export class ContainerPortBinding {
 
 export class ContainerMount {
   @ApiProperty({
-    description: 'Mount type',
+    description: 'Tipo de mount (bind/volume/tmpfs)',
     example: 'bind',
   })
   type: string;
 
   @ApiProperty({
-    description: 'Mount source path on host or volume name',
+    description: 'Origem no host ou nome do volume',
     example: '/path/on/host',
     required: false,
   })
   source?: string;
 
   @ApiProperty({
-    description: 'Mount target path in container',
+    description: 'Destino no container',
     example: '/usr/share/nginx/html',
   })
   target: string;
 
   @ApiProperty({
-    description: 'Whether the mount is read-only',
+    description: 'Indica se o mount é somente leitura',
     example: true,
   })
   readOnly: boolean;
 }
 
 export class ContainerNetwork {
-  @ApiProperty({ description: 'Network name', example: 'bridge' })
+  @ApiProperty({ description: 'Nome da rede', example: 'bridge' })
   name: string;
 
   @ApiProperty({
-    description: 'IPv4 address',
+    description: 'Endereço IPv4',
     example: '172.17.0.2',
     required: false,
   })
   ipv4Address?: string;
 
   @ApiProperty({
-    description: 'IPv6 address',
+    description: 'Endereço IPv6',
     required: false,
   })
   ipv6Address?: string;
 
   @ApiProperty({
-    description: 'MAC address',
+    description: 'Endereço MAC',
     required: false,
   })
   macAddress?: string;
 }
 
 export class RestartPolicyDto {
-  @ApiProperty({ example: 'always' })
+  @ApiProperty({ description: 'Política de restart', example: 'always' })
   name: string;
 
-  @ApiProperty({ example: 5, required: false })
+  @ApiProperty({
+    description: 'Número máximo de tentativas',
+    example: 5,
+    required: false,
+  })
   maximumRetryCount?: number;
 }
 
 export class ContainerDetailsDto {
   @ApiProperty({
-    description: 'Container ID',
+    description: 'ID do container',
     example: 'a9d7c7a3a3e6',
   })
   id: string;
 
-  @ApiProperty({ description: 'Container name', example: '/nginx' })
+  @ApiProperty({ description: 'Nome do container', example: '/nginx' })
   name: string;
 
   @ApiProperty({
-    description: 'Container image',
+    description: 'Imagem do container (tag)',
     example: 'nginx:latest',
   })
   image: string;
 
-  @ApiProperty({ description: 'Container state', example: 'running' })
+  @ApiProperty({ description: 'Estado do container', example: 'running' })
   state: string;
 
-  @ApiProperty({ description: 'Container status', example: 'Up 2 hours' })
+  @ApiProperty({ description: 'Status (texto do Docker)', example: 'Up 2 hours' })
   status: string;
 
   @ApiProperty({
-    description: 'Environment variables',
+    description: 'Variáveis de ambiente',
     example: ['PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin'],
   })
   env: string[];
@@ -118,26 +122,26 @@ export class ContainerDetailsDto {
   labels: Record<string, string>;
 
   @ApiProperty({
-    description: 'Restart policy',
+    description: 'Política de restart',
     required: false,
     type: RestartPolicyDto,
   })
   restartPolicy?: RestartPolicyDto;
 
   @ApiProperty({
-    description: 'Port bindings',
+    description: 'Mapeamento de portas',
     type: [ContainerPortBinding],
   })
   ports: ContainerPortBinding[];
 
   @ApiProperty({
-    description: 'Mounts',
+    description: 'Mounts (volumes/binds)',
     type: [ContainerMount],
   })
   mounts: ContainerMount[];
 
   @ApiProperty({
-    description: 'Networks',
+    description: 'Redes',
     type: [ContainerNetwork],
   })
   networks: ContainerNetwork[];

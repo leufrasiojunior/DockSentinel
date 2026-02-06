@@ -37,6 +37,7 @@ export class SettingsService {
       // flags úteis para UI
       hasPassword: Boolean(row?.adminPasswordHash),
       hasTotp: Boolean(row?.totpSecretEnc),
+      setupCompletedAt: row?.setupCompletedAt ?? null,
     }
   }
 

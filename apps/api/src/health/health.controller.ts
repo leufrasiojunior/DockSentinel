@@ -1,6 +1,7 @@
 import { Controller, Get } from '@nestjs/common';
 import { Public } from '../auth/public.decorator';
-import { ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
+import { ApiOkResponse, ApiOperation, ApiTags } from '@nestjs/swagger';
+import { HealthStatusDto } from './health.dto';
 
 /**
  * Health endpoint:
@@ -12,8 +13,11 @@ import { ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
 export class HealthController {
   @Public()
   @Get()
-  @ApiOperation({ summary: 'Check API health' })
-  @ApiResponse({ status: 200, description: 'API is healthy.' })
+  @ApiOperation({ summary: 'Verificar saúde da API' })
+  @ApiOkResponse({
+    description: 'API saudável.',
+    type: HealthStatusDto,
+  })
   getHealth() {
     return { ok: true };
   }

@@ -4,8 +4,21 @@ import { Public } from './public.decorator';
 import { SettingsService } from '../settings/settings.service';
 import { AuthService } from './auth.service';
 import { SessionService } from './session.service';
-import { ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
+import {
+  ApiBadRequestResponse,
+  ApiBody,
+  ApiCreatedResponse,
+  ApiOkResponse,
+  ApiOperation,
+  ApiTags,
+  ApiUnauthorizedResponse,
+} from '@nestjs/swagger';
 import { LoginDto } from './dto/login.dto';
+import {
+  AuthMeResponseDto,
+  AuthStatusResponseDto,
+} from './dto/auth-responses.dto';
+import { OkResponseDto } from '../common/dto/ok-response.dto';
 
 @ApiTags('Auth')
 @Controller('auth')
@@ -18,21 +31,25 @@ export class AuthController {
 
   @Public()
   @Get('status')
-  @ApiOperation({ summary: 'Get authentication status' })
-  @ApiResponse({
-    status: 200,
-    description: 'Returns the authentication mode.',
+  @ApiOperation({ summary: 'Obter status de autenticação' })
+  @ApiOkResponse({
+    description: 'Retorna o modo de autenticação atual.',
+    type: AuthStatusResponseDto,
   })
-async getStatus() {
-  const authMode = await this.settings.getAuthMode()
-  return { authMode }
-}
+  async getStatus() {
+    const authMode = await this.settings.getAuthMode();
+    return { authMode };
+  }
 
   @Public()
   @Post('login')
-  @ApiOperation({ summary: 'Login' })
-  @ApiResponse({ status: 201, description: 'Login successful.' })
-  @ApiResponse({ status: 400, description: 'Invalid credentials.' })
+  @ApiOperation({ summary: 'Fazer login' })
+  @ApiBody({ type: LoginDto })
+  @ApiCreatedResponse({
+    description: 'Login realizado com sucesso.',
+    type: OkResponseDto,
+  })
+  @ApiBadRequestResponse({ description: 'Credenciais inválidas.' })
   async login(
     @Body() body: LoginDto,
     @Res({ passthrough: true }) res: Response,
@@ -60,16 +77,22 @@ async getStatus() {
    * se o guard deixou passar, a sessão é válida
    */
   @Get('me')
-  @ApiOperation({ summary: 'Get current user' })
-  @ApiResponse({ status: 200, description: 'User is authenticated.' })
-  @ApiResponse({ status: 401, description: 'Unauthorized.' })
+  @ApiOperation({ summary: 'Obter sessão atual' })
+  @ApiOkResponse({
+    description: 'Usuário autenticado.',
+    type: AuthMeResponseDto,
+  })
+  @ApiUnauthorizedResponse({ description: 'Não autorizado.' })
   me() {
     return { authenticated: true };
   }
 
   @Post('logout')
-  @ApiOperation({ summary: 'Logout' })
-  @ApiResponse({ status: 200, description: 'Logout successful.' })
+  @ApiOperation({ summary: 'Fazer logout' })
+  @ApiOkResponse({
+    description: 'Logout realizado com sucesso.',
+    type: OkResponseDto,
+  })
   logout(@Res({ passthrough: true }) res: Response) {
     res.clearCookie('ds_session', {
       httpOnly: true,

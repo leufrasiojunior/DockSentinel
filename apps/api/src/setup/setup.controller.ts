@@ -2,7 +2,15 @@ import { Body, Controller, Post } from '@nestjs/common';
 import { Public } from '../auth/public.decorator';
 import { SetupDto } from './setup.dto';
 import { SetupService } from './setup.service';
-import { ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
+import {
+  ApiBadRequestResponse,
+  ApiBody,
+  ApiCreatedResponse,
+  ApiConflictResponse,
+  ApiOperation,
+  ApiTags,
+} from '@nestjs/swagger';
+import { SafeSettingsDto } from '../settings/dto/safe-settings.dto';
 
 /**
  * SetupController:
@@ -16,10 +24,14 @@ export class SetupController {
 
   @Public()
   @Post()
-  @ApiOperation({ summary: 'Run initial setup' })
-  @ApiResponse({ status: 201, description: 'Setup completed successfully.' })
-  @ApiResponse({ status: 400, description: 'Invalid setup data.' })
-  @ApiResponse({ status: 409, description: 'Setup already completed.' })
+  @ApiOperation({ summary: 'Executar setup inicial' })
+  @ApiBody({ type: SetupDto })
+  @ApiCreatedResponse({
+    description: 'Setup concluído com sucesso.',
+    type: SafeSettingsDto,
+  })
+  @ApiBadRequestResponse({ description: 'Dados de setup inválidos.' })
+  @ApiConflictResponse({ description: 'Setup já foi concluído.' })
   async run(@Body() body: SetupDto) {
     return this.setup.runSetup(body);
   }

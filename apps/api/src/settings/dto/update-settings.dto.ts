@@ -3,26 +3,29 @@ import { IsEnum, IsOptional, IsString, MinLength } from 'class-validator';
 
 export class UpdateSettingsDto {
   @ApiProperty({
-    description: 'Authentication mode',
+    description: 'Modo de autenticação',
     enum: ['none', 'password', 'totp', 'both'],
     required: false,
+    example: 'both',
   })
   @IsEnum(['none', 'password', 'totp', 'both'])
   @IsOptional()
   authMode?: 'none' | 'password' | 'totp' | 'both';
 
   @ApiProperty({
-    description: 'Log level',
+    description: 'Nível de log',
     enum: ['error', 'warn', 'info', 'debug'],
     required: false,
+    example: 'info',
   })
   @IsEnum(['error', 'warn', 'info', 'debug'])
   @IsOptional()
   logLevel?: 'error' | 'warn' | 'info' | 'debug';
 
   @ApiProperty({
-    description: 'Admin password (min 8 characters)',
+    description: 'Senha do admin (mínimo 8 caracteres)',
     required: false,
+    example: 'MinhaSenha123!',
   })
   @IsString()
   @MinLength(8)
@@ -30,8 +33,9 @@ export class UpdateSettingsDto {
   adminPassword?: string;
 
   @ApiProperty({
-    description: 'TOTP secret (min 16 characters)',
+    description: 'Secret TOTP (mínimo 16 caracteres)',
     required: false,
+    example: 'JBSWY3DPEHPK3PXP',
   })
   @IsString()
   @MinLength(16)

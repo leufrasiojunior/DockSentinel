@@ -6,20 +6,49 @@ import {
   Inject,
   Param,
   Post,
-  UsePipes,
 } from '@nestjs/common';
 import { DockerService } from './docker.service';
 import { DockerUpdateService } from './docker-update.service';
 import Docker from 'dockerode';
 import { DockerDigestService } from './docker-digest.service';
 import { DOCKER_CLIENT } from './docker.constants';
-import { ApiBody, ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
+import {
+  ApiBadRequestResponse,
+  ApiBody,
+  ApiCreatedResponse,
+  ApiExtraModels,
+  ApiNotFoundResponse,
+  ApiOkResponse,
+  ApiOperation,
+  ApiParam,
+  ApiTags,
+  getSchemaPath,
+} from '@nestjs/swagger';
 import { ZodValidationPipe } from 'src/common/pipes/zod-validation.pipe';
 import { recreateBodySchema } from './docker.schema';
 import { RecreateDto } from './dto/recreate.dto';
 import { updateBodySchema, UpdateDto } from './dto/update.dto';
+import { ContainerDetailsDto } from './dto/container-details.dto';
+import { RecreatePlanDto } from './dto/recreate-plan.dto';
+import { ContainerSummaryDto } from './dto/container-summary.dto';
+import { ContainerUpdateCheckDto } from './dto/update-check.dto';
+import {
+  ContainerRecreateNoopDto,
+  ContainerUpdateResultRolledBackDto,
+  ContainerUpdateResultSuccessDto,
+  UpdateContainerNoopDto,
+  UpdateContainerResultDto,
+} from './dto/update-result.dto';
 
 @ApiTags('Docker')
+@ApiExtraModels(
+  ContainerUpdateResultSuccessDto,
+  ContainerUpdateResultRolledBackDto,
+  ContainerRecreateNoopDto,
+  UpdateContainerNoopDto,
+  UpdateContainerResultDto,
+  ContainerUpdateCheckDto,
+)
 @Controller('docker')
 export class DockerController {
   constructor(
@@ -30,27 +59,36 @@ export class DockerController {
   ) {}
 
   @Get('containers')
-  @ApiOperation({ summary: 'List all containers' })
-  @ApiResponse({
-    status: 200,
-    description: 'Returns a list of all containers.',
+  @ApiOperation({ summary: 'Listar containers' })
+  @ApiOkResponse({
+    description: 'Lista de containers.',
+    type: ContainerSummaryDto,
+    isArray: true,
   })
   async containers() {
     return this.DockerService.listContainers();
   }
 
   @Get('containers/:id')
-  @ApiOperation({ summary: 'Get container details' })
-  @ApiResponse({ status: 200, description: 'Returns container details.' })
-  @ApiResponse({ status: 404, description: 'Container not found.' })
+  @ApiOperation({ summary: 'Obter detalhes do container' })
+  @ApiParam({ name: 'id', description: 'ID ou nome do container' })
+  @ApiOkResponse({
+    description: 'Detalhes do container.',
+    type: ContainerDetailsDto,
+  })
+  @ApiNotFoundResponse({ description: 'Container não encontrado.' })
   async containerDetails(@Param('id') id: string) {
     return this.DockerService.getContainerDetails(id);
   }
 
   @Get('containers/:id/recreate-plan')
-  @ApiOperation({ summary: 'Get a recreate plan for a container' })
-  @ApiResponse({ status: 200, description: 'Returns a recreate plan.' })
-  @ApiResponse({ status: 404, description: 'Container not found.' })
+  @ApiOperation({ summary: 'Obter plano de recriação do container' })
+  @ApiParam({ name: 'id', description: 'ID ou nome do container' })
+  @ApiOkResponse({
+    description: 'Plano de recriação do container.',
+    type: RecreatePlanDto,
+  })
+  @ApiNotFoundResponse({ description: 'Container não encontrado.' })
   async recreatePlan(@Param('id') id: string) {
     return this.DockerService.buildRecreatePlan(id);
   }
@@ -60,13 +98,21 @@ export class DockerController {
    * Isso é a base do "update engine" (manual primeiro; depois vira automático).
    */
   @Post('containers/:name/recreate')
-  @ApiOperation({ summary: 'Recreate a container with a new image' })
-  @ApiResponse({
-    status: 201,
-    description: 'Container recreated successfully.',
+  @ApiOperation({ summary: 'Recriar container com nova imagem' })
+  @ApiParam({ name: 'name', description: 'Nome do container' })
+  @ApiBody({ type: RecreateDto })
+  @ApiCreatedResponse({
+    description: 'Resultado da recriação.',
+    schema: {
+      oneOf: [
+        { $ref: getSchemaPath(ContainerRecreateNoopDto) },
+        { $ref: getSchemaPath(ContainerUpdateResultSuccessDto) },
+        { $ref: getSchemaPath(ContainerUpdateResultRolledBackDto) },
+      ],
+    },
   })
-  @ApiResponse({ status: 404, description: 'Container not found.' })
-  @ApiBody({ type: RecreateDto }) // Swagger continua usando class
+  @ApiBadRequestResponse({ description: 'Dados inválidos.' })
+  @ApiNotFoundResponse({ description: 'Container não encontrado.' })
   async recreate(
     @Param('name') name: string,
     @Body(new ZodValidationPipe(recreateBodySchema)) body: RecreateDto, // Zod valida o body
@@ -137,12 +183,13 @@ export class DockerController {
    * Observação: tags tipo "latest" podem mudar sem aviso, então digest é o jeito certo.
    */
   @Get('containers/:name/update-check')
-  @ApiOperation({ summary: 'Check for container image updates' })
-  @ApiResponse({
-    status: 200,
-    description: 'Returns update check status.',
+  @ApiOperation({ summary: 'Checar atualização de imagem do container' })
+  @ApiParam({ name: 'name', description: 'Nome do container' })
+  @ApiOkResponse({
+    description: 'Resultado da checagem de update.',
+    type: ContainerUpdateCheckDto,
   })
-  @ApiResponse({ status: 404, description: 'Container not found.' })
+  @ApiNotFoundResponse({ description: 'Container não encontrado.' })
   async updateCheck(@Param('name') name: string) {
     const c = this.docker.getContainer(name);
     const inspect = await c.inspect();
@@ -185,11 +232,21 @@ export class DockerController {
 
   @Post('containers/:name/update')
   @ApiOperation({
-    summary: 'Orchestrated update: check + pull + recreate (if needed)',
+    summary: 'Update orquestrado: check + pull + recreate (se necessário)',
   })
-  @ApiResponse({ status: 200, description: 'Noop or update result' })
-  @ApiResponse({ status: 404, description: 'Container not found' })
+  @ApiParam({ name: 'name', description: 'Nome do container' })
   @ApiBody({ type: UpdateDto })
+  @ApiOkResponse({
+    description: 'Resultado do update (noop ou execução).',
+    schema: {
+      oneOf: [
+        { $ref: getSchemaPath(UpdateContainerNoopDto) },
+        { $ref: getSchemaPath(UpdateContainerResultDto) },
+      ],
+    },
+  })
+  @ApiBadRequestResponse({ description: 'Dados inválidos.' })
+  @ApiNotFoundResponse({ description: 'Container não encontrado.' })
   async updateContainer(
     @Param('name') name: string,
     @Body(new ZodValidationPipe(updateBodySchema)) body: UpdateDto,

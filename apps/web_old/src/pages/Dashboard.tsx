@@ -128,6 +128,7 @@ const checkMutation = useMutation({
 });
 
 
+
   const cachedCheck = qc.getQueryData<UpdateCheckResult>(["update-check", name]);
 
   // Só habilita "Atualizar" quando tem hasUpdate true
@@ -147,7 +148,7 @@ const checkMutation = useMutation({
     mutationFn: () => dockerApi.update(name, { pull: true, force: true }),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["containers"] });
-      qc.invalidateQueries({ queryKey: ["update-check", name] });
+      qc.invalidateQueries({ querysKey: ["update-check", name] });
     },
   });
 

@@ -3,7 +3,7 @@ import { IsBoolean, IsOptional, IsString } from "class-validator";
 
 export class RecreateDto {
   @ApiPropertyOptional({
-    description: "New image to use (default: current container image).",
+    description: "Nova imagem para usar (padrão: imagem atual do container).",
     example: "nginx:latest",
   })
   @IsOptional()
@@ -11,7 +11,7 @@ export class RecreateDto {
   image?: string;
 
   @ApiPropertyOptional({
-    description: "Force recreate even if already up-to-date.",
+    description: "Força recriar mesmo se já estiver atualizado.",
     example: false,
     default: false,
   })
@@ -20,7 +20,7 @@ export class RecreateDto {
   force?: boolean;
 
   @ApiPropertyOptional({
-    description: "Pull image before recreating (recommended).",
+    description: "Faz pull da imagem antes de recriar (recomendado).",
     example: true,
     default: true,
   })

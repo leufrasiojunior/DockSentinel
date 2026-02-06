@@ -8,16 +8,18 @@ import { IsIn, IsOptional, IsString, MinLength } from 'class-validator';
  */
 export class SetupDto {
   @ApiProperty({
-    description: 'Authentication mode',
+    description: 'Modo de autenticação',
     enum: ['none', 'password', 'totp', 'both'],
+    example: 'password',
   })
   @IsIn(['none', 'password', 'totp', 'both'])
   authMode!: 'none' | 'password' | 'totp' | 'both';
 
   @ApiProperty({
-    description: 'Log level',
+    description: 'Nível de log',
     enum: ['error', 'warn', 'info', 'debug'],
     required: false,
+    example: 'info',
   })
   @IsOptional()
   @IsIn(['error', 'warn', 'info', 'debug'])
@@ -25,8 +27,9 @@ export class SetupDto {
 
   // usado quando authMode = password | both
   @ApiProperty({
-    description: 'Admin password (min 8 characters)',
+    description: 'Senha do admin (mínimo 8 caracteres)',
     required: false,
+    example: 'MinhaSenha123!',
   })
   @IsOptional()
   @IsString()
@@ -35,8 +38,9 @@ export class SetupDto {
 
   // usado quando authMode = totp | both
   @ApiProperty({
-    description: 'TOTP secret (min 16 characters)',
+    description: 'Secret TOTP (mínimo 16 caracteres)',
     required: false,
+    example: 'JBSWY3DPEHPK3PXP',
   })
   @IsOptional()
   @IsString()

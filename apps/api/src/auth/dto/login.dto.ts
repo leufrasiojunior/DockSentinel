@@ -3,16 +3,18 @@ import { IsOptional, IsString } from 'class-validator';
 
 export class LoginDto {
   @ApiProperty({
-    description: 'Password for login. Required if auth mode is PASSWORD.',
+    description: 'Senha para login. Obrigatória quando o modo é password/both.',
     required: false,
+    example: 'MinhaSenha123!',
   })
   @IsString()
   @IsOptional()
   password?: string;
 
   @ApiProperty({
-    description: 'Time-based one-time password. Required if auth mode is TOTP.',
+    description: 'Código TOTP de 6 dígitos. Obrigatório quando o modo é totp/both.',
     required: false,
+    example: '123456',
   })
   @IsString()
   @IsOptional()

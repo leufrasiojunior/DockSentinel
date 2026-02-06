@@ -1,0 +1,13 @@
+{
+  "home-assistant": ["homeassistant"],
+  "homeassistant": ["homeassistant"],
+  "postgres": ["postgresql"],
+  "postgis": ["postgresql"],
+  "mariadb": ["mariadb"],
+  "mongodb": ["mongodb"],
+  "mongo": ["mongodb"],
+  "nginx-proxy-manager": ["nginxproxymanager"],
+  "npm": ["nginxproxymanager"],
+  "pihole": ["pi-hole", "pihole"],
+  "pi-hole": ["pi-hole", "pihole"]
+}

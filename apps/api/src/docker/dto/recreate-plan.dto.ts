@@ -1,57 +1,88 @@
 import { ApiProperty } from '@nestjs/swagger';
 
 export class PortBinding {
-  @ApiProperty({ required: false })
+  @ApiProperty({
+    description: 'IP do host',
+    example: '0.0.0.0',
+    required: false,
+  })
   HostIp?: string;
 
-  @ApiProperty({ required: false })
+  @ApiProperty({
+    description: 'Porta publicada no host',
+    example: '8080',
+    required: false,
+  })
   HostPort?: string;
 }
 
 export class RestartPolicy {
-  @ApiProperty()
+  @ApiProperty({ description: 'Política de restart', example: 'always' })
   Name: string;
 
-  @ApiProperty({ required: false })
+  @ApiProperty({
+    description: 'Número máximo de tentativas',
+    example: 5,
+    required: false,
+  })
   MaximumRetryCount?: number;
 }
 
 export class NetworkAttachment {
-  @ApiProperty()
+  @ApiProperty({ description: 'Nome da rede', example: 'bridge' })
   name: string;
 
-  @ApiProperty({ required: false })
+  @ApiProperty({
+    description: 'Endereço IPv4 fixo (se existir)',
+    example: '172.17.0.10',
+    required: false,
+  })
   ipv4Address?: string;
 
-  @ApiProperty({ required: false })
+  @ApiProperty({
+    description: 'Endereço IPv6 fixo (se existir)',
+    required: false,
+  })
   ipv6Address?: string;
 }
 
 export class RecreatePlanDto {
-  @ApiProperty()
+  @ApiProperty({ description: 'ID do container atual', example: 'a9d7c7a3a3e6' })
   oldId: string;
 
-  @ApiProperty()
+  @ApiProperty({ description: 'Nome do container', example: 'nginx' })
   name: string;
 
-  @ApiProperty({ description: 'Target image (e.g., nginx:latest)' })
+  @ApiProperty({
+    description: 'Imagem alvo (ex.: nginx:latest)',
+    example: 'nginx:latest',
+  })
   image: string;
 
-  @ApiProperty()
+  @ApiProperty({
+    description: 'Variáveis de ambiente',
+    example: ['ENV=prod'],
+  })
   env: string[];
 
-  @ApiProperty({ type: 'object', additionalProperties: { type: 'string' } })
+  @ApiProperty({
+    description: 'Labels do container',
+    type: 'object',
+    additionalProperties: { type: 'string' },
+    example: { 'com.example.vendor': 'ACME' },
+  })
   labels: Record<string, string>;
 
   @ApiProperty({
-    description: 'Exposed ports, e.g., { "80/tcp": {} }',
+    description: 'Portas expostas, ex.: { "80/tcp": {} }',
     type: 'object',
     additionalProperties: true,
+    example: { '80/tcp': {} },
   })
   exposedPorts: Record<string, {}>;
 
   @ApiProperty({
-    description: 'Port bindings',
+    description: 'Mapeamento de portas (bindings)',
     type: 'object',
     additionalProperties: {
       type: 'array',
@@ -63,17 +94,24 @@ export class RecreatePlanDto {
         },
       },
     },
+    example: { '80/tcp': [{ HostIp: '0.0.0.0', HostPort: '8080' }] },
   })
   portBindings: Record<string, Array<{ HostIp?: string; HostPort?: string }>>;
 
   @ApiProperty({
-    description: 'Binds in Docker format: ["hostPath:/containerPath:ro", ...]',
+    description:
+      'Binds no formato do Docker: ["hostPath:/containerPath:ro", ...]',
+    example: ['/data/nginx:/usr/share/nginx/html:ro'],
   })
   binds: string[];
 
-  @ApiProperty({ type: RestartPolicy, required: false })
+  @ApiProperty({
+    description: 'Política de restart',
+    type: RestartPolicy,
+    required: false,
+  })
   restartPolicy?: RestartPolicy;
 
-  @ApiProperty({ type: [NetworkAttachment] })
+  @ApiProperty({ description: 'Redes', type: [NetworkAttachment] })
   networks: NetworkAttachment[];
 }

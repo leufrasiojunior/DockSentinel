@@ -1,5 +1,17 @@
 import { Body, Controller, Get, Param, Post, Put, Query } from '@nestjs/common';
-import { ApiBody, ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
+import {
+  ApiAcceptedResponse,
+  ApiBadRequestResponse,
+  ApiBody,
+  ApiCreatedResponse,
+  ApiExtraModels,
+  ApiOkResponse,
+  ApiNotFoundResponse,
+  ApiOperation,
+  ApiParam,
+  ApiQuery,
+  ApiTags,
+} from '@nestjs/swagger';
 import { UpdatesRepository } from './updates.repository';
 import { UpdatesWorkerService } from './updates.worker.service';
 import { ZodValidationPipe } from '../common/pipes/zod-validation.pipe';
@@ -15,9 +27,22 @@ import {
 import { UpdatesSchedulerService } from './updates.scheduler.service';
 import { UpdatesOrchestratorService } from './updates.orchestrator.service';
 import { SchedulerConfigDto, schedulerPatchSchema } from './dto/updates-scheduler.dto';
+import {
+  EnqueueManyResponseDto,
+  UpdateJobsListDto,
+} from './dto/updates-responses.dto';
+import { UpdateJobDto } from './dto/update-job.dto';
+import {
+  ScanAndEnqueueRequestDto,
+  ScanAndEnqueueResultDto,
+  ScanResultErrorDto,
+  ScanResultOkDto,
+} from './dto/scan-and-enqueue.dto';
+import { SchedulerConfigResponseDto } from './dto/scheduler-status.dto';
+import { OkResponseDto } from '../common/dto/ok-response.dto';
 
-
-@ApiTags('updates')
+@ApiTags('Updates')
+@ApiExtraModels(ScanResultOkDto, ScanResultErrorDto)
 @Controller('updates')
 export class UpdatesController {
   constructor(
@@ -28,9 +53,13 @@ export class UpdatesController {
   ) {}
 
   @Post('enqueue')
-  @ApiOperation({ summary: 'Enqueue one update job' })
-  @ApiResponse({ status: 201 })
+  @ApiOperation({ summary: 'Enfileirar um job de update' })
   @ApiBody({ type: EnqueueDto })
+  @ApiCreatedResponse({
+    description: 'Job enfileirado com sucesso.',
+    type: EnqueueManyResponseDto,
+  })
+  @ApiBadRequestResponse({ description: 'Dados inválidos.' })
   async enqueue(@Body(new ZodValidationPipe(enqueueSchema)) body: EnqueueDto) {
     const result = await this.repo.enqueueMany([body]);
 
@@ -43,9 +72,13 @@ export class UpdatesController {
   }
 
   @Post('batch')
-  @ApiOperation({ summary: 'Enqueue multiple update jobs' })
-  @ApiResponse({ status: 201 })
+  @ApiOperation({ summary: 'Enfileirar múltiplos jobs de update' })
   @ApiBody({ type: BatchDto })
+  @ApiCreatedResponse({
+    description: 'Jobs enfileirados com sucesso.',
+    type: EnqueueManyResponseDto,
+  })
+  @ApiBadRequestResponse({ description: 'Dados inválidos.' })
   async batch(@Body(new ZodValidationPipe(batchSchema)) body: BatchDto) {
     const result = await this.repo.enqueueMany(body.items ?? []);
 
@@ -59,8 +92,17 @@ export class UpdatesController {
 
   // ✅ Observabilidade (lista)
   @Get('jobs')
-  @ApiOperation({ summary: 'List update jobs (recent) with optional filters)' })
-  @ApiResponse({ status: 200 })
+  @ApiOperation({ summary: 'Listar jobs de update' })
+  @ApiQuery({ name: 'container', required: false, description: 'Filtra por container' })
+  @ApiQuery({
+    name: 'status',
+    required: false,
+    description: 'Filtra por status',
+    enum: ['queued', 'running', 'success', 'failed'],
+  })
+  @ApiQuery({ name: 'take', required: false, description: 'Quantidade máxima' })
+  @ApiQuery({ name: 'skip', required: false, description: 'Offset de paginação' })
+  @ApiOkResponse({ description: 'Lista de jobs.', type: UpdateJobsListDto })
   async listJobs(
     @Query(new ZodValidationPipe(jobsQuerySchema)) query: JobsQuery,
   ) {
@@ -69,17 +111,21 @@ export class UpdatesController {
 
   // ✅ Observabilidade (detalhe)
   @Get('jobs/:id')
-  @ApiOperation({ summary: 'Get one update job details' })
-  @ApiResponse({ status: 200 })
-  @ApiResponse({ status: 404 })
+  @ApiOperation({ summary: 'Obter detalhes de um job' })
+  @ApiParam({ name: 'id', description: 'ID do job' })
+  @ApiOkResponse({ description: 'Detalhes do job.', type: UpdateJobDto })
+  @ApiNotFoundResponse({ description: 'Job não encontrado.' })
   async getJob(@Param('id') id: string) {
     return this.repo.getJobOrThrow(id);
   }
 
   // (Opcional) útil pra debug manual
   @Post('kick')
-  @ApiOperation({ summary: 'Manually kick worker loop (debug)' })
-  @ApiResponse({ status: 202 })
+  @ApiOperation({ summary: 'Forçar execução do worker (debug)' })
+  @ApiAcceptedResponse({
+    description: 'Worker acionado.',
+    type: OkResponseDto,
+  })
   async kick() {
     this.worker.kick().catch((err) => {
       console.error('[UpdatesWorker] kick failed', err);
@@ -96,16 +142,25 @@ export class UpdatesController {
    * - Dispara worker.kick() sem await (assíncrono)
    */
   @Get('scheduler')
-  @ApiOperation({ summary: 'Get scheduler config (DB)' })
+  @ApiOperation({ summary: 'Obter configuração do scheduler (DB)' })
+  @ApiOkResponse({
+    description: 'Configuração atual.',
+    type: SchedulerConfigResponseDto,
+  })
   async getScheduler() {
     return this.scheduler.getConfig();
   }
 
   @Put('scheduler')
   @ApiOperation({
-    summary: 'Update scheduler config (DB) and apply immediately',
+    summary: 'Atualizar configuração do scheduler (DB) e aplicar imediatamente',
   })
   @ApiBody({ type: SchedulerConfigDto })
+  @ApiOkResponse({
+    description: 'Configuração atualizada.',
+    type: SchedulerConfigResponseDto,
+  })
+  @ApiBadRequestResponse({ description: 'Configuração inválida.' })
   async updateScheduler(
     @Body(new ZodValidationPipe(schedulerPatchSchema))
     body: SchedulerConfigDto,
@@ -116,9 +171,15 @@ export class UpdatesController {
   @Post('scan-and-enqueue')
   @ApiOperation({
     summary:
-      'Scan containers and optionally enqueue update jobs (DB config by default). ' +
-      'Auto-update is skipped when container has label docksentinel.update=false',
+      'Escanear containers e enfileirar updates (opcional). ' +
+      'Auto-update é pulado quando o container tem label docksentinel.update=false',
   })
+  @ApiBody({ type: ScanAndEnqueueRequestDto })
+  @ApiOkResponse({
+    description: 'Resultado do scan e enqueue.',
+    type: ScanAndEnqueueResultDto,
+  })
+  @ApiBadRequestResponse({ description: 'Parâmetros inválidos.' })
   async scanAndEnqueue(
     @Body()
     body?: Partial<{

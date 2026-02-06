@@ -2,48 +2,77 @@ import { ApiProperty, ApiPropertyOptional } from "@nestjs/swagger"
 import { z } from "zod"
 
 export class SchedulerConfigDto {
-  @ApiProperty({ example: true })
+  @ApiProperty({ description: "Habilita o scheduler", example: true })
   enabled: boolean
 
-  @ApiProperty({ example: "*/5 * * * *", description: "Cron com 5 campos (min hour dom mon dow)" })
+  @ApiProperty({
+    example: "*/5 * * * *",
+    description: "Expressão cron com 5 campos (min hora dom mês dia-semana)",
+  })
   cronExpr: string
 
-  @ApiProperty({ example: "scan_only", enum: ["scan_only", "scan_and_update"] })
+  @ApiProperty({
+    description: "Modo de execução",
+    example: "scan_only",
+    enum: ["scan_only", "scan_and_update"],
+  })
   mode: "scan_only" | "scan_and_update"
 
-  @ApiProperty({ example: "all", enum: ["all", "labeled"] })
+  @ApiProperty({
+    description: "Escopo de seleção de containers",
+    example: "all",
+    enum: ["all", "labeled"],
+  })
   scope: "all" | "labeled"
 
-  @ApiProperty({ example: "docksentinel.scan" })
+  @ApiProperty({
+    description: "Label usada para permitir scan quando scope=labeled",
+    example: "docksentinel.scan",
+  })
   scanLabelKey: string
 
-  @ApiProperty({ example: "docksentinel.update" })
+  @ApiProperty({
+    description: "Label usada para permitir update automático",
+    example: "docksentinel.update",
+  })
   updateLabelKey: string
 
-  @ApiProperty({ example: "2026-01-24T19:51:35.484Z" })
-  updatedAt: Date
 }
 
 export class UpdateSchedulerConfigPatchDto {
-  @ApiPropertyOptional({ example: true })
+  @ApiPropertyOptional({ description: "Habilita o scheduler", example: true })
   enabled?: boolean
 
   @ApiPropertyOptional({
     example: "*/10 * * * *",
-    description: "Cron com 5 campos (min hour dom mon dow)",
+    description: "Expressão cron com 5 campos (min hora dom mês dia-semana)",
   })
   cronExpr?: string
 
-  @ApiPropertyOptional({ enum: ["scan_only", "scan_and_update"], example: "scan_only" })
+  @ApiPropertyOptional({
+    description: "Modo de execução",
+    enum: ["scan_only", "scan_and_update"],
+    example: "scan_only",
+  })
   mode?: "scan_only" | "scan_and_update"
 
-  @ApiPropertyOptional({ enum: ["all", "labeled"], example: "all" })
+  @ApiPropertyOptional({
+    description: "Escopo de seleção de containers",
+    enum: ["all", "labeled"],
+    example: "all",
+  })
   scope?: "all" | "labeled"
 
-  @ApiPropertyOptional({ example: "docksentinel.scan" })
+  @ApiPropertyOptional({
+    description: "Label usada para permitir scan quando scope=labeled",
+    example: "docksentinel.scan",
+  })
   scanLabelKey?: string
 
-  @ApiPropertyOptional({ example: "docksentinel.update" })
+  @ApiPropertyOptional({
+    description: "Label usada para permitir update automático",
+    example: "docksentinel.update",
+  })
   updateLabelKey?: string
 }
 

@@ -1,7 +1,14 @@
 import { Body, Controller, Get, Put } from '@nestjs/common';
 import { SettingsService } from './settings.service';
 import { UpdateSettingsDto } from './dto/update-settings.dto';
-import { ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
+import {
+  ApiBadRequestResponse,
+  ApiBody,
+  ApiOkResponse,
+  ApiOperation,
+  ApiTags,
+} from '@nestjs/swagger';
+import { SafeSettingsDto } from './dto/safe-settings.dto';
 
 /**
  * /settings:
@@ -14,10 +21,10 @@ export class SettingsController {
   constructor(private readonly settings: SettingsService) {}
 
   @Get()
-  @ApiOperation({ summary: 'Get safe settings' })
-  @ApiResponse({
-    status: 200,
-    description: 'Returns the safe settings.',
+  @ApiOperation({ summary: 'Obter configurações seguras' })
+  @ApiOkResponse({
+    description: 'Retorna configurações seguras (sem secrets).',
+    type: SafeSettingsDto,
   })
   async get() {
     /**
@@ -29,9 +36,13 @@ export class SettingsController {
   }
 
   @Put()
-  @ApiOperation({ summary: 'Update settings' })
-  @ApiResponse({ status: 200, description: 'Settings updated successfully.' })
-  @ApiResponse({ status: 400, description: 'Invalid settings provided.' })
+  @ApiOperation({ summary: 'Atualizar configurações' })
+  @ApiBody({ type: UpdateSettingsDto })
+  @ApiOkResponse({
+    description: 'Configurações atualizadas com sucesso.',
+    type: SafeSettingsDto,
+  })
+  @ApiBadRequestResponse({ description: 'Configurações inválidas.' })
   async update(@Body() dto: UpdateSettingsDto) {
     return this.settings.updateSettings(dto);
   }

@@ -19,7 +19,7 @@ export default function ContainerRow({ c }: { c: any }) {
         <UpdateBadge check={checkQ.data} />
       </td>
       <td className="px-6 py-3">
-        <RowActions name={c.name} onChecked={checkQ.refetch} />
+        <RowActions name={c.name} onChecked={() => checkQ.refetch()} />
       </td>
     </tr>
   );

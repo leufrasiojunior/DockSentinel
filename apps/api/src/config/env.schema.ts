@@ -87,7 +87,12 @@ export const envSchema = z
      * TTL da sessão em horas.
      */
     SESSION_TTL_HOURS: z.coerce.number().int().min(1).max(720).default(24),
+
+    CORS_ORIGINS: z
+  .string()
+  .default("http://localhost:5173,http://127.0.0.1:5173"),
   })
+
   .superRefine((val, ctx) => {
     // Se o modo exige password, a senha deve existir
     if (

@@ -50,7 +50,7 @@ async function bootstrap() {
    * Isso evita perder logs iniciais em casos de custom logger mais tarde.
    */
   const app = await NestFactory.create(AppModule, { bufferLogs: true });
-
+  
   /**
    * ConfigService agora está disponível globalmente.
    * Ele já passou pela validação do Zod no boot.
@@ -59,6 +59,28 @@ async function bootstrap() {
   const port = config.getOrThrow('PORT', { infer: true });
 
   const secret = config.getOrThrow('DOCKSENTINEL_SECRET', { infer: true });
+
+  // ✅ CORS (precisa vir antes do listen)
+  const corsOriginsRaw = config.getOrThrow('CORS_ORIGINS', { infer: true });
+  const corsOrigins = corsOriginsRaw
+    .split(',')
+    .map((s) => s.trim())
+    .filter(Boolean);
+  const corsAllowAll = corsOrigins.includes('*');
+
+  app.enableCors({
+    origin: (origin, cb) => {
+      // requests sem Origin (curl, server-to-server) devem passar
+      if (!origin) return cb(null, true);
+      if (corsAllowAll) return cb(null, true);
+      if (corsOrigins.includes(origin)) return cb(null, true);
+      return cb(new Error(`CORS blocked for origin: ${origin}`), false);
+    },
+    credentials: true,
+    methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
+    allowedHeaders: ['Content-Type', 'Authorization'],
+  });
+
 
   /**
    * cookieParser(secret):

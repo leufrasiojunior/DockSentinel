@@ -2,35 +2,70 @@ import { ApiProperty } from "@nestjs/swagger"
 import { z } from "zod"
 
 export class EnqueueDto {
-  @ApiProperty({ example: "homarr" })
+  @ApiProperty({
+    description: "Nome do container alvo",
+    example: "homarr",
+  })
   container!: string
 
-  @ApiProperty({ example: "ghcr.io/homarr-labs/homarr:latest", required: false, nullable: true })
+  @ApiProperty({
+    description: "Imagem alvo (opcional; padrão: imagem atual do container)",
+    example: "ghcr.io/homarr-labs/homarr:latest",
+    required: false,
+    nullable: true,
+  })
   image?: string | null
 
-  @ApiProperty({ required: false, default: false })
+  @ApiProperty({
+    description: "Força enfileirar mesmo se já estiver atualizado",
+    required: false,
+    default: false,
+    example: false,
+  })
   force?: boolean
 
-  @ApiProperty({ required: false, default: true })
+  @ApiProperty({
+    description: "Faz pull antes de atualizar",
+    required: false,
+    default: true,
+    example: true,
+  })
   pull?: boolean
 }
 
 export class BatchDto {
-  @ApiProperty({ type: [EnqueueDto] })
+  @ApiProperty({ description: "Itens para enfileirar", type: [EnqueueDto] })
   items!: EnqueueDto[]
 }
 
 export class JobsQueryDto {
-  @ApiProperty({ required: false, example: "homarr" })
+  @ApiProperty({
+    description: "Filtra por container",
+    required: false,
+    example: "homarr",
+  })
   container?: string
 
-  @ApiProperty({ required: false, example: "queued" })
+  @ApiProperty({
+    description: "Filtra por status",
+    required: false,
+    example: "queued",
+  })
   status?: "queued" | "running" | "success" | "failed"
 
-  @ApiProperty({ required: false, default: 50, example: 50 })
+  @ApiProperty({
+    description: "Quantidade máxima de itens",
+    required: false,
+    default: 50,
+    example: 50,
+  })
   take?: number
 
-  @ApiProperty({ required: false, example: "0" })
+  @ApiProperty({
+    description: "Offset para paginação",
+    required: false,
+    example: 0,
+  })
   skip?: number
 }
 
