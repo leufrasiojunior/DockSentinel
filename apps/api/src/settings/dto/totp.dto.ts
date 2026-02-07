@@ -59,12 +59,6 @@ export class TotpConfirmDto {
 export class TotpConfirmResponseDto {
   @ApiProperty({ example: true })
   ok!: boolean
-
-  @ApiProperty({
-    description: "Modo final de auth gravado no DB (após confirmar).",
-    example: "both",
-  })
-  authMode!: "none" | "password" | "totp" | "both"
 }
 
 export const totpConfirmSchema = z.object({

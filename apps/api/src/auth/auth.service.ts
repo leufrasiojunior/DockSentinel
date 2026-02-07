@@ -1,9 +1,9 @@
 import { Injectable, Logger, UnauthorizedException } from "@nestjs/common"
 import * as argon2 from "argon2"
 import { authenticator } from "@otplib/preset-default"
-import { SettingsRepository } from "src/settings/settings.repository"
-import { CryptoService } from "src/crypto/crypto.service"
-import { SettingsService } from "src/settings/settings.service"
+import { SettingsRepository } from "../settings/settings.repository"
+import { CryptoService } from "../crypto/crypto.service"
+import { SettingsService } from "../settings/settings.service"
 
 @Injectable()
 export class AuthService {

@@ -10,7 +10,6 @@ export type SettingsPatch = {
   adminPasswordHash?: string | null;
   totpSecretEnc?: string | null;
   logLevel?: string;
-  setupCompletedAt?: Date | null;
 };
 
 @Injectable()
@@ -28,17 +27,10 @@ export class SettingsRepository {
    * Prisma exige `create` e `update` no formato plano.
    */
   async upsert(patch: SettingsPatch) {
-    const { setupCompletedAt, ...rest } = patch;
-
-    
     return this.prisma.client.globalSettings.upsert({
       where: { id: 1 },
       create: { id: 1, ...patch },
-      update: {
-        ...rest,
-        // só atualiza setupCompletedAt se vier definido (e não null acidental)
-        ...(setupCompletedAt instanceof Date ? { setupCompletedAt } : {}),
-      },
+      update: patch,
     });
   }
 }

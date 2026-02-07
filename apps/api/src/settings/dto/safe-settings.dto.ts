@@ -26,4 +26,18 @@ export class SafeSettingsDto {
     example: false,
   })
   hasTotp!: boolean;
+
+  @ApiProperty({
+    description: 'Data de criação da configuração inicial (setup)',
+    nullable: true,
+    example: '2026-02-07T12:00:00.000Z',
+  })
+  createdAt!: string | null;
+
+  @ApiProperty({
+    description: 'Data da última atualização das configurações',
+    nullable: true,
+    example: '2026-02-07T12:10:00.000Z',
+  })
+  updatedAt!: string | null;
 }

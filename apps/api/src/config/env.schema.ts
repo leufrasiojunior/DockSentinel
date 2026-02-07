@@ -1,5 +1,14 @@
 import { z } from 'zod';
 
+const isValidTimeZone = (tz: string) => {
+  try {
+    Intl.DateTimeFormat('en-US', { timeZone: tz });
+    return true;
+  } catch {
+    return false;
+  }
+};
+
 /**
  * Schema de validação do ENV.
  * A regra: se o ENV estiver inválido, o app NÃO sobe.
@@ -52,6 +61,18 @@ export const envSchema = z
     SCHEDULER_INTERVAL_MIN: z.coerce.number().int().min(1).max(1440).default(5),
 
     /**
+     * Timezone (IANA) para cron/scheduler.
+     * Ex: "America/Sao_Paulo"
+     */
+    TZ: z
+      .string()
+      .min(1)
+      .optional()
+      .refine((tz) => !tz || isValidTimeZone(tz), {
+        message: 'TZ must be a valid IANA timezone (e.g. America/Sao_Paulo)',
+      }),
+
+    /**
      * Secret master para criptografar campos sensíveis (registry password, smtp password, totp secret).
      * Para POC real, exigimos pelo menos 32 chars.
      * (Depois podemos reforçar com 64 bytes base64, etc.)
@@ -62,19 +83,19 @@ export const envSchema = z
       .default('CHANGE_ME_CHANGE_ME_CHANGE_ME_32CHARS_MIN'),
 
     /**
-     * Auth Mode (por enquanto via ENV; depois pode ir para DB e o ENV vira “setup default”).
+     * Auth Mode usado apenas como fallback quando o DB ainda não está acessível.
      */
     AUTH_MODE: z.enum(['none', 'password', 'totp', 'both']).default('none'),
 
     /**
      * Senha única do admin (inicialmente via ENV).
-     * Depois, isso vai para o DB via /setup e ficará criptografado.
+     * O valor efetivo fica no DB via /settings (hash).
      */
     ADMIN_PASSWORD: z.string().min(8).optional(),
 
     /**
      * Secret base32 do TOTP (inicialmente via ENV).
-     * Depois, isso vai para o DB via /setup e ficará criptografado.
+     * O valor efetivo fica no DB via /settings (criptografado).
      */
     TOTP_SECRET: z.string().min(16).optional(),
 
