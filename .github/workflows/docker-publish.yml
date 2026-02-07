@@ -11,6 +11,7 @@ permissions:
 jobs:
   docker:
     runs-on: ubuntu-latest
+    environment: ci-ds
     steps:
       - name: Checkout
         uses: actions/checkout@v4
