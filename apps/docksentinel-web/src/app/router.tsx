@@ -7,16 +7,12 @@ import { JobsPage } from "../pages/Jobs/JobsPage";
 import { SchedulerPage } from "../pages/Scheduler/SchedulerPage";
 import { LoginPage } from "../pages/Auth/LoginPage";
 import { AppShell } from "../layouts/AppShell";
-import { SetupPage } from "../pages/Setup/SetupPage";
 import { SettingsPage } from "../pages/Settings/SettingsPage";
 
 export const router = createBrowserRouter([
   {
     path: "/login",
     element: <LoginPage />,
-  },
-  { path: "/setup", 
-    element: <SetupPage /> 
   },
   {
     path: "/",

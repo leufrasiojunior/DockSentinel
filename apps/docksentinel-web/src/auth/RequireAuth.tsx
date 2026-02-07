@@ -41,8 +41,7 @@ export function RequireAuth({ children }: { children: ReactNode }) {
     return <FullscreenLoading text="Verificando modo de login..." />;
   }
 
-  // Se /auth/status falhar, preferimos mandar pro login,
-  // mas levando o usuário a ter um "caminho" (login/setup).
+  // Se /auth/status falhar, preferimos mandar pro login.
   if (statusQuery.isError || !mode) {
     return (
       <Navigate

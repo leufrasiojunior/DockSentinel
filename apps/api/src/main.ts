@@ -123,7 +123,7 @@ async function bootstrap() {
     const swaggerConfig = new DocumentBuilder()
       .setTitle('DockSentinel API')
       .setDescription(
-        'API do DockSentinel (containers, updates, auth, setup, settings)',
+        'API do DockSentinel (containers, updates, auth, settings)',
       )
       .setVersion('1.0.0')
       .build();

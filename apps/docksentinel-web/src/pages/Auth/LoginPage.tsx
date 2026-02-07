@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useState } from "react";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { useLocation, useNavigate } from "react-router-dom";
 
@@ -6,14 +6,8 @@ import { Button } from "../../layouts/ui/Button";
 import { Card, CardHeader } from "../../layouts/ui/Card";
 import { useToast } from "../../layouts/ui/ToastProvider";
 
-import { getAuthStatus, login, type AuthMode } from "../../api/auth";
-
-function needsPassword(mode: AuthMode) {
-  return mode === "password" || mode === "both";
-}
-function needsTotp(mode: AuthMode) {
-  return mode === "totp" || mode === "both";
-}
+import { getAuthStatus, login } from "../../api/auth";
+import { buildLoginBody, loginHint, needsPassword, needsTotp } from "./loginUtils";
 
 export function LoginPage() {
   const nav = useNavigate();
@@ -32,18 +26,11 @@ export function LoginPage() {
   const authMode = statusQuery.data?.authMode ?? "password";
   const from = (location.state as any)?.from ?? "/dashboard";
 
-  const hints = useMemo(() => {
-    if (authMode === "none") return "Sem login: clique em Entrar.";
-    if (authMode === "password") return "Informe a senha.";
-    if (authMode === "totp") return "Informe o código TOTP (6 dígitos).";
-    return "Informe senha + TOTP.";
-  }, [authMode]);
+  const hints = loginHint(authMode);
 
   const loginMutation = useMutation({
     mutationFn: async () => {
-      const body: any = {};
-      if (needsPassword(authMode)) body.password = password;
-      if (needsTotp(authMode)) body.totp = totp;
+      const body = buildLoginBody(authMode, password, totp);
 
       // em authMode=none, body vazio (LoginDto permite campos opcionais)
       await login(body);
@@ -119,7 +106,7 @@ export function LoginPage() {
                 Entrar
               </Button>
 
-              <Button type="button" onClick={() => nav("/setup")}>
+              <Button type="button" onClick={() => nav("/settings")}>
                 Configurar
               </Button>
             </div>

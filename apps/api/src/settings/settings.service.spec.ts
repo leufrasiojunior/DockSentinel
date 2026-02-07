@@ -3,6 +3,7 @@ import { CryptoService } from "../crypto/crypto.service"
 import type { SettingsRepository, SettingsPatch } from "./settings.repository"
 import type { ConfigService } from "@nestjs/config"
 import type { Env } from "../config/env.schema"
+import { BadRequestException } from "@nestjs/common"
 
 describe("SettingsService (unit)", () => {
   beforeAll(() => {
@@ -15,12 +16,21 @@ describe("SettingsService (unit)", () => {
      * - upsert grava em `db`
      * - get devolve o que está em `db`
      */
-    const db: { value: (SettingsPatch & { id: number }) | null } = { value: null }
+    const db: {
+      value:
+        | (SettingsPatch & {
+            id: number
+            createdAt: Date
+            updatedAt: Date
+          })
+        | null
+    } = { value: null }
 
 
     const repo: Pick<SettingsRepository, "get" | "upsert"> = {
       get: jest.fn().mockImplementation(async () => db.value ?? null),
       upsert: jest.fn().mockImplementation(async (patch: SettingsPatch) => {
+        const now = new Date()
         // cria/atualiza o registro como Prisma faria
         db.value = {
           id: 1,
@@ -28,6 +38,8 @@ describe("SettingsService (unit)", () => {
           logLevel: patch.logLevel ?? db.value?.logLevel ?? "info",
           adminPasswordHash: patch.adminPasswordHash ?? db.value?.adminPasswordHash ?? null,
           totpSecretEnc: patch.totpSecretEnc ?? db.value?.totpSecretEnc ?? null,
+          createdAt: db.value?.createdAt ?? now,
+          updatedAt: now,
         }
         return db.value
       }),
@@ -56,5 +68,33 @@ describe("SettingsService (unit)", () => {
     expect(result.logLevel).toBe("debug")
     expect(result.hasPassword).toBe(true)
     expect(result.hasTotp).toBe(true)
+    expect(result.createdAt).toBeInstanceOf(Date)
+    expect(result.updatedAt).toBeInstanceOf(Date)
+  })
+
+  it("should reject password mode without password configured", async () => {
+    const repo: Pick<SettingsRepository, "get" | "upsert"> = {
+      get: jest.fn().mockResolvedValue(null),
+      upsert: jest.fn(),
+    }
+
+    const crypto = new CryptoService()
+    const config = {
+      get: jest.fn().mockReturnValue("none"),
+      getOrThrow: jest.fn().mockReturnValue("none"),
+    } as unknown as ConfigService<Env>
+    const svc = new SettingsService(
+      repo as SettingsRepository,
+      crypto,
+      config,
+    )
+
+    await expect(
+      svc.updateSettings({
+        authMode: "password",
+      }),
+    ).rejects.toBeInstanceOf(BadRequestException)
+
+    expect(repo.upsert).not.toHaveBeenCalled()
   })
 })

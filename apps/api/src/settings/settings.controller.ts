@@ -36,7 +36,7 @@ export class SettingsController {
   }
 
   @Put()
-  @ApiOperation({ summary: 'Atualizar configurações' })
+  @ApiOperation({ summary: 'Criar/atualizar configurações (setup e manutenção)' })
   @ApiBody({ type: UpdateSettingsDto })
   @ApiOkResponse({
     description: 'Configurações atualizadas com sucesso.',

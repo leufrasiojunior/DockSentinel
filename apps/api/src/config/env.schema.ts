@@ -83,19 +83,19 @@ export const envSchema = z
       .default('CHANGE_ME_CHANGE_ME_CHANGE_ME_32CHARS_MIN'),
 
     /**
-     * Auth Mode (por enquanto via ENV; depois pode ir para DB e o ENV vira “setup default”).
+     * Auth Mode usado apenas como fallback quando o DB ainda não está acessível.
      */
     AUTH_MODE: z.enum(['none', 'password', 'totp', 'both']).default('none'),
 
     /**
      * Senha única do admin (inicialmente via ENV).
-     * Depois, isso vai para o DB via /setup e ficará criptografado.
+     * O valor efetivo fica no DB via /settings (hash).
      */
     ADMIN_PASSWORD: z.string().min(8).optional(),
 
     /**
      * Secret base32 do TOTP (inicialmente via ENV).
-     * Depois, isso vai para o DB via /setup e ficará criptografado.
+     * O valor efetivo fica no DB via /settings (criptografado).
      */
     TOTP_SECRET: z.string().min(16).optional(),
 

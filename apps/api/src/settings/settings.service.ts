@@ -1,4 +1,4 @@
-import { Injectable, Logger } from "@nestjs/common"
+import { BadRequestException, Injectable, Logger } from "@nestjs/common"
 import * as argon2 from "argon2"
 import { SettingsRepository } from "./settings.repository"
 import { CryptoService } from "../crypto/crypto.service"
@@ -22,7 +22,7 @@ export class SettingsService {
   constructor(
     private readonly repo: SettingsRepository,
     private readonly crypto: CryptoService,
-     private readonly config: ConfigService<Env>,
+    private readonly config: ConfigService<Env>,
   ) {}
 
   /**
@@ -32,12 +32,13 @@ export class SettingsService {
   async getSafeSettings() {
     const row = await this.repo.get()
     return {
-      authMode: row?.authMode ?? "none",
+      authMode: isAuthMode(row?.authMode) ? row.authMode : "none",
       logLevel: row?.logLevel ?? "info",
       // flags úteis para UI
       hasPassword: Boolean(row?.adminPasswordHash),
       hasTotp: Boolean(row?.totpSecretEnc),
-      setupCompletedAt: row?.setupCompletedAt ?? null,
+      createdAt: row?.createdAt ?? null,
+      updatedAt: row?.updatedAt ?? null,
     }
   }
 
@@ -47,6 +48,21 @@ export class SettingsService {
    * - Se totpSecret vier, criptografa e salva.
    */
   async updateSettings(dto: UpdateSettingsDto) {
+    const row = await this.repo.get()
+    const currentAuthMode = isAuthMode(row?.authMode) ? row.authMode : "none"
+    const nextAuthMode = dto.authMode ?? currentAuthMode
+
+    const willHavePassword = Boolean(dto.adminPassword) || Boolean(row?.adminPasswordHash)
+    const willHaveTotp = Boolean(dto.totpSecret) || Boolean(row?.totpSecretEnc)
+
+    if ((nextAuthMode === "password" || nextAuthMode === "both") && !willHavePassword) {
+      throw new BadRequestException("adminPassword is required for password/both modes")
+    }
+
+    if ((nextAuthMode === "totp" || nextAuthMode === "both") && !willHaveTotp) {
+      throw new BadRequestException("totpSecret is required for totp/both modes")
+    }
+
     const patch: {
       authMode?: string
       logLevel?: string
@@ -73,26 +89,20 @@ export class SettingsService {
     return this.getSafeSettings()
   }
 
-async getAuthMode(): Promise<AuthMode> {
-  try {
-    const row = await this.repo.get()
+  async getAuthMode(): Promise<AuthMode> {
+    try {
+      const row = await this.repo.get()
+      if (isAuthMode(row?.authMode)) {
+        return row.authMode
+      }
 
-    // ✅ Se setup já foi concluído, DB manda
-    if (row?.setupCompletedAt && isAuthMode(row?.authMode)) {
-      return row.authMode
+      // primeira configuração: sem linha no DB, libera fluxo inicial
+      return "none"
+    } catch {
+      // fallback de boot quando o DB ainda não está acessível.
+      this.logger.warn("DB not ready for settings yet; falling back to ENV")
+      const fromEnv = this.config.get("AUTH_MODE", { infer: true })
+      return isAuthMode(fromEnv) ? fromEnv : "none"
     }
-
-    // ✅ Se setup ainda NÃO foi concluído, podemos usar ENV como "default"
-    const fromEnv = this.config.get("AUTH_MODE", { infer: true })
-    return isAuthMode(fromEnv) ? fromEnv : "none"
-  } catch {
-    // ✅ Se DB não está acessível (ex.: primeiro boot / migrations não rodaram ainda),
-    // cai no ENV para não quebrar a API.
-    this.logger.warn("DB not ready for settings yet; falling back to ENV")
-    const fromEnv = this.config.get("AUTH_MODE", { infer: true })
-    return isAuthMode(fromEnv) ? fromEnv : "none"
   }
-}
-
-
 }
