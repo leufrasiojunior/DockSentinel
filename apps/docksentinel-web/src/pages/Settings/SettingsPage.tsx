@@ -282,10 +282,10 @@ export function SettingsPage() {
                   setTotpConfirmed(false);
                 }}
               >
-                <option value="none">none</option>
-                <option value="password">password</option>
-                <option value="totp">totp</option>
-                <option value="both">both</option>
+                <option value="none"> Sem senha</option>
+                <option value="password">Somente senha</option>
+                <option value="totp">TOTP</option>
+                <option value="both">Ambos(Senha+TOTP)</option>
               </select>
             </label>
 

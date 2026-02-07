@@ -4,6 +4,7 @@ on:
   push:
     branches:
       - main
+  workflow_dispatch:
 
 permissions:
   contents: write
@@ -16,5 +17,5 @@ jobs:
       - uses: googleapis/release-please-action@v4
         with:
           release-type: node
-          package-name: docksentinel
-          # Se seu repo for monorepo depois, dá pra ajustar com "path"
+          target-branch: main
+          # path: .   # opcional (use se seu package.json estiver em subpasta)
