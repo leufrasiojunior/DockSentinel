@@ -5,18 +5,14 @@ import type { LogLevel } from "./setup";
 export type SafeSettings = {
   authMode?: AuthMode;
   logLevel?: LogLevel;
-  // outros campos "safe" podem aparecer
+  setupCompletedAt: string | null;
   [key: string]: unknown;
 };
 
-export type UpdateSettingsBody = {
-  authMode?: AuthMode;
-  logLevel?: LogLevel;
+export type UpdateSettingsBody = Partial<Pick<SafeSettings, "authMode" | "logLevel">> & {
   adminPassword?: string;
-  totpSecret?: string;
-  setupCompletedAt: string | null;
-
 };
+
 
 export async function getSettings(): Promise<SafeSettings> {
   return http<SafeSettings>("/settings");
