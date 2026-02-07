@@ -1,0 +1,81 @@
+name: Publish Docker (tags only)
+
+on:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: read
+
+jobs:
+  docker:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      # Necessário para builds multi-arch (amd64/arm64)
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v3
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Login to Docker Hub
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      # Gera tags Docker a partir da tag Git (SemVer)
+      - name: Docker meta
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ secrets.DOCKERHUB_USERNAME }}/docksentinel
+          tags: |
+            # v1.2.3        -> 1.2.3, 1.2, 1
+            # v1.2.3-beta.1 -> 1.2.3-beta.1 (apenas full)
+            type=semver,pattern={{version}}
+            type=semver,pattern={{major}}.{{minor}}
+            type=semver,pattern={{major}}
+
+            # Tag por SHA (debug)
+            type=sha,format=short,prefix=sha-
+
+      - name: Add channel tags (latest/alpha/beta)
+        id: channel
+        shell: bash
+        run: |
+          REF="${GITHUB_REF_NAME}"
+          EXTRA=""
+          # stable: v1.2.3 -> latest
+          if [[ "$REF" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            EXTRA="${{ secrets.DOCKERHUB_USERNAME }}/docksentinel:latest"
+          fi
+          # alpha tag: v1.2.3-alpha.1 -> alpha
+          if [[ "$REF" == *"-alpha."* ]]; then
+            EXTRA="${{ secrets.DOCKERHUB_USERNAME }}/docksentinel:alpha"
+          fi
+          # beta tag: v1.2.3-beta.1 -> beta
+          if [[ "$REF" == *"-beta."* ]]; then
+            EXTRA="${{ secrets.DOCKERHUB_USERNAME }}/docksentinel:beta"
+          fi
+
+          echo "extra_tags<<EOF" >> $GITHUB_OUTPUT
+          echo "$EXTRA" >> $GITHUB_OUTPUT
+          echo "EOF" >> $GITHUB_OUTPUT
+
+      - name: Build and push (multi-arch)
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          push: true
+          platforms: linux/amd64,linux/arm64
+          tags: |
+            ${{ steps.meta.outputs.tags }}
+            ${{ steps.channel.outputs.extra_tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
