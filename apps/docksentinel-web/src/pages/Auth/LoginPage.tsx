@@ -116,11 +116,6 @@ export function LoginPage() {
             )}
           </div>
         </Card>
-
-        <div className="text-center text-xs text-gray-500">
-          Dica dev: em ambiente de desenvolvimento, prefira acessar o front pela
-          porta do Vite (e usar proxy) para manter cookies.
-        </div>
       </div>
     </div>
   );

@@ -567,7 +567,7 @@ export function DashboardPage() {
       {containersQuery.isError && (
         <Card className="border-red-200 bg-red-50 px-4 py-3">
           <div className="text-sm text-red-700">
-            Erro ao carregar containers:{" "}
+            Erro ao carregar containers:
             {(containersQuery.error as any)?.message ?? "desconhecido"}
           </div>
         </Card>
