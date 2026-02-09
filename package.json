@@ -2,8 +2,17 @@
   "name": "docksentinel",
   "private": true,
   "version": "0.1.2-beta.1",
+  
   "workspaces": [
     "apps/*",
     "packages/*"
-  ]
+  ],
+  "scripts": {
+    "publish": "node scripts/publish.mjs",
+    "publish:beta": "node scripts/publish.mjs beta",
+    "publish:alpha": "node scripts/publish.mjs alpha",
+    "publish:release": "node scripts/publish.mjs release",
+    "version:current": "node scripts/version.mjs",
+    "tag:latest": "node scripts/tag-latest.mjs"
+  }
 }
