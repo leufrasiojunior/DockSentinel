@@ -1,5 +1,13 @@
 # Changelog
 
+## [1.4.0](https://github.com/leufrasiojunior/DockSentinel/compare/v1.3.0...v1.4.0) (2026-02-22)
+
+
+### Features
+
+* adiciona variáveis de ambiente para o fluxo de trabalho de lanç… ([f3b8423](https://github.com/leufrasiojunior/DockSentinel/commit/f3b84235e4b64718918a37b491c68911c9595692))
+* adiciona variáveis de ambiente para o fluxo de trabalho de lançamento ([9c2da9b](https://github.com/leufrasiojunior/DockSentinel/commit/9c2da9b87b55eb365f2f023538ec395ba3c95168))
+
 ## [1.3.0](https://github.com/leufrasiojunior/DockSentinel/compare/v1.2.0...v1.3.0) (2026-02-22)
 
 
