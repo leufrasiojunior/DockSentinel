@@ -762,7 +762,7 @@ export function DashboardPage() {
               </div>
 
               {detailsQuery.isLoading && (
-                <div className="mt-4 text-sm text-gray-600">Carregando detalhes...</div>
+                <div className="mt-4 text-sm text-gray-600">Carregando detalhes dos containers...</div>
               )}
 
               {detailsQuery.isError && (
