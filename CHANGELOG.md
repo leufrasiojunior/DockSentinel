@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.3.0](https://github.com/leufrasiojunior/DockSentinel/compare/v1.2.0...v1.3.0) (2026-02-22)
+
+
+### Features
+
+* adiciona documentação e scripts de publicação para gerenciamento de versões no DockSentinel ([d7e7410](https://github.com/leufrasiojunior/DockSentinel/commit/d7e741038523b500a1d229c323fcbcc4cc3a722c))
+
 ## [1.2.0](https://github.com/leufrasiojunior/DockSentinel/compare/v1.1.0...v1.2.0) (2026-02-07)
 
 
