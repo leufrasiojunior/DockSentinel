@@ -5,131 +5,100 @@
 </p>
 
 <p align="center">
-  <strong>Monitoramento e atualizacao inteligente de containers Docker</strong> 🐳🛡️
+  <strong>Monitoramento e atualizacao inteligente de containers Docker</strong>
 </p>
 
 ## O que e o DockSentinel?
 
-O **DockSentinel** e uma aplicacao para **monitorar atualizacoes de containers Docker** e executar atualizacoes com seguranca, controle e rastreabilidade.
+DockSentinel e um painel web para monitorar updates de containers Docker e executar atualizacoes com controle, seguranca e rastreabilidade.
 
-Ele nasceu para resolver um problema comum em ambientes self-hosted e homelab:
+Ele foi pensado para ambientes self-hosted e homelab onde voce precisa:
 
-- saber **quais containers tem update disponivel**;
-- decidir **quando** e **como** atualizar;
-- evitar atualizacoes cegas e sem visibilidade;
-- manter o ambiente protegido com autenticacao configuravel.
+- identificar quais containers possuem nova imagem;
+- decidir quando atualizar;
+- executar atualizacao individual ou em lote;
+- acompanhar fila e historico de jobs.
 
-## Status atual
+## Instalacao com Docker Compose (Docker Hub)
 
-O projeto ja possui a **base MVP pronta** ✅, com foco em operacao real:
+### Imagens disponiveis
 
-- listagem de containers;
-- checagem manual e automatica de updates;
-- enfileiramento de atualizacoes;
-- execucao individual e em lote;
-- scheduler com configuracoes avancadas;
-- autenticacao com multiplos modos de seguranca.
+- `docker pull leufrasiojunior/docksentinel:latest`
+- `docker pull leufrasiojunior/docksentinel:beta`
 
-## Recursos principais (MVP)
+### 1. Crie o `docker-compose.yml`
 
-### 1) Visao de containers (Dashboard) 📦
+```yaml
+services:
+  docksentinel:
+    image: leufrasiojunior/docksentinel:latest
+    # image: leufrasiojunior/docksentinel:beta
+    container_name: docksentinel
+    restart: unless-stopped
+    ports:
+      - "8080:80"
+      - "3000:3000"
+    environment:
+      PORT: "3000"
+      LOG_LEVEL: "info"
+      DATABASE_URL: "file:/data/docksentinel.db"
+      DOCKSENTINEL_SECRET: "CHANGE_ME_CHANGE_ME_CHANGE_ME_32CHARS_MIN"
+      AUTO_MIGRATE: "true"
+      SWAGGER_ENABLED: "true"
+      CORS_ORIGINS: "*"
+      TZ: "America/Sao_Paulo"
+    volumes:
+      - docksentinel_data:/data
+      - /var/run/docker.sock:/var/run/docker.sock
 
-- lista containers do host Docker;
-- mostra estado/status;
-- exibe detalhes tecnicos do container;
-- permite selecionar varios containers.
-
-### 2) Checagem de atualizacoes 🔎
-
-- checagem **individual** por container;
-- checagem **em massa** ("Checar todos");
-- comparacao por digest (local x remoto) para detectar update real.
-
-### 3) Atualizacao individual e em lote ⚙️
-
-- atualizar um container especifico;
-- atualizar containers selecionados em lote;
-- bloqueio por label para evitar update indevido (`docksentinel.update=false`).
-
-### 4) Fila de atualizacoes (Jobs) 🧵
-
-- enfileira jobs de update;
-- processamento assicrono por worker;
-- historico/observabilidade com status:
-  - queued
-  - running
-  - success/done
-  - failed
-
-### 5) Scan manual e automatico 🤖
-
-- scan manual sob demanda:
-  - `scan_only`
-  - `scan_and_update`
-- scheduler com cron configuravel;
-- modo e escopo configuraveis:
-  - `scan_only` ou `scan_and_update`
-  - `all` ou `labeled`
-- filtros por labels de scan/update.
-
-### 6) Configuracoes amplas de atualizacao 🛠️
-
-- habilitar/desabilitar scheduler;
-- cron expression customizavel;
-- escolha de modo de execucao;
-- escolha de escopo de containers;
-- chaves de label configuraveis (`scanLabelKey`, `updateLabelKey`);
-- status de runtime do scheduler (proxima execucao, ultimo erro, ultimo resultado).
-
-### 7) Alta seguranca e autenticacao flexivel 🔐
-
-Modos suportados:
-
-- `none` (sem senha)
-- `password` (somente senha)
-- `totp` (somente TOTP)
-- `both` (senha + TOTP)
-
-Mais recursos de seguranca:
-
-- sessao por cookie assinado (`HttpOnly`);
-- hash de senha com Argon2;
-- secret TOTP criptografado;
-- guard global de autenticacao.
-
-## Arquitetura (resumo)
-
-- **Frontend:** React + Vite (`apps/docksentinel-web`)
-- **Backend:** NestJS (`apps/api`)
-- **Banco:** SQLite + Prisma
-- **Execucao Docker:** integracao via Docker socket
-- **Deploy/Release:** scripts de release + GitHub Actions + Docker Hub
-
-## Estrutura do repositorio
-
-```text
-apps/
-  api/               # Backend NestJS (docker, updates, auth, settings)
-  docksentinel-web/  # Frontend React (dashboard, jobs, scheduler, settings)
-scripts/             # Automacao de release/publicacao
-.github/workflows/   # CI/CD e publicacao Docker
-Docs/                # Documentacao operacional e de releases
+volumes:
+  docksentinel_data:
 ```
 
-## Documentacao complementar
+### 2. Suba o DockSentinel
 
-- Manual de scripts e workflows: `Docs/Manual-Scripts-e-Workflows.md`
-- Guia de releases/CI-CD: `Docs/Releases.md`
+Versao `latest` (padrao):
 
-## Visao de produto
+```bash
+docker compose pull
+docker compose up -d
+```
 
-O DockSentinel busca ser um **"control plane leve para updates Docker"**:
+Versao `beta`:
 
-- simples de operar no dia a dia;
-- robusto para ambientes reais;
-- seguro por padrao;
-- extensivel para melhorias futuras.
+```bash
+DOCKSENTINEL_TAG=beta docker compose pull
+DOCKSENTINEL_TAG=beta docker compose up -d
+```
 
----
+### 3. Acesse a aplicacao
 
-Feito para quem quer menos atualizacao manual e mais confiabilidade no ciclo de vida dos containers. 🚀
+- UI: `http://localhost:8080`
+- API docs (opcional): `http://localhost:3000/docs`
+
+## Como usar
+
+Depois de subir o container:
+
+1. Acesse `http://localhost:8080`.
+2. Abra o Dashboard para listar os containers do host.
+3. Rode a checagem de updates (manual ou automatica).
+4. Atualize containers individualmente ou em lote.
+5. Ajuste modo de autenticacao e scheduler em Settings.
+
+Se `SWAGGER_ENABLED=true`, a API fica disponivel em `http://localhost:3000/docs`.
+
+## Atualizacao da aplicacao
+
+Para atualizar a imagem e recriar o container:
+
+```bash
+docker compose pull
+docker compose up -d
+```
+
+## Observacoes importantes
+
+- Troque `DOCKSENTINEL_SECRET` por um valor forte (minimo 32 caracteres). Para gerar automaticamente, voce pode usar: `https://www.random.org/passwords/`.
+- O mount `/var/run/docker.sock` e obrigatorio para o DockSentinel inspecionar e atualizar containers do host.
+- O banco SQLite fica persistido no volume `docksentinel_data`.
