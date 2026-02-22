@@ -1,5 +1,13 @@
 # Changelog
 
+## [1.4.1](https://github.com/leufrasiojunior/DockSentinel/compare/v1.4.0...v1.4.1) (2026-02-22)
+
+
+### Bug Fixes
+
+* atualiza mensagem de carregamento para maior clareza na página d… ([1e7a355](https://github.com/leufrasiojunior/DockSentinel/commit/1e7a355059ff09eb31b63a2dc29f98a5e128c595))
+* atualiza mensagem de carregamento para maior clareza na página do dashboard ([f3e0382](https://github.com/leufrasiojunior/DockSentinel/commit/f3e0382d17922a3c3d57cc46ef4a1adc7f07e638))
+
 ## [1.4.0](https://github.com/leufrasiojunior/DockSentinel/compare/v1.3.0...v1.4.0) (2026-02-22)
 
 
