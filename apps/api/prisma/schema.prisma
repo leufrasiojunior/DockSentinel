@@ -33,8 +33,38 @@ model GlobalSettings {
    */
   logLevel String @default("info")
 
+  notificationsInAppEnabled Boolean @default(true)
+  notificationsEmailEnabled Boolean @default(false)
+  notificationLevel String @default("all") // all | errors_only
+  notificationReadRetentionDays Int @default(15)
+  notificationUnreadRetentionDays Int @default(60)
+  notificationRecipientEmail String?
+  smtpHost String?
+  smtpPort Int?
+  smtpSecureMode String @default("starttls") // starttls | tls
+  smtpUsername String?
+  smtpPasswordEnc String?
+  smtpFromName String?
+  smtpFromEmail String?
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+}
+
+model NotificationEvent {
+  id String @id @default(cuid())
+  type String // job_success | job_failed | scan_info | scan_error | system_error
+  level String @default("info") // info | error
+  channel String @default("in_app")
+  title String
+  message String
+  payloadJson String?
+  readAt DateTime?
+  createdAt DateTime @default(now())
+
+  @@index([createdAt(sort: Desc)])
+  @@index([readAt])
+  @@index([id])
 }
 
 model UpdateJob {

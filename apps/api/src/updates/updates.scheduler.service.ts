@@ -16,6 +16,7 @@ import {
   UpdatesOrchestratorService,
   type ScanAndEnqueueResult,
 } from './updates.orchestrator.service';
+import { NotificationsService } from '../notifications/notifications.service';
 
 const JOB_NAME = 'updates_scan_job';
 
@@ -40,6 +41,7 @@ export class UpdatesSchedulerService implements OnModuleInit {
     private readonly schedule: SchedulerRegistry,
     private readonly orchestrator: UpdatesOrchestratorService,
     private readonly config: ConfigService<Env>,
+    private readonly notifications: NotificationsService,
   ) {
     this.timeZone = this.normalizeTimeZone(
       this.config.get('TZ', { infer: true }),
@@ -195,6 +197,9 @@ export class UpdatesSchedulerService implements OnModuleInit {
           const msg = this.getErrorMessage(err);
           this.lastError = msg;
           this.logger.error(`[scheduler] tick failed: ${msg}`);
+          await this.notifications.emitSystemError(`Scheduler tick failed: ${msg}`, {
+            scope: 'scheduler_tick',
+          });
         } finally {
           this.lastFinishedAt = new Date();
           this.nextScanAt = this.safeNextScan(job);

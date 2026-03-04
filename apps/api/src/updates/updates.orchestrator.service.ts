@@ -7,6 +7,7 @@ import {
 import { UpdatesRepository } from './updates.repository';
 import { UpdatesWorkerService } from './updates.worker.service';
 import { UpdatesSchedulerRepository } from './updates.scheduler.repository';
+import { NotificationsService } from '../notifications/notifications.service';
 
 export type ScanMode = 'scan_only' | 'scan_and_update';
 export type ScanScope = 'all' | 'labeled';
@@ -43,6 +44,7 @@ export class UpdatesOrchestratorService {
     private readonly repo: UpdatesRepository,
     private readonly worker: UpdatesWorkerService,
     private readonly schedRepo: UpdatesSchedulerRepository,
+    private readonly notifications: NotificationsService,
   ) {}
 
   async scanAndEnqueueFromDb(): Promise<ScanAndEnqueueResult> {
@@ -137,6 +139,28 @@ export class UpdatesOrchestratorService {
       }
     }
 
+    const errored = results.filter((r) => 'error' in r).length;
+    const hasAnyError = errored > 0;
+    const scannedImages = results.map((r) => {
+      if ('error' in r) return `${r.name} (erro)`;
+      const image = r.imageRef ?? 'n/a';
+      return `${r.name} => ${image}`;
+    });
+    const updateCandidates: string[] = [];
+    for (const r of results) {
+      if (!('error' in r) && r.hasUpdate) {
+        updateCandidates.push(`${r.name} => ${r.imageRef ?? 'n/a'}`);
+      }
+    }
+    const scannedSummary =
+      scannedImages.length > 0
+        ? scannedImages.slice(0, 8).join(' | ')
+        : 'nenhum container';
+    const updatesSummary =
+      updateCandidates.length > 0
+        ? updateCandidates.slice(0, 8).join(' | ')
+        : 'nenhuma atualização';
+
     if (input.mode === 'scan_and_update' && toQueue.length > 0) {
       const enq = await this.repo.enqueueMany(toQueue);
 
@@ -147,12 +171,54 @@ export class UpdatesOrchestratorService {
           this.logger.error(`worker kick failed: ${this.getErrorMessage(e)}`),
         );
 
+      const message = hasAnyError
+        ? `Scan concluído com erros. mode=${input.mode}, scanned=${results.length}, queued=${enq.queued.length}, errors=${errored}. Imagens: ${scannedSummary}. Updates: ${updatesSummary}.`
+        : `Scan concluído. mode=${input.mode}, scanned=${results.length}, queued=${enq.queued.length}. Imagens: ${scannedSummary}. Updates: ${updatesSummary}.`;
+      if (hasAnyError) {
+        await this.notifications.emitScanError(message, {
+          mode: input.mode,
+          scanned: results.length,
+          queued: enq.queued.length,
+          errors: errored,
+          scannedImages,
+          updateCandidates,
+        });
+      } else {
+        await this.notifications.emitScanInfo(message, {
+          mode: input.mode,
+          scanned: results.length,
+          queued: enq.queued.length,
+          scannedImages,
+          updateCandidates,
+        });
+      }
+
       return {
         scanned: results.length,
         mode: input.mode,
         queued: enq,
         results,
       };
+    }
+
+    const message = hasAnyError
+      ? `Scan concluído com erros. mode=${input.mode}, scanned=${results.length}, errors=${errored}. Imagens: ${scannedSummary}. Updates: ${updatesSummary}.`
+      : `Scan concluído sem enqueue. mode=${input.mode}, scanned=${results.length}. Imagens: ${scannedSummary}. Updates: ${updatesSummary}.`;
+    if (hasAnyError) {
+      await this.notifications.emitScanError(message, {
+        mode: input.mode,
+        scanned: results.length,
+        errors: errored,
+        scannedImages,
+        updateCandidates,
+      });
+    } else {
+      await this.notifications.emitScanInfo(message, {
+        mode: input.mode,
+        scanned: results.length,
+        scannedImages,
+        updateCandidates,
+      });
     }
 
     return { scanned: results.length, mode: input.mode, queued: null, results };

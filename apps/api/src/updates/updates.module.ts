@@ -10,9 +10,10 @@ import { UpdatesQueueService } from "./updates.queue.service";
 import { UpdatesSchedulerRepository } from "./updates.scheduler.repository";
 import { UpdatesOrchestratorService } from "./updates.orchestrator.service";
 import { UpdatesSchedulerController } from "./updates.scheduler.controller";
+import { NotificationsModule } from "src/notifications/notifications.module";
 
 @Module({
-  imports: [DockerModule, PrismaModule],
+  imports: [DockerModule, PrismaModule, NotificationsModule],
   controllers: [UpdatesController, UpdatesSchedulerController],
   providers: [
     UpdatesRepository,

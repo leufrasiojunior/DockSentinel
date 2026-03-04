@@ -10,6 +10,19 @@ export type SettingsPatch = {
   adminPasswordHash?: string | null;
   totpSecretEnc?: string | null;
   logLevel?: string;
+  notificationsInAppEnabled?: boolean;
+  notificationsEmailEnabled?: boolean;
+  notificationLevel?: "all" | "errors_only";
+  notificationReadRetentionDays?: number;
+  notificationUnreadRetentionDays?: number;
+  notificationRecipientEmail?: string | null;
+  smtpHost?: string | null;
+  smtpPort?: number | null;
+  smtpSecureMode?: "starttls" | "tls";
+  smtpUsername?: string | null;
+  smtpPasswordEnc?: string | null;
+  smtpFromName?: string | null;
+  smtpFromEmail?: string | null;
 };
 
 @Injectable()
