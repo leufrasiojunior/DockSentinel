@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Put } from '@nestjs/common';
+import { Body, Controller, Get, Post, Put } from '@nestjs/common';
 import { SettingsService } from './settings.service';
 import { UpdateSettingsDto } from './dto/update-settings.dto';
 import {
@@ -9,6 +9,8 @@ import {
   ApiTags,
 } from '@nestjs/swagger';
 import { SafeSettingsDto } from './dto/safe-settings.dto';
+import { OkResponseDto } from '../common/dto/ok-response.dto';
+import { SmtpTestDto } from './dto/smtp-test.dto';
 
 /**
  * /settings:
@@ -45,5 +47,17 @@ export class SettingsController {
   @ApiBadRequestResponse({ description: 'Configurações inválidas.' })
   async update(@Body() dto: UpdateSettingsDto) {
     return this.settings.updateSettings(dto);
+  }
+
+  @Post('smtp/test')
+  @ApiOperation({ summary: 'Testar envio SMTP com config atual ou override no body' })
+  @ApiBody({ type: SmtpTestDto, required: false })
+  @ApiOkResponse({
+    description: 'SMTP validado com sucesso.',
+    type: OkResponseDto,
+  })
+  @ApiBadRequestResponse({ description: 'Configuração SMTP inválida.' })
+  async testSmtp(@Body() dto?: SmtpTestDto) {
+    return this.settings.testSmtp(dto);
   }
 }

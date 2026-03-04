@@ -12,12 +12,44 @@ import { useConfirm } from "../../layouts/ui/ConfirmProvider";
 import { getAuthStatus, logout, type AuthMode } from "../../api/auth";
 import {
   getSettings,
+  testSmtp,
   updateSettings,
   type LogLevel,
+  type NotificationLevel,
   type SafeSettings,
+  type SmtpSecureMode,
   type UpdateSettingsBody,
 } from "../../api/settings";
-import { totpInit, totpConfirm, type TotpInitResponse } from "../../api/totp";
+import { totpConfirm, totpInit, type TotpInitResponse } from "../../api/totp";
+
+type SettingsTab = "auth" | "notifications";
+type ProviderPreset = {
+  id: "gmail" | "outlook" | "hotmail" | "yahoo" | "custom";
+  label: string;
+  host: string;
+  port: number;
+  secureMode: SmtpSecureMode;
+};
+
+const PROVIDERS: ProviderPreset[] = [
+  { id: "gmail", label: "Gmail", host: "smtp.gmail.com", port: 587, secureMode: "starttls" },
+  {
+    id: "outlook",
+    label: "Outlook",
+    host: "smtp-mail.outlook.com",
+    port: 587,
+    secureMode: "starttls",
+  },
+  {
+    id: "hotmail",
+    label: "Hotmail",
+    host: "smtp-mail.outlook.com",
+    port: 587,
+    secureMode: "starttls",
+  },
+  { id: "yahoo", label: "Yahoo", host: "smtp.mail.yahoo.com", port: 587, secureMode: "starttls" },
+  { id: "custom", label: "Personalizado", host: "", port: 587, secureMode: "starttls" },
+];
 
 function needsPassword(mode: AuthMode) {
   return mode === "password" || mode === "both";
@@ -54,6 +86,8 @@ export function SettingsPage() {
   const nav = useNavigate();
   const qc = useQueryClient();
 
+  const [activeTab, setActiveTab] = useState<SettingsTab>("auth");
+
   const statusQuery = useQuery({
     queryKey: ["auth", "status"],
     queryFn: getAuthStatus,
@@ -81,6 +115,25 @@ export function SettingsPage() {
   const [totpConfirmed, setTotpConfirmed] = useState(false);
   const [totpNow, setTotpNow] = useState(() => Date.now());
 
+  const [notificationsInAppEnabled, setNotificationsInAppEnabled] = useState(true);
+  const [notificationsEmailEnabled, setNotificationsEmailEnabled] = useState(false);
+  const [notificationLevel, setNotificationLevel] = useState<NotificationLevel>("all");
+  const [notificationReadRetentionDays, setNotificationReadRetentionDays] = useState("15");
+  const [notificationUnreadRetentionDays, setNotificationUnreadRetentionDays] = useState("60");
+  const [smtpHost, setSmtpHost] = useState("");
+  const [smtpPort, setSmtpPort] = useState("587");
+  const [smtpSecureMode, setSmtpSecureMode] = useState<SmtpSecureMode>("starttls");
+  const [smtpUsername, setSmtpUsername] = useState("");
+  const [smtpPassword, setSmtpPassword] = useState("");
+  const [smtpFromName, setSmtpFromName] = useState("DockSentinel");
+  const [smtpFromEmail, setSmtpFromEmail] = useState("");
+
+  const [presetModalOpen, setPresetModalOpen] = useState(false);
+  const [presetSelected, setPresetSelected] = useState<ProviderPreset | null>(null);
+  const [presetHost, setPresetHost] = useState("");
+  const [presetPort, setPresetPort] = useState("587");
+  const [presetMode, setPresetMode] = useState<SmtpSecureMode>("starttls");
+
   useEffect(() => {
     if (!statusQuery.data) return;
     setDesiredMode((statusQuery.data.authMode ?? "none") as AuthMode);
@@ -89,6 +142,17 @@ export function SettingsPage() {
   useEffect(() => {
     if (!safe) return;
     setLogLevel((safe.logLevel as LogLevel) ?? "info");
+    setNotificationsInAppEnabled(safe.notificationsInAppEnabled ?? true);
+    setNotificationsEmailEnabled(safe.notificationsEmailEnabled ?? false);
+    setNotificationLevel((safe.notificationLevel as NotificationLevel) ?? "all");
+    setNotificationReadRetentionDays(String(safe.notificationReadRetentionDays ?? 15));
+    setNotificationUnreadRetentionDays(String(safe.notificationUnreadRetentionDays ?? 60));
+    setSmtpHost(safe.smtpHost ?? "");
+    setSmtpPort(String(safe.smtpPort ?? 587));
+    setSmtpSecureMode((safe.smtpSecureMode as SmtpSecureMode) ?? "starttls");
+    setSmtpUsername(safe.smtpUsername ?? "");
+    setSmtpFromName(safe.smtpFromName ?? "DockSentinel");
+    setSmtpFromEmail(safe.smtpFromEmail ?? "");
   }, [safe]);
 
   const wantPassword = needsPassword(desiredMode);
@@ -129,6 +193,19 @@ export function SettingsPage() {
   const saveMutation = useMutation({
     mutationFn: async (options?: { totpConfirmedOverride?: boolean }) => {
       const body: UpdateSettingsBody = { authMode: desiredMode, logLevel };
+      body.notificationsInAppEnabled = notificationsInAppEnabled;
+      body.notificationsEmailEnabled = notificationsEmailEnabled;
+      body.notificationLevel = notificationLevel;
+      body.notificationReadRetentionDays = Number(notificationReadRetentionDays);
+      body.notificationUnreadRetentionDays = Number(notificationUnreadRetentionDays);
+      body.smtpHost = smtpHost.trim();
+      body.smtpPort = Number(smtpPort);
+      body.smtpSecureMode = smtpSecureMode;
+      body.smtpUsername = smtpUsername.trim();
+      body.smtpFromName = smtpFromName.trim() || "DockSentinel";
+      body.smtpFromEmail = smtpFromEmail.trim();
+      body.notificationRecipientEmail = smtpFromEmail.trim();
+      if (smtpPassword.trim().length > 0) body.smtpPassword = smtpPassword;
 
       if (wantPassword) {
         if (isChangingPassword) {
@@ -151,6 +228,7 @@ export function SettingsPage() {
     },
     onSuccess: async () => {
       toast.success("Configurações salvas.", "Settings");
+      setSmtpPassword("");
       await qc.invalidateQueries({ queryKey: ["settings", "safe"] });
       await qc.invalidateQueries({ queryKey: ["auth", "status"] });
 
@@ -171,6 +249,21 @@ export function SettingsPage() {
       }
     },
     onError: (error: unknown) => toast.error(errorMessage(error, "Erro ao salvar"), "Settings"),
+  });
+
+  const smtpTestMutation = useMutation({
+    mutationFn: async () =>
+      testSmtp({
+        smtpHost: smtpHost.trim(),
+        smtpPort: Number(smtpPort),
+        smtpSecureMode,
+        smtpUsername: smtpUsername.trim(),
+        smtpPassword: smtpPassword.trim() || undefined,
+        smtpFromName: smtpFromName.trim() || "DockSentinel",
+        smtpFromEmail: smtpFromEmail.trim(),
+      }),
+    onSuccess: () => toast.success("SMTP validado com sucesso.", "SMTP"),
+    onError: (error: unknown) => toast.error(errorMessage(error, "Falha no teste SMTP"), "SMTP"),
   });
 
   async function handleSaveClicked() {
@@ -219,9 +312,23 @@ export function SettingsPage() {
         saveMutation.mutate({ totpConfirmedOverride: true });
       }
     },
-    onError: (error: unknown) =>
-      toast.error(errorMessage(error, "Falha ao confirmar"), "TOTP"),
+    onError: (error: unknown) => toast.error(errorMessage(error, "Falha ao confirmar"), "TOTP"),
   });
+
+  function openProviderModal(preset: ProviderPreset) {
+    setPresetSelected(preset);
+    setPresetHost(preset.host || smtpHost);
+    setPresetPort(String(preset.port || Number(smtpPort) || 587));
+    setPresetMode(preset.secureMode || smtpSecureMode);
+    setPresetModalOpen(true);
+  }
+
+  function applyProviderPreset() {
+    setSmtpHost(presetHost.trim());
+    setSmtpPort(String(Number(presetPort) || 587));
+    setSmtpSecureMode(presetMode);
+    setPresetModalOpen(false);
+  }
 
   const loading = statusQuery.isLoading || settingsQuery.isLoading;
   const hasError = statusQuery.isError || settingsQuery.isError;
@@ -230,9 +337,24 @@ export function SettingsPage() {
     <div className="p-6 space-y-4">
       <div>
         <h1 className="text-2xl font-semibold">Configurações</h1>
-        <p className="mt-1 text-sm text-gray-600">
-          Troque modo de login, log level e configure TOTP quando necessário.
-        </p>
+        <p className="mt-1 text-sm text-gray-600">Auth e Notificações em abas separadas.</p>
+      </div>
+
+      <div className="flex gap-2">
+        <Button
+          type="button"
+          variant={activeTab === "auth" ? "primary" : "ghost"}
+          onClick={() => setActiveTab("auth")}
+        >
+          Autenticação
+        </Button>
+        <Button
+          type="button"
+          variant={activeTab === "notifications" ? "primary" : "ghost"}
+          onClick={() => setActiveTab("notifications")}
+        >
+          Notificações
+        </Button>
       </div>
 
       {loading && (
@@ -252,16 +374,14 @@ export function SettingsPage() {
         </Card>
       )}
 
-      {safe && (
+      {safe && activeTab === "auth" && (
         <Card className="p-4">
           <CardHeader
             title="Autenticação"
             subtitle={
               <>
                 Modo atual: <Badge tone="gray">{currentMode}</Badge>
-                <span className="ml-2 text-xs text-gray-500">
-                  criado: {formatDateTime(safe.createdAt)}
-                </span>
+                <span className="ml-2 text-xs text-gray-500">criado: {formatDateTime(safe.createdAt)}</span>
                 <span className="ml-2 text-xs text-gray-500">
                   atualizado: {formatDateTime(safe.updatedAt)}
                 </span>
@@ -285,7 +405,7 @@ export function SettingsPage() {
                 <option value="none"> Sem senha</option>
                 <option value="password">Somente senha</option>
                 <option value="totp">TOTP</option>
-                <option value="both">Ambos(Senha+TOTP)</option>
+                <option value="both">Ambos (Senha + TOTP)</option>
               </select>
             </label>
 
@@ -334,9 +454,7 @@ export function SettingsPage() {
                 )}
 
                 {hasPassword && !isChangingPassword && (
-                  <div className="text-xs text-gray-500">
-                    Se você não preencher, a senha atual será mantida.
-                  </div>
+                  <div className="text-xs text-gray-500">Se você não preencher, a senha atual será mantida.</div>
                 )}
               </div>
             )}
@@ -403,10 +521,6 @@ export function SettingsPage() {
                       </Button>
                       {totpConfirmed && <Badge tone="green">Confirmado</Badge>}
                     </div>
-
-                    <div className="text-xs text-gray-600">
-                      Ao confirmar com sucesso, o modo <span className="font-mono">{desiredMode}</span> será salvo automaticamente.
-                    </div>
                   </div>
                 </div>
               )}
@@ -429,6 +543,239 @@ export function SettingsPage() {
             )}
           </div>
         </Card>
+      )}
+
+      {safe && activeTab === "notifications" && (
+        <Card className="p-4">
+          <CardHeader title="Notificações" subtitle="Canal na tela + e-mail SMTP com presets." />
+
+          <div className="grid gap-4 md:grid-cols-2">
+            <label className="flex items-center gap-2">
+              <input
+                type="checkbox"
+                checked={notificationsInAppEnabled}
+                onChange={(e) => setNotificationsInAppEnabled(e.target.checked)}
+              />
+              <span className="text-sm text-gray-700">Notificações na tela</span>
+            </label>
+
+            <label className="flex items-center gap-2">
+              <input
+                type="checkbox"
+                checked={notificationsEmailEnabled}
+                onChange={(e) => setNotificationsEmailEnabled(e.target.checked)}
+              />
+              <span className="text-sm text-gray-700">Notificações por e-mail</span>
+            </label>
+
+            <label className="space-y-1">
+              <div className="text-sm font-medium text-gray-700">Nível de notificação</div>
+              <select
+                className="w-full rounded-md border px-3 py-2 text-sm"
+                value={notificationLevel}
+                onChange={(e) => setNotificationLevel(e.target.value as NotificationLevel)}
+              >
+                <option value="all">Todas</option>
+                <option value="errors_only">Somente erros</option>
+              </select>
+            </label>
+
+            <label className="space-y-1">
+              <div className="text-sm font-medium text-gray-700">Retenção de lidas (dias)</div>
+              <input
+                className="w-full rounded-md border px-3 py-2 text-sm"
+                type="number"
+                min={1}
+                max={3650}
+                value={notificationReadRetentionDays}
+                onChange={(e) => setNotificationReadRetentionDays(e.target.value)}
+              />
+            </label>
+
+            <label className="space-y-1">
+              <div className="text-sm font-medium text-gray-700">
+                Retenção de não lidas (dias)
+              </div>
+              <input
+                className="w-full rounded-md border px-3 py-2 text-sm"
+                type="number"
+                min={1}
+                max={3650}
+                value={notificationUnreadRetentionDays}
+                onChange={(e) => setNotificationUnreadRetentionDays(e.target.value)}
+              />
+            </label>
+
+            <div className="space-y-2">
+              <div className="text-sm font-medium text-gray-700">Presets SMTP</div>
+              <div className="flex flex-wrap gap-2">
+                {PROVIDERS.map((p) => (
+                  <Button key={p.id} type="button" size="sm" variant="ghost" onClick={() => openProviderModal(p)}>
+                    {p.label}
+                  </Button>
+                ))}
+              </div>
+            </div>
+
+            <label className="space-y-1">
+              <div className="text-sm font-medium text-gray-700">SMTP host</div>
+              <input
+                className="w-full rounded-md border px-3 py-2 text-sm"
+                value={smtpHost}
+                onChange={(e) => setSmtpHost(e.target.value)}
+                placeholder="smtp.gmail.com"
+              />
+            </label>
+
+            <label className="space-y-1">
+              <div className="text-sm font-medium text-gray-700">SMTP port</div>
+              <input
+                className="w-full rounded-md border px-3 py-2 text-sm"
+                type="number"
+                min={1}
+                max={65535}
+                value={smtpPort}
+                onChange={(e) => setSmtpPort(e.target.value)}
+              />
+            </label>
+
+            <label className="space-y-1">
+              <div className="text-sm font-medium text-gray-700">Segurança</div>
+              <select
+                className="w-full rounded-md border px-3 py-2 text-sm"
+                value={smtpSecureMode}
+                onChange={(e) => setSmtpSecureMode(e.target.value as SmtpSecureMode)}
+              >
+                <option value="starttls">STARTTLS</option>
+                <option value="tls">SSL/TLS</option>
+              </select>
+            </label>
+
+            <label className="space-y-1">
+              <div className="text-sm font-medium text-gray-700">
+                SMTP usuário
+                {safe?.hasSmtpPassword && (
+                  <span className="ml-2 text-xs text-gray-500">senha já cadastrada</span>
+                )}
+              </div>
+              <input
+                className="w-full rounded-md border px-3 py-2 text-sm"
+                value={smtpUsername}
+                onChange={(e) => setSmtpUsername(e.target.value)}
+                placeholder="usuario"
+              />
+            </label>
+
+            <label className="space-y-1 md:col-span-2">
+              <div className="text-sm font-medium text-gray-700">SMTP senha (opcional)</div>
+              <input
+                className="w-full rounded-md border px-3 py-2 text-sm"
+                type="password"
+                value={smtpPassword}
+                onChange={(e) => setSmtpPassword(e.target.value)}
+                placeholder={safe?.hasSmtpPassword ? "Deixe em branco para manter a senha atual" : ""}
+              />
+            </label>
+
+            <label className="space-y-1">
+              <div className="text-sm font-medium text-gray-700">From name</div>
+              <input
+                className="w-full rounded-md border px-3 py-2 text-sm"
+                value={smtpFromName}
+                onChange={(e) => setSmtpFromName(e.target.value)}
+                placeholder="DockSentinel"
+              />
+            </label>
+
+            <label className="space-y-1">
+              <div className="text-sm font-medium text-gray-700">From email</div>
+              <input
+                className="w-full rounded-md border px-3 py-2 text-sm"
+                type="email"
+                value={smtpFromEmail}
+                onChange={(e) => setSmtpFromEmail(e.target.value)}
+                placeholder="seuemail@provedor.com"
+              />
+              <div className="text-xs text-gray-500">
+                O destinatário será sempre este mesmo e-mail (auto-notificação).
+              </div>
+            </label>
+          </div>
+
+          <div className="mt-4 flex flex-wrap gap-2">
+            <Button type="button" variant="ghost" onClick={() => smtpTestMutation.mutate()} disabled={smtpTestMutation.isPending}>
+              {smtpTestMutation.isPending ? "Testando..." : "Testar envio SMTP"}
+            </Button>
+
+            <Button
+              type="button"
+              variant="primary"
+              onClick={() => saveMutation.mutate(undefined)}
+              disabled={saveMutation.isPending}
+            >
+              Salvar notificações
+            </Button>
+          </div>
+        </Card>
+      )}
+
+      {presetModalOpen && (
+        <div className="fixed inset-0 z-[1000] flex items-center justify-center bg-black/40 p-4">
+          <div className="w-full max-w-lg rounded-xl border bg-white p-4 shadow-xl">
+            <div className="mb-3 flex items-center justify-between">
+              <h3 className="text-base font-semibold">Preset SMTP: {presetSelected?.label ?? ""}</h3>
+              <button
+                type="button"
+                onClick={() => setPresetModalOpen(false)}
+                className="rounded border px-2 py-1 text-xs"
+              >
+                Fechar
+              </button>
+            </div>
+
+            <div className="grid gap-3 md:grid-cols-2">
+              <label className="space-y-1 md:col-span-2">
+                <div className="text-sm font-medium text-gray-700">Host</div>
+                <input
+                  className="w-full rounded-md border px-3 py-2 text-sm"
+                  value={presetHost}
+                  onChange={(e) => setPresetHost(e.target.value)}
+                />
+              </label>
+
+              <label className="space-y-1">
+                <div className="text-sm font-medium text-gray-700">Porta</div>
+                <input
+                  className="w-full rounded-md border px-3 py-2 text-sm"
+                  type="number"
+                  value={presetPort}
+                  onChange={(e) => setPresetPort(e.target.value)}
+                />
+              </label>
+
+              <label className="space-y-1">
+                <div className="text-sm font-medium text-gray-700">Segurança</div>
+                <select
+                  className="w-full rounded-md border px-3 py-2 text-sm"
+                  value={presetMode}
+                  onChange={(e) => setPresetMode(e.target.value as SmtpSecureMode)}
+                >
+                  <option value="starttls">STARTTLS</option>
+                  <option value="tls">SSL/TLS</option>
+                </select>
+              </label>
+            </div>
+
+            <div className="mt-4 flex justify-end gap-2">
+              <Button type="button" variant="ghost" onClick={() => setPresetModalOpen(false)}>
+                Cancelar
+              </Button>
+              <Button type="button" variant="primary" onClick={applyProviderPreset}>
+                Aplicar preset
+              </Button>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );

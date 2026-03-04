@@ -29,6 +29,14 @@ export default defineConfig({
         secure: false,
       },
 
+      // NOTIFICATIONS API (avoid clash with SPA route /notifications)
+      "/api/notifications": {
+        target: API_TARGET,
+        changeOrigin: true,
+        secure: false,
+        rewrite: (path) => path.replace(/^\/api/, ""),
+      },
+
       // SETTINGS/SETUP/HEALTH
       "/settings": { 
         target: API_TARGET, 

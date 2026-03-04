@@ -4,7 +4,9 @@ import { SettingsRepository } from "./settings.repository"
 import { CryptoService } from "../crypto/crypto.service"
 import type { UpdateSettingsDto } from "./dto/update-settings.dto"
 import { ConfigService } from "@nestjs/config"
-import { Env } from "src/config/env.schema"
+import { Env } from "../config/env.schema"
+import { MailService } from "../mail/mail.service"
+import type { SmtpTestDto } from "./dto/smtp-test.dto"
 
 type AuthMode = Env["AUTH_MODE"]
 const isAuthMode = (value: unknown): value is AuthMode =>
@@ -23,6 +25,7 @@ export class SettingsService {
     private readonly repo: SettingsRepository,
     private readonly crypto: CryptoService,
     private readonly config: ConfigService<Env>,
+    private readonly mail: MailService,
   ) {}
 
   /**
@@ -37,9 +40,26 @@ export class SettingsService {
       // flags úteis para UI
       hasPassword: Boolean(row?.adminPasswordHash),
       hasTotp: Boolean(row?.totpSecretEnc),
+      notificationsInAppEnabled: row?.notificationsInAppEnabled ?? true,
+      notificationsEmailEnabled: row?.notificationsEmailEnabled ?? false,
+      notificationLevel: row?.notificationLevel === "errors_only" ? "errors_only" : "all",
+      notificationReadRetentionDays: row?.notificationReadRetentionDays ?? 15,
+      notificationUnreadRetentionDays: row?.notificationUnreadRetentionDays ?? 60,
+      notificationRecipientEmail: row?.notificationRecipientEmail ?? null,
+      smtpHost: row?.smtpHost ?? null,
+      smtpPort: row?.smtpPort ?? null,
+      smtpSecureMode: row?.smtpSecureMode === "tls" ? "tls" : "starttls",
+      smtpUsername: row?.smtpUsername ?? null,
+      hasSmtpPassword: Boolean(row?.smtpPasswordEnc),
+      smtpFromName: row?.smtpFromName ?? null,
+      smtpFromEmail: row?.smtpFromEmail ?? null,
       createdAt: row?.createdAt ?? null,
       updatedAt: row?.updatedAt ?? null,
     }
+  }
+
+  async getRawSettings() {
+    return this.repo.get()
   }
 
   /**
@@ -68,6 +88,19 @@ export class SettingsService {
       logLevel?: string
       adminPasswordHash?: string | null
       totpSecretEnc?: string | null
+      notificationsInAppEnabled?: boolean
+      notificationsEmailEnabled?: boolean
+      notificationLevel?: "all" | "errors_only"
+      notificationReadRetentionDays?: number
+      notificationUnreadRetentionDays?: number
+      notificationRecipientEmail?: string | null
+      smtpHost?: string | null
+      smtpPort?: number | null
+      smtpSecureMode?: "starttls" | "tls"
+      smtpUsername?: string | null
+      smtpPasswordEnc?: string | null
+      smtpFromName?: string | null
+      smtpFromEmail?: string | null
     } = {}
 
     if (dto.authMode) patch.authMode = dto.authMode
@@ -81,6 +114,74 @@ export class SettingsService {
     if (dto.totpSecret) {
       patch.totpSecretEnc = this.crypto.encrypt(dto.totpSecret)
       this.logger.log("TOTP secret updated (encrypted)")
+    }
+
+    if (typeof dto.notificationsInAppEnabled === "boolean") {
+      patch.notificationsInAppEnabled = dto.notificationsInAppEnabled
+    }
+    if (typeof dto.notificationsEmailEnabled === "boolean") {
+      patch.notificationsEmailEnabled = dto.notificationsEmailEnabled
+    }
+    if (dto.notificationLevel !== undefined) {
+      patch.notificationLevel = dto.notificationLevel
+    }
+    if (dto.notificationReadRetentionDays !== undefined) {
+      patch.notificationReadRetentionDays = this.validateRetentionDays(
+        "notificationReadRetentionDays",
+        dto.notificationReadRetentionDays,
+      )
+    }
+    if (dto.notificationUnreadRetentionDays !== undefined) {
+      patch.notificationUnreadRetentionDays = this.validateRetentionDays(
+        "notificationUnreadRetentionDays",
+        dto.notificationUnreadRetentionDays,
+      )
+    }
+    if (dto.notificationRecipientEmail !== undefined) {
+      patch.notificationRecipientEmail = dto.notificationRecipientEmail?.trim() || null
+    }
+    if (dto.smtpHost !== undefined) patch.smtpHost = dto.smtpHost?.trim() || null
+    if (dto.smtpPort !== undefined) patch.smtpPort = dto.smtpPort ?? null
+    if (dto.smtpSecureMode !== undefined) patch.smtpSecureMode = dto.smtpSecureMode
+    if (dto.smtpUsername !== undefined) patch.smtpUsername = dto.smtpUsername?.trim() || null
+    if (dto.smtpFromName !== undefined) patch.smtpFromName = dto.smtpFromName?.trim() || null
+    if (dto.smtpFromEmail !== undefined) patch.smtpFromEmail = dto.smtpFromEmail?.trim() || null
+    if (!patch.smtpFromName && !row?.smtpFromName) patch.smtpFromName = "DockSentinel"
+    if (dto.smtpPassword !== undefined && dto.smtpPassword.trim().length > 0) {
+      patch.smtpPasswordEnc = this.crypto.encrypt(dto.smtpPassword)
+    }
+
+    // destinatário = próprio usuário (fromEmail), conforme requisito
+    if (patch.smtpFromEmail !== undefined) {
+      patch.notificationRecipientEmail = patch.smtpFromEmail
+    }
+
+    const nextEmailEnabled =
+      patch.notificationsEmailEnabled ?? row?.notificationsEmailEnabled ?? false
+    const nextRecipient =
+      patch.notificationRecipientEmail ?? patch.smtpFromEmail ?? row?.smtpFromEmail ?? null
+    const nextHost = patch.smtpHost ?? row?.smtpHost ?? null
+    const nextPort = patch.smtpPort ?? row?.smtpPort ?? null
+    const nextFrom = patch.smtpFromEmail ?? row?.smtpFromEmail ?? null
+    const nextUser = patch.smtpUsername ?? row?.smtpUsername ?? null
+    const nextPwd =
+      patch.smtpPasswordEnc !== undefined ? patch.smtpPasswordEnc : row?.smtpPasswordEnc
+
+    if (nextEmailEnabled) {
+      if (!nextRecipient) {
+        throw new BadRequestException("smtpFromEmail is required (recipient uses the same email)")
+      }
+      if (!nextHost || !nextPort || !nextFrom) {
+        throw new BadRequestException(
+          "smtpHost, smtpPort and smtpFromEmail are required when email notification is enabled",
+        )
+      }
+      // Para o MVP: exigimos username + password para evitar configurações ambíguas.
+      if (!nextUser || !nextPwd) {
+        throw new BadRequestException(
+          "smtpUsername and smtpPassword are required when email notification is enabled",
+        )
+      }
     }
 
     await this.repo.upsert(patch)
@@ -104,5 +205,61 @@ export class SettingsService {
       const fromEnv = this.config.get("AUTH_MODE", { infer: true })
       return isAuthMode(fromEnv) ? fromEnv : "none"
     }
+  }
+
+  async testSmtp(dto?: SmtpTestDto) {
+    const row = await this.repo.get()
+    const recipient = dto?.smtpFromEmail?.trim() || row?.smtpFromEmail
+    const host = dto?.smtpHost?.trim() || row?.smtpHost
+    const port = dto?.smtpPort ?? row?.smtpPort
+    const secureMode = dto?.smtpSecureMode ?? (row?.smtpSecureMode === "tls" ? "tls" : "starttls")
+    const username = dto?.smtpUsername?.trim() || row?.smtpUsername
+    const fromEmail = dto?.smtpFromEmail?.trim() || row?.smtpFromEmail
+    const fromName =
+      dto?.smtpFromName !== undefined
+        ? dto.smtpFromName?.trim() || "DockSentinel"
+        : row?.smtpFromName || "DockSentinel"
+
+    let password: string | null = null
+    if (dto?.smtpPassword && dto.smtpPassword.trim().length > 0) {
+      password = dto.smtpPassword
+    } else if (row?.smtpPasswordEnc) {
+      password = this.crypto.decrypt(row.smtpPasswordEnc)
+    }
+
+    if (!recipient || !host || !port || !fromEmail || !username || !password) {
+      throw new BadRequestException(
+        "SMTP incomplete: host, port, username, password and fromEmail are required",
+      )
+    }
+
+    await this.mail.send(
+      {
+        host,
+        port,
+        secureMode,
+        username,
+        password,
+        fromName,
+        fromEmail,
+      },
+      {
+        to: recipient,
+        subject: "Teste SMTP DockSentinel",
+        html: "<html><body><h2>Teste SMTP DockSentinel</h2><p>Envio realizado com sucesso.</p></body></html>",
+      },
+    )
+    return { ok: true as const }
+  }
+
+  private validateRetentionDays(field: string, value: unknown) {
+    if (typeof value !== "number" || !Number.isFinite(value)) {
+      throw new BadRequestException(`${field} must be a finite number`)
+    }
+    const days = Math.floor(value)
+    if (days < 1 || days > 3650) {
+      throw new BadRequestException(`${field} must be between 1 and 3650`)
+    }
+    return days
   }
 }

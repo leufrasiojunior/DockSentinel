@@ -4,6 +4,7 @@ import type { SettingsRepository, SettingsPatch } from "./settings.repository"
 import type { ConfigService } from "@nestjs/config"
 import type { Env } from "../config/env.schema"
 import { BadRequestException } from "@nestjs/common"
+import type { MailService } from "../mail/mail.service"
 
 describe("SettingsService (unit)", () => {
   beforeAll(() => {
@@ -54,6 +55,7 @@ describe("SettingsService (unit)", () => {
       repo as SettingsRepository,
       crypto,
       config,
+      { send: jest.fn() } as unknown as MailService,
     )
 
     const result = await svc.updateSettings({
@@ -68,6 +70,8 @@ describe("SettingsService (unit)", () => {
     expect(result.logLevel).toBe("debug")
     expect(result.hasPassword).toBe(true)
     expect(result.hasTotp).toBe(true)
+    expect(result.notificationsInAppEnabled).toBe(true)
+    expect(result.notificationsEmailEnabled).toBe(false)
     expect(result.createdAt).toBeInstanceOf(Date)
     expect(result.updatedAt).toBeInstanceOf(Date)
   })
@@ -87,6 +91,7 @@ describe("SettingsService (unit)", () => {
       repo as SettingsRepository,
       crypto,
       config,
+      { send: jest.fn() } as unknown as MailService,
     )
 
     await expect(

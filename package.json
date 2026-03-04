@@ -8,6 +8,7 @@
     "packages/*"
   ],
   "scripts": {
+    "dev": "bash scripts/dev-all.sh",
     "publish": "node scripts/publish.mjs",
     "publish:beta": "node scripts/publish.mjs beta",
     "publish:alpha": "node scripts/publish.mjs alpha",

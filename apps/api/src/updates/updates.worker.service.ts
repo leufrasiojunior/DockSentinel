@@ -1,6 +1,7 @@
 import { Injectable, Logger, OnModuleInit } from "@nestjs/common"
 import { UpdatesRepository } from "./updates.repository"
 import { DockerUpdateService } from "../docker/docker-update.service"
+import { NotificationsService } from "../notifications/notifications.service"
 
 @Injectable()
 export class UpdatesWorkerService implements OnModuleInit {
@@ -10,6 +11,7 @@ export class UpdatesWorkerService implements OnModuleInit {
   constructor(
     private readonly repo: UpdatesRepository,
     private readonly updater: DockerUpdateService,
+    private readonly notifications: NotificationsService,
   ) {}
 
   async onModuleInit() {
@@ -42,10 +44,26 @@ export class UpdatesWorkerService implements OnModuleInit {
           )
 
           await this.repo.markSuccess(job.id, result)
+          await this.notifications.emitJobSuccess({
+            jobId: job.id,
+            status: "success",
+            container: job.container,
+            image: job.image,
+            finishedAt: new Date().toISOString(),
+            error: null,
+          })
         } catch (err: unknown) {
           const msg = err instanceof Error ? err.message : String(err)
           this.logger.error(`[${job.id}] failed: ${msg}`)
           await this.repo.markFailed(job.id, msg)
+          await this.notifications.emitJobFailed({
+            jobId: job.id,
+            status: "failed",
+            container: job.container,
+            image: job.image,
+            finishedAt: new Date().toISOString(),
+            error: msg,
+          })
         }
       }
     } finally {

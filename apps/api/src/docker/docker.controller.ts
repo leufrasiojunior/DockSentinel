@@ -39,6 +39,7 @@ import {
   UpdateContainerNoopDto,
   UpdateContainerResultDto,
 } from './dto/update-result.dto';
+import { NotificationsService } from '../notifications/notifications.service';
 
 @ApiTags('Docker')
 @ApiExtraModels(
@@ -56,6 +57,7 @@ export class DockerController {
     private readonly updater: DockerUpdateService,
     @Inject(DOCKER_CLIENT) private readonly docker: Docker,
     private readonly digests: DockerDigestService,
+    private readonly notifications: NotificationsService,
   ) {}
 
   @Get('containers')
@@ -191,43 +193,65 @@ export class DockerController {
   })
   @ApiNotFoundResponse({ description: 'Container não encontrado.' })
   async updateCheck(@Param('name') name: string) {
-    const c = this.docker.getContainer(name);
-    const inspect = await c.inspect();
+    try {
+      const c = this.docker.getContainer(name);
+      const inspect = await c.inspect();
 
-    const imageRef = inspect?.Config?.Image as string;
-    const localImageId = inspect?.Image as string;
+      const imageRef = inspect?.Config?.Image as string;
+      const localImageId = inspect?.Image as string;
 
-    const remoteDigest = await this.digests.getRemoteDigest(imageRef);
+      const remoteDigest = await this.digests.getRemoteDigest(imageRef);
 
-    if (!remoteDigest) {
+      if (!remoteDigest) {
+        await this.notifications.emitScanError(
+          `Checagem manual sem digest remoto para ${name} (${imageRef}).`,
+          { container: name, imageRef, reason: 'remote_digest_not_found' },
+        );
+        return {
+          container: name,
+          imageRef,
+          localImageId,
+          canCheckRemote: false,
+          canCheckLocal: true,
+          hasUpdate: false,
+          reason: 'remote_digest_not_found',
+        };
+      }
+
+      const img = this.docker.getImage(localImageId);
+      const imgInspect = await img.inspect();
+
+      const repoDigests: string[] = imgInspect?.RepoDigests ?? [];
+
+      const hasUpdate = this.updater.hasUpdate(repoDigests, remoteDigest);
+
+      await this.notifications.emitScanInfo(
+        `Checagem manual concluída: ${name}. hasUpdate=${hasUpdate}. image=${imageRef}.`,
+        {
+          mode: 'manual_check',
+          scanned: 1,
+          scannedImages: [`${name} => ${imageRef}`],
+          updateCandidates: hasUpdate ? [`${name} => ${imageRef}`] : [],
+        },
+      );
+
       return {
         container: name,
         imageRef,
         localImageId,
-        canCheckRemote: false,
+        remoteDigest,
+        repoDigests,
+        canCheckRemote: true,
         canCheckLocal: true,
-        hasUpdate: false,
-        reason: 'remote_digest_not_found',
+        hasUpdate,
       };
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : String(err);
+      await this.notifications.emitSystemError(`Falha em update-check manual: ${name} -> ${msg}`, {
+        container: name,
+      });
+      throw err;
     }
-
-    const img = this.docker.getImage(localImageId);
-    const imgInspect = await img.inspect();
-
-    const repoDigests: string[] = imgInspect?.RepoDigests ?? [];
-
-    const hasUpdate = this.updater.hasUpdate(repoDigests, remoteDigest);
-
-    return {
-      container: name,
-      imageRef,
-      localImageId,
-      remoteDigest,
-      repoDigests,
-      canCheckRemote: true,
-      canCheckLocal: true,
-      hasUpdate,
-    };
   }
 
   @Post('containers/:name/update')

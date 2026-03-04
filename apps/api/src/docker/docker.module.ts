@@ -7,8 +7,10 @@ import { DockerUpdateService } from "./docker-update.service"
 import { DockerDigestService } from "./docker-digest.service"
 import { DockerController } from "./docker.controller"
 import { DOCKER_CLIENT } from "./docker.constants"
+import { NotificationsModule } from "../notifications/notifications.module"
 
 @Module({
+  imports: [NotificationsModule],
   providers: [
     {
       provide: DOCKER_CLIENT,
