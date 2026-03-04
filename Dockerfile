@@ -14,6 +14,10 @@ COPY apps/docksentinel-web/package.json apps/docksentinel-web/package.json
 COPY packages/shared/package.json packages/shared/package.json
 
 RUN npm ci
+# Work around npm optionalDependencies bug for Rollup native binaries in cross-platform Docker builds.
+RUN ROLLUP_VERSION=$(node -p 'require("./node_modules/rollup/package.json").version') \
+  && ROLLUP_PKG=$(node -e 'const { platform, arch, report } = process; const isMusl = platform === "linux" && !report.getReport().header.glibcVersionRuntime; const targets = { x64: { gnu: "linux-x64-gnu", musl: "linux-x64-musl" }, arm64: { gnu: "linux-arm64-gnu", musl: "linux-arm64-musl" } }; const target = targets[arch]; if (platform !== "linux" || !target) { console.error(`Unsupported platform/arch for Rollup native package: ${platform}/${arch}`); process.exit(1); } console.log(`@rollup/rollup-${isMusl ? target.musl : target.gnu}`);') \
+  && npm install --no-save "${ROLLUP_PKG}@${ROLLUP_VERSION}"
 
 COPY . .
 
