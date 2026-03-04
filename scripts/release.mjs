@@ -2,150 +2,341 @@
 import { execSync } from "node:child_process";
 import fs from "node:fs";
 import path from "node:path";
+import { confirm, ensurePromptsAvailableOrExit } from "./lib/cli.mjs";
+import {
+  buildVersion,
+  getRootPackagePath,
+  readJson,
+  writeJson,
+} from "./lib/release-utils.mjs";
 
-function sh(cmd) {
+function usage() {
+  console.log(`
+Uso:
+  node scripts/release.mjs alpha  1.2.0 1 [--dry-run] [--yes] [--non-interactive]
+  node scripts/release.mjs beta   1.2.0 1 [--dry-run] [--yes] [--non-interactive]
+  node scripts/release.mjs stable 1.2.0   [--dry-run] [--yes] [--non-interactive]
+
+Flags:
+  --dry-run          Mostra tudo que seria executado sem mutar arquivos/git.
+  --yes              Pula confirmações interativas.
+  --non-interactive  Não abre prompts; use junto com --yes para automação.
+
+Fluxo:
+  1) Atualizar package.json (e package-lock.json se existir/for válido)
+  2) Criar commit "chore(release): vX.Y.Z..."
+  3) Criar tag anotada "vX.Y.Z..."
+  4) Push do commit e da tag
+`);
+  process.exit(1);
+}
+
+function parseCliArgs(argv) {
+  const flags = {
+    dryRun: false,
+    yes: false,
+    nonInteractive: false,
+  };
+  const positional = [];
+
+  for (const arg of argv) {
+    if (arg === "--dry-run") {
+      flags.dryRun = true;
+      continue;
+    }
+    if (arg === "--yes") {
+      flags.yes = true;
+      continue;
+    }
+    if (arg === "--non-interactive") {
+      flags.nonInteractive = true;
+      continue;
+    }
+    if (arg.startsWith("--")) {
+      console.error(`Flag desconhecida: ${arg}`);
+      usage();
+    }
+    positional.push(arg);
+  }
+
+  return { positional, flags };
+}
+
+function quoteShell(value) {
+  return `"${String(value).replace(/(["\\$`])/g, "\\$1")}"`;
+}
+
+function sh(cmd, { dryRun = false } = {}) {
   console.log(`\n$ ${cmd}`);
-  return execSync(cmd, { stdio: "inherit" });
+  if (dryRun) return;
+  execSync(cmd, { stdio: "inherit" });
 }
 
 function shOut(cmd) {
   return execSync(cmd, { stdio: ["ignore", "pipe", "pipe"] }).toString().trim();
 }
 
-function requireCleanGit() {
-  const out = shOut("git status --porcelain");
-  if (out) {
-    console.error("Seu git não está limpo. Commit/stash antes de gerar release.");
-    process.exit(1);
-  }
+function getCleanStatus() {
+  return shOut("git status --porcelain");
 }
 
-function usage() {
-  console.log(`
-Uso:
-  node scripts/release.mjs alpha  1.2.0 1
-  node scripts/release.mjs beta   1.2.0 1
-  node scripts/release.mjs stable 1.2.0
+function requireCleanGit() {
+  const out = getCleanStatus();
+  if (!out) return;
 
-O script vai:
-- Atualizar package.json (e package-lock.json se existir)
-- Criar commit "chore(release): vX.Y.Z..."
-- Criar tag anotada "vX.Y.Z..."
-- Push do commit e da tag
-`);
+  const preview = out.split("\n").slice(0, 20).join("\n");
+  console.error("Seu git não está limpo. Commit/stash antes de gerar release.");
+  console.error("Arquivos pendentes:");
+  console.error(preview);
+  if (out.split("\n").length > 20) {
+    console.error("... (lista truncada)");
+  }
   process.exit(1);
 }
 
-function readJson(filePath) {
-  const raw = fs.readFileSync(filePath, "utf-8");
-  return JSON.parse(raw);
+function tagExists(tag) {
+  try {
+    shOut(`git rev-parse -q --verify "refs/tags/${tag}"`);
+    return true;
+  } catch {
+    return false;
+  }
 }
 
-function writeJson(filePath, data) {
-  const content = JSON.stringify(data, null, 2) + "\n";
-  fs.writeFileSync(filePath, content, "utf-8");
-}
-
-function bumpPackageJsonVersion(rootDir, newVersion) {
-  const pkgPath = path.join(rootDir, "package.json");
-  if (!fs.existsSync(pkgPath)) {
-    console.error("Não encontrei package.json na raiz do projeto.");
-    process.exit(1);
-  }
-
-  const pkg = readJson(pkgPath);
-
-  if (!pkg.version) {
-    console.error("package.json não tem o campo 'version'.");
-    process.exit(1);
-  }
-
-  const oldVersion = pkg.version;
-  if (oldVersion === newVersion) {
-    console.error(`A versão já está em ${newVersion}. Escolha outra versão/tag.`);
-    process.exit(1);
-  }
-
-  pkg.version = newVersion;
-  writeJson(pkgPath, pkg);
-
-  console.log(`Atualizado package.json: ${oldVersion} -> ${newVersion}`);
-  return [pkgPath];
-}
-
-function bumpPackageLockVersion(rootDir, newVersion) {
+function inspectLockFile(rootDir) {
   const lockPath = path.join(rootDir, "package-lock.json");
-  if (!fs.existsSync(lockPath)) return [];
+  if (!fs.existsSync(lockPath)) {
+    return {
+      path: lockPath,
+      exists: false,
+      parseError: null,
+      oldVersion: null,
+      hasRootPackageVersion: false,
+    };
+  }
 
   try {
     const lock = readJson(lockPath);
-
-    // Campos comuns no npm lockfile:
-    // - lock.version (versão do pacote/root)
-    // - lock.packages[""].version (npm v7+)
-    const oldVersion = lock.version;
-
-    lock.version = newVersion;
-
-    if (lock.packages && lock.packages[""] && lock.packages[""].version) {
-      lock.packages[""].version = newVersion;
-    }
-
-    writeJson(lockPath, lock);
-
-    console.log(
-      `Atualizado package-lock.json: ${oldVersion ?? "(sem)"} -> ${newVersion}`
-    );
-    return [lockPath];
-  } catch (e) {
-    console.log(
-      "⚠️ Não consegui atualizar package-lock.json (talvez esteja em formato diferente). Prosseguindo..."
-    );
-    return [];
+    const hasRootPackageVersion = Boolean(lock.packages && lock.packages[""]);
+    return {
+      path: lockPath,
+      exists: true,
+      parseError: null,
+      oldVersion: lock.version ?? null,
+      hasRootPackageVersion,
+    };
+  } catch (error) {
+    return {
+      path: lockPath,
+      exists: true,
+      parseError: error,
+      oldVersion: null,
+      hasRootPackageVersion: false,
+    };
   }
 }
 
-const [channel, base, n] = process.argv.slice(2);
-if (!channel || !base) usage();
+function buildReleasePlan({ channel, base, n, rootDir = process.cwd() }) {
+  const version = buildVersion(channel, base, n);
+  const tag = `v${version}`;
+  const pkgPath = getRootPackagePath(rootDir);
 
-const isAlpha = channel === "alpha";
-const isBeta = channel === "beta";
-const isStable = channel === "stable";
+  if (!fs.existsSync(pkgPath)) {
+    throw new Error("Não encontrei package.json na raiz do projeto.");
+  }
 
-if (!isAlpha && !isBeta && !isStable) usage();
-if ((isAlpha || isBeta) && !n) {
-  console.error("Para alpha/beta, informe o número (ex: 1, 2, 3).");
-  process.exit(1);
+  const pkg = readJson(pkgPath);
+  if (!pkg.version) {
+    throw new Error("package.json não possui o campo 'version'.");
+  }
+
+  const oldVersion = String(pkg.version).trim();
+  if (oldVersion === version) {
+    throw new Error(`A versão já está em ${version}. Escolha outra versão/tag.`);
+  }
+
+  const lock = inspectLockFile(rootDir);
+  const touchedFiles = [pkgPath];
+  if (lock.exists && !lock.parseError) {
+    touchedFiles.push(lock.path);
+  }
+
+  return {
+    rootDir,
+    channel,
+    base,
+    n,
+    version,
+    tag,
+    pkg: {
+      path: pkgPath,
+      oldVersion,
+      newVersion: version,
+    },
+    lock,
+    touchedFiles,
+  };
 }
 
-// Ex: base=1.2.0 / channel=alpha / n=1 -> version=1.2.0-alpha.1 / tag=v1.2.0-alpha.1
-const version =
-  isStable ? `${base}` : isAlpha ? `${base}-alpha.${n}` : `${base}-beta.${n}`;
+function applyVersionFiles(plan, { dryRun }) {
+  const touched = [];
 
-const tag = `v${version}`;
+  const pkg = readJson(plan.pkg.path);
+  pkg.version = plan.version;
+  if (dryRun) {
+    console.log(
+      `[dry-run] Atualizaria package.json: ${plan.pkg.oldVersion} -> ${plan.version}`
+    );
+  } else {
+    writeJson(plan.pkg.path, pkg);
+    console.log(`Atualizado package.json: ${plan.pkg.oldVersion} -> ${plan.version}`);
+  }
+  touched.push(plan.pkg.path);
 
-requireCleanGit();
+  if (!plan.lock.exists) return touched;
 
-// Atualiza refs/tags
-sh("git fetch --all --tags");
+  if (plan.lock.parseError) {
+    console.warn(
+      "⚠️ Não consegui ler package-lock.json (formato inválido). O arquivo não será alterado."
+    );
+    return touched;
+  }
 
-// Atualiza arquivos de versão
-const rootDir = process.cwd();
-const touched = [
-  ...bumpPackageJsonVersion(rootDir, version),
-  ...bumpPackageLockVersion(rootDir, version),
-];
+  const lock = readJson(plan.lock.path);
+  const oldVersion = lock.version ?? "(sem)";
+  lock.version = plan.version;
+  if (lock.packages && lock.packages[""]) {
+    lock.packages[""].version = plan.version;
+  }
 
-// Commit de release
-sh(`git add ${touched.map((p) => `"${p}"`).join(" ")}`);
-sh(`git commit -m "chore(release): ${tag}"`);
+  if (dryRun) {
+    console.log(`[dry-run] Atualizaria package-lock.json: ${oldVersion} -> ${plan.version}`);
+  } else {
+    writeJson(plan.lock.path, lock);
+    console.log(`Atualizado package-lock.json: ${oldVersion} -> ${plan.version}`);
+  }
 
-// Cria tag anotada no commit do release
-sh(`git tag -a "${tag}" -m "Release ${tag}"`);
+  touched.push(plan.lock.path);
+  return touched;
+}
 
-// Push do commit e da tag
-sh(`git push origin HEAD`);
-sh(`git push origin "${tag}"`);
+function runCommitAndTag(plan, touched, { dryRun }) {
+  sh("git fetch --all --tags", { dryRun });
+  sh(`git add ${touched.map((p) => quoteShell(p)).join(" ")}`, { dryRun });
+  sh(`git commit -m "chore(release): ${plan.tag}"`, { dryRun });
+  sh(`git tag -a "${plan.tag}" -m "Release ${plan.tag}"`, { dryRun });
+}
 
-console.log(`\n✅ Release pronto: ${tag}`);
-console.log("Se o CI estiver configurado para tags v*, ele vai publicar no Docker Hub.");
+function runPush(plan, { dryRun }) {
+  sh("git push origin HEAD", { dryRun });
+  sh(`git push origin "${plan.tag}"`, { dryRun });
+}
+
+async function confirmStepOrExit(question, { yes, nonInteractive }) {
+  if (yes) return;
+
+  if (nonInteractive) {
+    console.error(
+      `Confirmação obrigatória para este fluxo. Use --yes junto com --non-interactive para automação.`
+    );
+    process.exit(1);
+  }
+
+  ensurePromptsAvailableOrExit("Não foi possível abrir prompt de confirmação.");
+  const accepted = await confirm(question, { defaultYes: false });
+  if (!accepted) {
+    console.error("Operação cancelada.");
+    process.exit(1);
+  }
+}
+
+function printPlanSummary(plan, flags) {
+  console.log("\nPlano de release:");
+  console.log(`- Canal: ${plan.channel}`);
+  console.log(`- Versão nova: ${plan.version}`);
+  console.log(`- Tag: ${plan.tag}`);
+  console.log(`- package.json: ${plan.pkg.oldVersion} -> ${plan.version}`);
+
+  if (!plan.lock.exists) {
+    console.log("- package-lock.json: não encontrado (sem alteração)");
+  } else if (plan.lock.parseError) {
+    console.log("- package-lock.json: inválido (será ignorado)");
+  } else {
+    const oldLock = plan.lock.oldVersion ?? "(sem)";
+    console.log(`- package-lock.json: ${oldLock} -> ${plan.version}`);
+  }
+
+  if (flags.dryRun) {
+    console.log("- Modo: dry-run (nenhuma mutação será aplicada)");
+  }
+  if (flags.nonInteractive) {
+    console.log("- Execução: non-interactive");
+  }
+}
+
+async function main() {
+  const { positional, flags } = parseCliArgs(process.argv.slice(2));
+  const [channel, base, nRaw] = positional;
+
+  if (!channel || !base) usage();
+  if (positional.length > 3) {
+    console.error("Argumentos demais.");
+    usage();
+  }
+
+  const isAlpha = channel === "alpha";
+  const isBeta = channel === "beta";
+  const isStable = channel === "stable";
+  if (!isAlpha && !isBeta && !isStable) {
+    console.error(`Canal inválido: "${channel}". Use alpha | beta | stable.`);
+    usage();
+  }
+
+  if ((isAlpha || isBeta) && !nRaw) {
+    console.error("Para alpha/beta, informe o número (ex: 1, 2, 3).");
+    process.exit(1);
+  }
+  if (isStable && nRaw) {
+    console.error("Para stable, não informe o número N.");
+    process.exit(1);
+  }
+
+  const n = nRaw ? Number(nRaw) : null;
+  if ((isAlpha || isBeta) && (!Number.isInteger(n) || n <= 0)) {
+    console.error(`Número inválido: "${nRaw}". Use inteiro >= 1.`);
+    process.exit(1);
+  }
+
+  requireCleanGit();
+  const plan = buildReleasePlan({ channel, base, n });
+  if (tagExists(plan.tag)) {
+    console.error(
+      `A tag ${plan.tag} já existe localmente. Escolha outra versão ou remova a tag antes de continuar.`
+    );
+    process.exit(1);
+  }
+
+  printPlanSummary(plan, flags);
+
+  await confirmStepOrExit("Confirmar atualização dos arquivos de versão?", flags);
+  const touched = applyVersionFiles(plan, { dryRun: flags.dryRun });
+
+  await confirmStepOrExit("Confirmar criação de commit e tag?", flags);
+  runCommitAndTag(plan, touched, { dryRun: flags.dryRun });
+
+  await confirmStepOrExit("Confirmar push para origin?", flags);
+  runPush(plan, { dryRun: flags.dryRun });
+
+  if (flags.dryRun) {
+    console.log(`\n✅ Dry-run concluído: ${plan.tag}`);
+    return;
+  }
+
+  console.log(`\n✅ Release pronto: ${plan.tag}`);
+  console.log("Se o CI estiver configurado para tags v*, ele vai publicar no Docker Hub.");
+}
+
+await main().catch((error) => {
+  console.error(`\n❌ ${error?.message ?? error}`);
+  process.exit(1);
+});

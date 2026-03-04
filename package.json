@@ -13,6 +13,7 @@
     "publish:alpha": "node scripts/publish.mjs alpha",
     "publish:release": "node scripts/publish.mjs release",
     "version:current": "node scripts/version.mjs",
-    "tag:latest": "node scripts/tag-latest.mjs"
+    "tag:latest": "node scripts/tag-latest.mjs",
+    "test:scripts": "node --test scripts/tests/release-utils.test.mjs && bash scripts/tests/publish-release.integration.sh"
   }
 }

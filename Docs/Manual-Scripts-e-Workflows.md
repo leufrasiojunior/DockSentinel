@@ -6,8 +6,8 @@ Este manual descreve como usar os scripts da pasta `scripts/` e como funcionam o
 
 Fluxo principal de release/publicacao:
 
-1. Voce executa `npm run publish -- <canal> [tag]`.
-2. O script `scripts/publish.mjs` valida o canal e decide a tag.
+1. Voce executa `npm run publish -- [canal] [tag] [flags]`.
+2. O script `scripts/publish.mjs` valida argumentos, pode abrir wizard interativo e decide a tag.
 3. Ele chama `scripts/release.mjs`, que:
    - atualiza versao no `package.json` da raiz (e `package-lock.json`, se existir),
    - cria commit de release,
@@ -26,6 +26,7 @@ Definidos no `package.json` da raiz:
 - `npm run publish:release`
 - `npm run version:current`
 - `npm run tag:latest`
+- `npm run test:scripts`
 
 ## 3. Como usar (comandos)
 
@@ -71,7 +72,25 @@ Manual:
 npm run publish -- release v0.2.0
 ```
 
-### 3.4 Consultar versao atual
+### 3.4 Wizard interativo (sem canal/tag)
+
+```bash
+npm run publish -- --dry-run
+```
+
+O script mostra contexto atual (versao + ultima tag), pergunta canal/tag e pede confirmacoes por etapa.
+
+### 3.5 Flags uteis
+
+```bash
+npm run publish -- alpha v0.2.0-alpha.1 --dry-run --yes --non-interactive
+```
+
+- `--dry-run`: simula sem mutar arquivos/git.
+- `--yes`: pula confirmacoes.
+- `--non-interactive`: nao abre prompts e exige argumentos completos.
+
+### 3.6 Consultar versao atual
 
 ```bash
 npm run version:current
@@ -79,7 +98,7 @@ npm run version:current
 
 Le o `version` do `package.json` da raiz e imprime no terminal.
 
-### 3.5 Consultar ultima tag v* alcancavel do HEAD
+### 3.7 Consultar ultima tag v* alcancavel do HEAD
 
 ```bash
 npm run tag:latest
@@ -95,8 +114,10 @@ Responsabilidades:
 
 - aceita canal: `alpha`, `beta` ou `release`;
 - opcionalmente recebe uma tag manual;
+- se faltar canal/tag em modo interativo, abre wizard guiado;
 - se nao vier tag, gera sugestao com base no `package.json` da raiz;
 - valida formato da tag;
+- imprime resumo final e pede confirmacao (a menos que `--yes`);
 - chama `scripts/release.mjs` com os argumentos corretos.
 
 Regra de sugestao automatica:
@@ -111,6 +132,7 @@ Regra de sugestao automatica:
 Responsabilidades:
 
 - exige repositorio git limpo (`git status --porcelain` sem saida);
+- separa plano e execucao;
 - faz `git fetch --all --tags`;
 - monta versao final:
   - `alpha`: `X.Y.Z-alpha.N`
@@ -121,6 +143,11 @@ Responsabilidades:
 - cria commit `chore(release): v...`;
 - cria tag anotada `v...`;
 - faz push de `HEAD` e da tag para `origin`.
+- em modo interativo, pede confirmacao antes de:
+  - atualizar arquivos de versao;
+  - criar commit/tag;
+  - fazer push.
+- suporta `--dry-run`, `--yes` e `--non-interactive`.
 
 Falhas comuns que ele bloqueia:
 
