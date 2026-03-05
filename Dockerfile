@@ -46,11 +46,15 @@ RUN apk add --no-cache \
 COPY package.json package-lock.json ./
 COPY apps/api/package.json apps/api/package.json
 COPY packages/shared/package.json packages/shared/package.json
+COPY apps/api/prisma.config.ts apps/api/prisma.config.ts
+COPY apps/api/prisma/schema.prisma apps/api/prisma/schema.prisma
 
 # Install only production deps needed by the API workspace
 RUN npm ci --omit=dev --workspace apps/api \
   && PRISMA_VERSION=$(node -p 'require("./apps/api/package.json").devDependencies.prisma') \
   && npm install --no-save --omit=dev --workspace apps/api "prisma@${PRISMA_VERSION}" \
+  && cd /app/apps/api \
+  && ../../node_modules/.bin/prisma generate --config=prisma.config.ts \
   && npm cache clean --force
 
 FROM node:20-alpine AS runtime
@@ -69,17 +73,12 @@ ENV NODE_ENV=production \
   LOG_LEVEL=info \
   DATABASE_URL=file:/data/docksentinel.db \
   SCHEDULER_INTERVAL_MIN=5 \
-  DOCKSENTINEL_SECRET=CHANGE_ME_CHANGE_ME_CHANGE_ME_32CHARS_MIN \
   AUTO_MIGRATE=true \
   SWAGGER_ENABLED=true \
   CORS_ORIGINS=* \
   TZ=UTC
 
 COPY --from=prod-deps /app/node_modules /app/node_modules
-COPY --from=build /app/node_modules/.prisma /app/node_modules/.prisma
-COPY --from=build /app/node_modules/@prisma /app/node_modules/@prisma
-COPY --from=build /app/package.json /app/package-lock.json /app/
-COPY --from=build /app/apps/api/package.json /app/apps/api/package.json
 COPY --from=build /app/apps/api/prisma.config.ts /app/apps/api/prisma.config.ts
 COPY --from=build /app/apps/api/dist /app/apps/api/dist
 COPY --from=build /app/apps/api/prisma/schema.prisma /app/apps/api/prisma/schema.prisma

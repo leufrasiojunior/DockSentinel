@@ -5,9 +5,9 @@ import { ConfigService } from '@nestjs/config';
 import { Env } from './config/env.schema';
 import cookieParser from 'cookie-parser';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
-import { execSync } from 'node:child_process';
+import { execFileSync } from 'node:child_process';
 import { mkdirSync } from 'node:fs';
-import { join } from 'node:path';
+import { join, resolve } from 'node:path';
 
 function ensureMigrations(config: ConfigService<Env>, logger: Logger) {
   const auto = config.get('AUTO_MIGRATE', { infer: true });
@@ -21,7 +21,8 @@ function ensureMigrations(config: ConfigService<Env>, logger: Logger) {
 
   logger.log('AUTO_MIGRATE=true -> running Prisma migrations (deploy)...');
 
-  execSync('npx prisma migrate deploy --config=prisma.config.ts', {
+  const prismaBin = resolve(process.cwd(), '..', '..', 'node_modules', '.bin', 'prisma');
+  execFileSync(prismaBin, ['migrate', 'deploy', '--config=prisma.config.ts'], {
     stdio: 'inherit',
     cwd: process.cwd(),
     env: process.env,
