@@ -160,4 +160,30 @@ status="$(
 assert_eq "$status" "1" "repositório sujo deveria bloquear release"
 assert_contains "$out" "git não está limpo"
 
+echo "Running integration: mesma versão/tag exige --keep-tag"
+repo="$(create_temp_repo "0.9.0-beta.1")"
+out="$(new_log_file)"
+status="$(
+  cd "$repo" && run_capture "$out" node scripts/publish.mjs beta v0.9.0-beta.1 --dry-run --non-interactive --yes
+)"
+assert_eq "$status" "1" "sem --keep-tag deveria bloquear versão repetida"
+assert_contains "$out" "A versão já está em 0.9.0-beta.1"
+
+echo "Running integration: --keep-tag permite retry com mesma tag"
+repo="$(create_temp_repo "1.1.0-beta.2")"
+out="$(new_log_file)"
+before_count="$(cd "$repo" && git rev-list --count HEAD)"
+(
+  cd "$repo"
+  git tag -a "v1.1.0-beta.2" -m "Release v1.1.0-beta.2" >/dev/null
+)
+status="$(
+  cd "$repo" && run_capture "$out" node scripts/publish.mjs beta v1.1.0-beta.2 --keep-tag --dry-run --non-interactive --yes
+)"
+assert_eq "$status" "0" "com --keep-tag deveria permitir retry da mesma tag"
+assert_contains "$out" "keep-tag"
+assert_contains "$out" "Dry-run keep-tag concluído"
+after_count="$(cd "$repo" && git rev-list --count HEAD)"
+assert_eq "$after_count" "$before_count" "retry keep-tag em dry-run não deveria criar commit"
+
 echo "Integration tests passed."

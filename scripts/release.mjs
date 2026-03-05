@@ -13,14 +13,15 @@ import {
 function usage() {
   console.log(`
 Uso:
-  node scripts/release.mjs alpha  1.2.0 1 [--dry-run] [--yes] [--non-interactive]
-  node scripts/release.mjs beta   1.2.0 1 [--dry-run] [--yes] [--non-interactive]
-  node scripts/release.mjs stable 1.2.0   [--dry-run] [--yes] [--non-interactive]
+  node scripts/release.mjs alpha  1.2.0 1 [--dry-run] [--yes] [--non-interactive] [--keep-tag]
+  node scripts/release.mjs beta   1.2.0 1 [--dry-run] [--yes] [--non-interactive] [--keep-tag]
+  node scripts/release.mjs stable 1.2.0   [--dry-run] [--yes] [--non-interactive] [--keep-tag]
 
 Flags:
   --dry-run          Mostra tudo que seria executado sem mutar arquivos/git.
   --yes              Pula confirmações interativas.
   --non-interactive  Não abre prompts; use junto com --yes para automação.
+  --keep-tag         Permite reaproveitar a mesma versão/tag para retry da publicação.
 
 Fluxo:
   1) Atualizar package.json (e package-lock.json se existir/for válido)
@@ -36,6 +37,7 @@ function parseCliArgs(argv) {
     dryRun: false,
     yes: false,
     nonInteractive: false,
+    keepTag: false,
   };
   const positional = [];
 
@@ -50,6 +52,10 @@ function parseCliArgs(argv) {
     }
     if (arg === "--non-interactive") {
       flags.nonInteractive = true;
+      continue;
+    }
+    if (arg === "--keep-tag") {
+      flags.keepTag = true;
       continue;
     }
     if (arg.startsWith("--")) {
@@ -136,7 +142,13 @@ function inspectLockFile(rootDir) {
   }
 }
 
-function buildReleasePlan({ channel, base, n, rootDir = process.cwd() }) {
+function buildReleasePlan({
+  channel,
+  base,
+  n,
+  rootDir = process.cwd(),
+  allowSameVersion = false,
+}) {
   const version = buildVersion(channel, base, n);
   const tag = `v${version}`;
   const pkgPath = getRootPackagePath(rootDir);
@@ -151,7 +163,8 @@ function buildReleasePlan({ channel, base, n, rootDir = process.cwd() }) {
   }
 
   const oldVersion = String(pkg.version).trim();
-  if (oldVersion === version) {
+  const isSameVersion = oldVersion === version;
+  if (isSameVersion && !allowSameVersion) {
     throw new Error(`A versão já está em ${version}. Escolha outra versão/tag.`);
   }
 
@@ -173,6 +186,7 @@ function buildReleasePlan({ channel, base, n, rootDir = process.cwd() }) {
       oldVersion,
       newVersion: version,
     },
+    isSameVersion,
     lock,
     touchedFiles,
   };
@@ -232,6 +246,12 @@ function runPush(plan, { dryRun }) {
   sh(`git push origin "${plan.tag}"`, { dryRun });
 }
 
+function runKeepTagRetry(plan, { dryRun }) {
+  sh("git fetch --all --tags", { dryRun });
+  sh(`git tag -f -a "${plan.tag}" -m "Retry release ${plan.tag}"`, { dryRun });
+  sh(`git push origin "refs/tags/${plan.tag}" --force`, { dryRun });
+}
+
 async function confirmStepOrExit(question, { yes, nonInteractive }) {
   if (yes) return;
 
@@ -243,27 +263,35 @@ async function confirmStepOrExit(question, { yes, nonInteractive }) {
   }
 
   ensurePromptsAvailableOrExit("Não foi possível abrir prompt de confirmação.");
-  const accepted = await confirm(question, { defaultYes: false });
+  const accepted = await confirm(question, { defaultYes: true });
   if (!accepted) {
     console.error("Operação cancelada.");
     process.exit(1);
   }
 }
 
-function printPlanSummary(plan, flags) {
+function printPlanSummary(plan, flags, { retryWithKeepTag, localTagExists }) {
   console.log("\nPlano de release:");
   console.log(`- Canal: ${plan.channel}`);
   console.log(`- Versão nova: ${plan.version}`);
   console.log(`- Tag: ${plan.tag}`);
-  console.log(`- package.json: ${plan.pkg.oldVersion} -> ${plan.version}`);
+  console.log(`- package.json atual: ${plan.pkg.oldVersion}`);
 
-  if (!plan.lock.exists) {
-    console.log("- package-lock.json: não encontrado (sem alteração)");
-  } else if (plan.lock.parseError) {
-    console.log("- package-lock.json: inválido (será ignorado)");
+  if (retryWithKeepTag) {
+    console.log("- Modo keep-tag: reutilizar versão/tag sem novo commit");
+    console.log(`- Tag já existe localmente: ${localTagExists ? "sim" : "não"}`);
+    console.log("- Ação prevista: recriar tag anotada e forçar push da tag no origin");
   } else {
-    const oldLock = plan.lock.oldVersion ?? "(sem)";
-    console.log(`- package-lock.json: ${oldLock} -> ${plan.version}`);
+    console.log(`- package.json: ${plan.pkg.oldVersion} -> ${plan.version}`);
+
+    if (!plan.lock.exists) {
+      console.log("- package-lock.json: não encontrado (sem alteração)");
+    } else if (plan.lock.parseError) {
+      console.log("- package-lock.json: inválido (será ignorado)");
+    } else {
+      const oldLock = plan.lock.oldVersion ?? "(sem)";
+      console.log(`- package-lock.json: ${oldLock} -> ${plan.version}`);
+    }
   }
 
   if (flags.dryRun) {
@@ -308,15 +336,40 @@ async function main() {
   }
 
   requireCleanGit();
-  const plan = buildReleasePlan({ channel, base, n });
-  if (tagExists(plan.tag)) {
+  const plan = buildReleasePlan({
+    channel,
+    base,
+    n,
+    allowSameVersion: flags.keepTag,
+  });
+  const localTagExists = tagExists(plan.tag);
+  const retryWithKeepTag = flags.keepTag && plan.isSameVersion;
+
+  if (localTagExists && !retryWithKeepTag) {
     console.error(
       `A tag ${plan.tag} já existe localmente. Escolha outra versão ou remova a tag antes de continuar.`
     );
     process.exit(1);
   }
 
-  printPlanSummary(plan, flags);
+  printPlanSummary(plan, flags, { retryWithKeepTag, localTagExists });
+
+  if (retryWithKeepTag) {
+    await confirmStepOrExit(
+      "Confirmar recriação e push forçado da tag para retry da Action?",
+      flags
+    );
+    runKeepTagRetry(plan, { dryRun: flags.dryRun });
+
+    if (flags.dryRun) {
+      console.log(`\n✅ Dry-run keep-tag concluído: ${plan.tag}`);
+      return;
+    }
+
+    console.log(`\n✅ Retry de tag concluído: ${plan.tag}`);
+    console.log("A Action deve ser disparada novamente para esta tag.");
+    return;
+  }
 
   await confirmStepOrExit("Confirmar atualização dos arquivos de versão?", flags);
   const touched = applyVersionFiles(plan, { dryRun: flags.dryRun });

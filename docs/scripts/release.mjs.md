@@ -16,9 +16,9 @@ Tambem suporta modo de simulacao (`--dry-run`).
 Normalmente via `publish.mjs`, mas pode ser chamado direto:
 
 ```bash
-node scripts/release.mjs alpha 1.2.0 1 [--dry-run] [--yes] [--non-interactive]
-node scripts/release.mjs beta 1.2.0 1 [--dry-run] [--yes] [--non-interactive]
-node scripts/release.mjs stable 1.2.0 [--dry-run] [--yes] [--non-interactive]
+node scripts/release.mjs alpha 1.2.0 1 [--dry-run] [--yes] [--non-interactive] [--keep-tag]
+node scripts/release.mjs beta 1.2.0 1 [--dry-run] [--yes] [--non-interactive] [--keep-tag]
+node scripts/release.mjs stable 1.2.0 [--dry-run] [--yes] [--non-interactive] [--keep-tag]
 ```
 
 ## 3. Argumentos e flags
@@ -34,6 +34,7 @@ Flags:
 - `--dry-run`: mostra tudo sem executar mutacoes.
 - `--yes`: pula confirmacoes por etapa.
 - `--non-interactive`: impede prompts; se sem `--yes`, aborta quando precisar confirmar.
+- `--keep-tag`: permite retry usando a mesma versao/tag (recria e faz push forcado da tag).
 
 ## 4. Dependencias internas
 
@@ -66,7 +67,7 @@ Isso melhora legibilidade e facilita `dry-run`.
    - calcula `version` final com `buildVersion`;
    - monta `tag` (`v<version>`);
    - le `package.json` e valida versao atual;
-   - garante que nova versao seja diferente da atual;
+   - garante que nova versao seja diferente da atual (exceto com `--keep-tag`);
    - inspeciona `package-lock.json`.
 5. Verifica se tag ja existe localmente (`tagExists`).
 6. Imprime resumo do plano (`printPlanSummary`).
@@ -80,6 +81,12 @@ Isso melhora legibilidade e facilita `dry-run`.
    - `runPush`
 9. Finaliza com mensagem de sucesso (ou `Dry-run concluido`).
 
+Fluxo alternativo com `--keep-tag` (mesma versao/tag):
+
+1. nao atualiza arquivos nem cria commit;
+2. recria tag anotada local;
+3. faz push forcado da tag para `origin` para disparar a Action novamente.
+
 ## 7. Comandos Git executados (modo real)
 
 1. `git fetch --all --tags`
@@ -90,6 +97,12 @@ Isso melhora legibilidade e facilita `dry-run`.
 6. `git push origin "v..."`
 
 No modo `--dry-run`, esses comandos sao apenas impressos.
+
+No fluxo `--keep-tag`, os comandos principais ficam:
+
+1. `git fetch --all --tags`
+2. `git tag -f -a "v..." -m "Retry release v..."`
+3. `git push origin "refs/tags/v..." --force`
 
 ## 8. Atualizacao de arquivos de versao
 
@@ -106,8 +119,8 @@ Sempre tenta atualizar:
 ## 9. Validacoes importantes
 
 - repositorio precisa estar limpo;
-- nova versao nao pode repetir versao atual;
-- tag local nao pode existir;
+- nova versao nao pode repetir versao atual (a menos de `--keep-tag`);
+- tag local nao pode existir em release normal (com `--keep-tag`, e reutilizada);
 - `n` precisa ser inteiro >= 1 para `alpha/beta`;
 - `stable` nao aceita `n`.
 
@@ -115,7 +128,8 @@ Sempre tenta atualizar:
 
 Sem `--yes`:
 
-- pergunta antes de cada etapa mutavel.
+- pergunta antes de cada etapa mutavel;
+- Enter confirma por padrao (`sim`).
 
 Com `--non-interactive`:
 
@@ -142,3 +156,6 @@ Em `--dry-run`:
 - canal/argumentos invalidos
 - lockfile invalido (nao bloqueia release, mas nao atualiza lock)
 
+Para repetir uma tag apos falha de Action:
+
+- use `--keep-tag --yes --non-interactive`.

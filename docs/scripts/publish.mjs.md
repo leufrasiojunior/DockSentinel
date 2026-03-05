@@ -14,7 +14,7 @@ Orquestrar a publicacao de release de forma amigavel:
 Via scripts da raiz:
 
 ```bash
-npm run publish -- [channel] [tag] [--dry-run] [--yes] [--non-interactive]
+npm run publish -- [channel] [tag] [--dry-run] [--yes] [--non-interactive] [--keep-tag]
 npm run publish:alpha
 npm run publish:beta
 npm run publish:release
@@ -39,6 +39,7 @@ Flags:
 - `--dry-run`: repassa simulacao para `release.mjs`.
 - `--yes`: pula confirmacao final no `publish` (e tambem no `release` quando repassado).
 - `--non-interactive`: bloqueia prompts; exige argumentos completos.
+- `--keep-tag`: permite reaproveitar mesma versao/tag para retry da Action.
 
 ## 4. Dependencias internas
 
@@ -77,6 +78,7 @@ Importa:
 5. Imprime resumo da operacao (`printSummary`).
 6. Pede confirmacao final (`confirmPlanOrExit`)
    - pulada com `--yes`;
+   - em interativo, Enter confirma (padrao `sim`);
    - em `--non-interactive` sem `--yes`, aborta para evitar operacao sem confirmacao.
 7. Monta comando para `release.mjs` (`buildReleaseInvocation`)
    - `release` vira `stable` no script de release.
@@ -144,3 +146,8 @@ CI com simulacao:
 npm run publish -- release v0.2.0 --dry-run --yes --non-interactive
 ```
 
+Retry da mesma tag:
+
+```bash
+npm run publish -- release v0.2.0 --keep-tag --yes --non-interactive
+```

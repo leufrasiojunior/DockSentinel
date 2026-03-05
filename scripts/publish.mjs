@@ -19,9 +19,9 @@ const ALLOWED_CHANNELS = new Set(["alpha", "beta", "release"]);
 function usage() {
   console.log(`
 Uso:
-  npm run publish -- beta [vX.Y.Z-beta.N] [--dry-run] [--yes] [--non-interactive]
-  npm run publish -- alpha [vX.Y.Z-alpha.N] [--dry-run] [--yes] [--non-interactive]
-  npm run publish -- release [vX.Y.Z] [--dry-run] [--yes] [--non-interactive]
+  npm run publish -- beta [vX.Y.Z-beta.N] [--dry-run] [--yes] [--non-interactive] [--keep-tag]
+  npm run publish -- alpha [vX.Y.Z-alpha.N] [--dry-run] [--yes] [--non-interactive] [--keep-tag]
+  npm run publish -- release [vX.Y.Z] [--dry-run] [--yes] [--non-interactive] [--keep-tag]
 
 Se você omitir canal/tag em modo interativo, o script abre um fluxo guiado.
 
@@ -29,11 +29,13 @@ Flags:
   --dry-run          Simula todo o release sem mutar arquivos/git.
   --yes              Pula confirmações interativas.
   --non-interactive  Não abre prompts; exige argumentos completos.
+  --keep-tag         Reaproveita a mesma tag/versão para republicar (retry da Action).
 
 Exemplos:
   npm run publish -- beta v0.1.0-beta.1
   npm run publish -- beta
   npm run publish -- release --dry-run
+  npm run publish -- release v0.1.0 --keep-tag
 `);
   process.exit(1);
 }
@@ -43,6 +45,7 @@ function parseCliArgs(argv) {
     dryRun: false,
     yes: false,
     nonInteractive: false,
+    keepTag: false,
   };
   const positional = [];
 
@@ -57,6 +60,10 @@ function parseCliArgs(argv) {
     }
     if (arg === "--non-interactive") {
       flags.nonInteractive = true;
+      continue;
+    }
+    if (arg === "--keep-tag") {
+      flags.keepTag = true;
       continue;
     }
     if (arg.startsWith("--")) {
@@ -156,6 +163,9 @@ function printSummary({ channel, tag, currentVersion, latestTag, flags }) {
   if (flags.nonInteractive) {
     console.log("- Execução: non-interactive");
   }
+  if (flags.keepTag) {
+    console.log("- Modo: keep-tag (reutiliza a mesma tag para retry de publicação)");
+  }
 }
 
 async function confirmPlanOrExit(flags) {
@@ -169,7 +179,7 @@ async function confirmPlanOrExit(flags) {
 
   ensurePromptsAvailableOrExit("Não foi possível abrir prompt de confirmação.");
   const accepted = await confirm("Confirma executar o release com os dados acima?", {
-    defaultYes: false,
+    defaultYes: true,
   });
   if (!accepted) {
     console.error("Operação cancelada.");
@@ -195,6 +205,7 @@ function buildReleaseInvocation({ channel, tag, flags }) {
   if (flags.dryRun) args.push("--dry-run");
   if (flags.yes) args.push("--yes");
   if (flags.nonInteractive) args.push("--non-interactive");
+  if (flags.keepTag) args.push("--keep-tag");
 
   return args;
 }
