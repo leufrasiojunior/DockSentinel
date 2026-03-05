@@ -1,7 +1,7 @@
 {
   "name": "docksentinel",
   "private": true,
-  "version": "1.5.1-beta.4",
+  "version": "1.5.1-beta.5",
   "workspaces": [
     "apps/*",
     "packages/*"
