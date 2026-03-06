@@ -10,11 +10,11 @@ import {
   type UpdateCheckResult,
 } from "../../api/docker";
 import { scanAndEnqueue } from "../../api/updates";
-import { Badge } from "../../layouts/ui/Badge";
-import { Card, CardHeader } from "../../layouts/ui/Card";
-import { useToast } from "../../layouts/ui/ToastProvider";
-import { useConfirm } from "../../layouts/ui/ConfirmProvider";
-import { Button } from "../../layouts/ui/Button";
+import { Badge } from "../../shared/components/ui/Badge";
+import { Card, CardHeader } from "../../shared/components/ui/Card";
+import { useToast } from "../../shared/components/ui/ToastProvider";
+import { useConfirm } from "../../shared/components/ui/ConfirmProvider";
+import { Button } from "../../shared/components/ui/Button";
 import simpleIconsAliases from "../../assets/simpleicons-aliases.json";
 
 type CheckState =

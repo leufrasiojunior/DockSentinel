@@ -3,11 +3,11 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { QRCodeSVG } from "qrcode.react";
 import { useNavigate } from "react-router-dom";
 
-import { Card, CardHeader } from "../../layouts/ui/Card";
-import { Button } from "../../layouts/ui/Button";
-import { Badge } from "../../layouts/ui/Badge";
-import { useToast } from "../../layouts/ui/ToastProvider";
-import { useConfirm } from "../../layouts/ui/ConfirmProvider";
+import { Card, CardHeader } from "../../shared/components/ui/Card";
+import { Button } from "../../shared/components/ui/Button";
+import { Badge } from "../../shared/components/ui/Badge";
+import { useToast } from "../../shared/components/ui/ToastProvider";
+import { useConfirm } from "../../shared/components/ui/ConfirmProvider";
 
 import { getAuthStatus, logout, type AuthMode } from "../../api/auth";
 import {

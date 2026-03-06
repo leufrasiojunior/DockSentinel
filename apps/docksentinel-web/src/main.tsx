@@ -6,8 +6,8 @@ import { router } from "./app/router";
 import { queryClient } from "./app/queryClient";
 
 import "./index.css";
-import { ToastProvider } from "./layouts/ui/ToastProvider";
-import { ConfirmProvider } from "./layouts/ui/ConfirmProvider";
+import { ToastProvider } from "./shared/components/ui/ToastProvider";
+import { ConfirmProvider } from "./shared/components/ui/ConfirmProvider";
 
 ReactDOM.createRoot(document.getElementById("root")!).render(
   <React.StrictMode>

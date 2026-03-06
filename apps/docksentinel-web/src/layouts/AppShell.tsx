@@ -8,7 +8,7 @@ import {
   markNotificationRead,
 } from "../api/notifications";
 import { usePageVisibility } from "../hooks/usePageVisibility";
-import { Button } from "./ui/Button";
+import { Button } from "../shared/components/ui/Button";
 import { NotificationsBridge } from "./NotificationsBridge";
 
 function toEpoch(value: string) {

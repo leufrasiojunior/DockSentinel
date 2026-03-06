@@ -2,9 +2,9 @@ import { useState } from "react";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { useLocation, useNavigate } from "react-router-dom";
 
-import { Button } from "../../layouts/ui/Button";
-import { Card, CardHeader } from "../../layouts/ui/Card";
-import { useToast } from "../../layouts/ui/ToastProvider";
+import { Button } from "../../shared/components/ui/Button";
+import { Card, CardHeader } from "../../shared/components/ui/Card";
+import { useToast } from "../../shared/components/ui/ToastProvider";
 
 import { getAuthStatus, login } from "../../api/auth";
 import { buildLoginBody, loginHint, needsPassword, needsTotp } from "./loginUtils";

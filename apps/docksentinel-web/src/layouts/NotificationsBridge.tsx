@@ -2,7 +2,7 @@ import { useEffect, useRef } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { listNotifications } from "../api/notifications";
 import { usePageVisibility } from "../hooks/usePageVisibility";
-import { useToast } from "./ui/ToastProvider";
+import { useToast } from "../shared/components/ui/ToastProvider";
 
 export function NotificationsBridge() {
   const toast = useToast();

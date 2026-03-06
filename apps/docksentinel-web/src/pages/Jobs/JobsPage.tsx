@@ -1,8 +1,8 @@
 import { useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { Badge } from "../../layouts/ui/Badge";
-import { Button } from "../../layouts/ui/Button";
-import { Card, CardHeader } from "../../layouts/ui/Card";
+import { Badge } from "../../shared/components/ui/Badge";
+import { Button } from "../../shared/components/ui/Button";
+import { Card, CardHeader } from "../../shared/components/ui/Card";
 import { usePageVisibility } from "../../hooks/usePageVisibility";
 import { listJobs, type UpdateJob } from "../../api/jobs";
 

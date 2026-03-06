@@ -1,12 +1,12 @@
 import { useEffect, useMemo, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { Button } from "../../layouts/ui/Button";
-import { Badge } from "../../layouts/ui/Badge";
-import { Card, CardHeader } from "../../layouts/ui/Card";
-import { Input } from "../../layouts/ui/Input";
-import { Select } from "../../layouts/ui/Select";
-import { useToast } from "../../layouts/ui/ToastProvider";
-import { useConfirm } from "../../layouts/ui/ConfirmProvider";
+import { Button } from "../../shared/components/ui/Button";
+import { Badge } from "../../shared/components/ui/Badge";
+import { Card, CardHeader } from "../../shared/components/ui/Card";
+import { Input } from "../../shared/components/ui/Input";
+import { Select } from "../../shared/components/ui/Select";
+import { useToast } from "../../shared/components/ui/ToastProvider";
+import { useConfirm } from "../../shared/components/ui/ConfirmProvider";
 import { usePageVisibility } from "../../hooks/usePageVisibility";
 import {
   getSchedulerBundle,

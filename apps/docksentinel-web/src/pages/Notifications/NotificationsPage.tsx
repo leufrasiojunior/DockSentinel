@@ -6,8 +6,8 @@ import {
   markNotificationRead,
 } from "../../api/notifications";
 import { usePageVisibility } from "../../hooks/usePageVisibility";
-import { Card, CardHeader } from "../../layouts/ui/Card";
-import { Button } from "../../layouts/ui/Button";
+import { Card, CardHeader } from "../../shared/components/ui/Card";
+import { Button } from "../../shared/components/ui/Button";
 
 function fmt(value: string) {
   const d = new Date(value);
