@@ -4,7 +4,7 @@ import { Badge } from "../../shared/components/ui/Badge";
 import { Button } from "../../shared/components/ui/Button";
 import { Card, CardHeader } from "../../shared/components/ui/Card";
 import { usePageVisibility } from "../../hooks/usePageVisibility";
-import { listJobs, type UpdateJob } from "../../api/jobs";
+import { listJobs, type UpdateJob } from "../../features/jobs/api/jobs";
 
 function fmt(iso?: string | null) {
   if (!iso) return "—";

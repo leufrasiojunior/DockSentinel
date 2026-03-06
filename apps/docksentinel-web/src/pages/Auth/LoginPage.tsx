@@ -6,7 +6,7 @@ import { Button } from "../../shared/components/ui/Button";
 import { Card, CardHeader } from "../../shared/components/ui/Card";
 import { useToast } from "../../shared/components/ui/ToastProvider";
 
-import { getAuthStatus, login } from "../../api/auth";
+import { getAuthStatus, login } from "../../features/auth/api/auth";
 import { buildLoginBody, loginHint, needsPassword, needsTotp } from "./loginUtils";
 
 export function LoginPage() {

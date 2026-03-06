@@ -14,7 +14,7 @@ import {
   scanAndEnqueue,
   type SchedulerMode,
   type SchedulerScope,
-} from "../../api/scheduler";
+} from "../../features/scheduler/api/scheduler";
 
 function fmt(iso?: string | null) {
   if (!iso) return "—";

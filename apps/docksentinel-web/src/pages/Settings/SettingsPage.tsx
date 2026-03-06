@@ -9,7 +9,7 @@ import { Badge } from "../../shared/components/ui/Badge";
 import { useToast } from "../../shared/components/ui/ToastProvider";
 import { useConfirm } from "../../shared/components/ui/ConfirmProvider";
 
-import { getAuthStatus, logout, type AuthMode } from "../../api/auth";
+import { getAuthStatus, logout, type AuthMode } from "../../features/auth/api/auth";
 import {
   getSettings,
   testSmtp,
@@ -19,8 +19,8 @@ import {
   type SafeSettings,
   type SmtpSecureMode,
   type UpdateSettingsBody,
-} from "../../api/settings";
-import { totpConfirm, totpInit, type TotpInitResponse } from "../../api/totp";
+} from "../../features/settings/api/settings";
+import { totpConfirm, totpInit, type TotpInitResponse } from "../../features/auth/api/totp";
 
 type SettingsTab = "auth" | "notifications";
 type ProviderPreset = {

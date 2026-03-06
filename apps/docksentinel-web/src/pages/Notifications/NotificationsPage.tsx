@@ -4,7 +4,7 @@ import {
   listNotifications,
   markAllNotificationsRead,
   markNotificationRead,
-} from "../../api/notifications";
+} from "../../features/notifications/api/notifications";
 import { usePageVisibility } from "../../hooks/usePageVisibility";
 import { Card, CardHeader } from "../../shared/components/ui/Card";
 import { Button } from "../../shared/components/ui/Button";

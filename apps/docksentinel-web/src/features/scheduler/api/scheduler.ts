@@ -1,4 +1,4 @@
-import { http } from "./http";
+import { http } from "../../../shared/api/http";
 
 export type SchedulerMode = "scan_only" | "scan_and_update" | string;
 export type SchedulerScope = "all" | "labeled" | string;

@@ -2,8 +2,8 @@
 import type { ReactNode } from "react";
 import { Navigate, useLocation } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
-import { getAuthStatus, me, type AuthMode } from "../api/auth";
-import { ApiError } from "../api/http";
+import { getAuthStatus, me, type AuthMode } from "../features/auth/api/auth";
+import { ApiError } from "../shared/api/http";
 
 function FullscreenLoading({ text }: { text: string }) {
   return (

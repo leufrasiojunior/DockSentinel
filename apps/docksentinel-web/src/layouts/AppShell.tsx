@@ -1,12 +1,12 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Link, NavLink, Outlet, useNavigate } from "react-router-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { logout } from "../api/auth";
+import { logout } from "../features/auth/api/auth";
 import {
   listNotifications,
   markAllNotificationsRead,
   markNotificationRead,
-} from "../api/notifications";
+} from "../features/notifications/api/notifications";
 import { usePageVisibility } from "../hooks/usePageVisibility";
 import { Button } from "../shared/components/ui/Button";
 import { NotificationsBridge } from "./NotificationsBridge";

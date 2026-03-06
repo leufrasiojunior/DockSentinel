@@ -1,4 +1,4 @@
-import { http } from "./http";
+import { http } from "../../../shared/api/http";
 import type { AuthMode } from "./auth";
 
 export type LogLevel = "error" | "warn" | "info" | "debug";

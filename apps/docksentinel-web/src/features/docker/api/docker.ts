@@ -1,4 +1,4 @@
-import { http } from "./http";
+import { http } from "../../../shared/api/http";
 
 export type DockerContainer = {
   id: string;

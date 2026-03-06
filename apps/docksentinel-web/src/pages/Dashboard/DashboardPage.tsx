@@ -8,8 +8,8 @@ import {
   getContainerDetails,
   type DockerContainer,
   type UpdateCheckResult,
-} from "../../api/docker";
-import { scanAndEnqueue } from "../../api/updates";
+} from "../../features/docker/api/docker";
+import { scanAndEnqueue } from "../../features/updates/api/updates";
 import { Badge } from "../../shared/components/ui/Badge";
 import { Card, CardHeader } from "../../shared/components/ui/Card";
 import { useToast } from "../../shared/components/ui/ToastProvider";

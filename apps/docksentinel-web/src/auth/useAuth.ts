@@ -1,5 +1,5 @@
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { me, type AuthMeResponse } from "../api/auth";
+import { me, type AuthMeResponse } from "../features/auth/api/auth";
 
 export function useAuth() {
   const queryClient = useQueryClient();

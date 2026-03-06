@@ -1,5 +1,5 @@
 // src/api/auth.ts
-import { http } from "./http";
+import { http } from "../../../shared/api/http";
 
 export type AuthMode = "none" | "password" | "totp" | "both";
 

@@ -1,4 +1,4 @@
-import { http } from "./http";
+import { http } from "../../../shared/api/http";
 
 export type ScanMode = "scan_only" | "scan_and_update";
 
