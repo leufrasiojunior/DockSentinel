@@ -1,66 +1,19 @@
-import { useMemo, useState } from "react";
-import { useQuery } from "@tanstack/react-query";
-import { Badge } from "../../shared/components/ui/Badge";
 import { Button } from "../../shared/components/ui/Button";
 import { Card, CardHeader } from "../../shared/components/ui/Card";
-import { usePageVisibility } from "../../hooks/usePageVisibility";
-import { listJobs, type UpdateJob } from "../../features/jobs/api/jobs";
-
-function fmt(iso?: string | null) {
-  if (!iso) return "—";
-  const d = new Date(iso);
-  if (Number.isNaN(d.getTime())) return String(iso);
-  return d.toLocaleString();
-}
-
-function statusTone(status: string) {
-  const s = status.toLowerCase();
-  if (s.includes("fail")) return "red";
-  if (s.includes("run")) return "blue";
-  if (s.includes("done") || s.includes("success")) return "green";
-  return "gray";
-}
+import { useJobs } from "../../features/jobs/hooks/useJobs";
+import { JobTable } from "../../features/jobs/components/JobTable";
 
 export function JobsPage() {
-  const visible = usePageVisibility();
-  const [filter, setFilter] = useState<
-    "all" | "queued" | "running" | "done" | "failed"
-  >("all");
-
-  const jobsQuery = useQuery({
-    queryKey: ["updates", "jobs"],
-    queryFn: listJobs,
-    refetchInterval: visible ? 4_000 : false,
-    retry: false,
-  });
-
-  const jobs = jobsQuery.data ?? [];
-
-  const counters = useMemo(() => {
-    const c = {
-      queued: 0,
-      running: 0,
-      done: 0,
-      failed: 0,
-      total: jobs.length,
-    };
-
-    for (const j of jobs) {
-      const s = String(j.status ?? "").toLowerCase();
-      if (s.includes("queue")) c.queued++;
-      else if (s.includes("run")) c.running++;
-      else if (s.includes("fail")) c.failed++;
-      else if (s.includes("done") || s.includes("success")) c.done++;
-    }
-    return c;
-  }, [jobs]);
-
-  const filtered = useMemo(() => {
-    if (filter === "all") return jobs;
-    return jobs.filter((j) =>
-      String(j.status ?? "").toLowerCase().includes(filter),
-    );
-  }, [jobs, filter]);
+  const {
+    filtered,
+    counters,
+    filter,
+    setFilter,
+    loading,
+    isFetching,
+    refetch,
+    visible,
+  } = useJobs();
 
   return (
     <div className="p-6 space-y-4">
@@ -75,8 +28,8 @@ export function JobsPage() {
 
         <div className="flex flex-wrap gap-2">
           <Button
-            onClick={() => jobsQuery.refetch()}
-            disabled={jobsQuery.isFetching}
+            onClick={() => refetch()}
+            disabled={isFetching}
             type="button"
           >
             Recarregar
@@ -157,87 +110,7 @@ export function JobsPage() {
           }
         />
 
-        <div className="overflow-x-auto">
-          <table className="min-w-full text-left text-sm">
-            <thead className="bg-gray-50 text-xs uppercase tracking-wide text-gray-600">
-              <tr>
-                <th className="px-4 py-3">Status</th>
-                <th className="px-4 py-3">Container</th>
-                <th className="px-4 py-3">Imagem</th>
-                <th className="px-4 py-3">Timestamps</th>
-                <th className="px-4 py-3">Lock</th>
-              </tr>
-            </thead>
-
-            <tbody className="divide-y">
-              {jobsQuery.isLoading && (
-                <tr>
-                  <td className="px-4 py-4 text-gray-600" colSpan={5}>
-                    Carregando...
-                  </td>
-                </tr>
-              )}
-
-              {!jobsQuery.isLoading && filtered.length === 0 && (
-                <tr>
-                  <td className="px-4 py-4 text-gray-600" colSpan={5}>
-                    Nenhum job encontrado.
-                  </td>
-                </tr>
-              )}
-
-              {filtered.map((j: UpdateJob) => (
-                <tr key={j.id} className="hover:bg-gray-50">
-                  <td className="px-4 py-4">
-                    <div className="flex items-center gap-2">
-                      <Badge tone={statusTone(String(j.status)) as any}>
-                        {String(j.status)}
-                      </Badge>
-                      <div className="text-[11px] text-gray-500 font-mono">
-                        {j.id.slice(0, 8)}
-                      </div>
-                    </div>
-                    {j.error && (
-                      <div className="mt-1 text-xs text-red-600">{j.error}</div>
-                    )}
-                  </td>
-
-                  <td className="px-4 py-4">
-                    <div className="font-medium text-gray-900">
-                      {j.container ?? "—"}
-                    </div>
-                    <div className="text-xs text-gray-500">
-                      pull: {String(!!j.pull)} • force: {String(!!j.force)}
-                    </div>
-                  </td>
-
-                  <td className="px-4 py-4">
-                    <div className="font-mono text-xs text-gray-900 max-w-130 truncate">
-                      {j.image ?? "—"}
-                    </div>
-                  </td>
-
-                  <td className="px-4 py-4">
-                    <div className="text-xs text-gray-600 space-y-1">
-                      <div>created: {fmt(j.createdAt)}</div>
-                      <div>start: {fmt(j.startedAt)}</div>
-                      <div>end: {fmt(j.finishedAt ?? null)}</div>
-                    </div>
-                  </td>
-
-                  <td className="px-4 py-4">
-                    <div className="text-xs text-gray-600 space-y-1">
-                      <div>lockedAt: {fmt(j.lockedAt ?? null)}</div>
-                      <div className="font-mono truncate max-w-65">
-                        lockedBy: {j.lockedBy ?? "—"}
-                      </div>
-                    </div>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+        <JobTable jobs={filtered} loading={loading} />
       </Card>
     </div>
   );
