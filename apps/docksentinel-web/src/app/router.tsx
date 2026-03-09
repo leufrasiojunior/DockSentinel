@@ -9,6 +9,7 @@ import { LoginPage } from "../pages/Auth/LoginPage";
 import { AppShell } from "../layouts/AppShell";
 import { SettingsPage } from "../pages/Settings/SettingsPage";
 import { NotificationsPage } from "../pages/Notifications/NotificationsPage";
+import  NewNotifications  from "../features/notifications/pages/NewNotifications";
 
 export const router = createBrowserRouter([
   {
@@ -32,6 +33,7 @@ export const router = createBrowserRouter([
       { path: "scheduler", element: <SchedulerPage /> },
       { path: "notifications", element: <NotificationsPage /> },
       { path: "settings", element: <SettingsPage /> },
+      { path: "teste", element: <NewNotifications /> },
     ],
   },
 

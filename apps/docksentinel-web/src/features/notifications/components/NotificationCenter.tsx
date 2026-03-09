@@ -84,7 +84,7 @@ export function NotificationCenter() {
       </button>
 
       {open && (
-        <div className="absolute right-0 top-12 z-50 w-[430px] rounded-xl border bg-white p-3 shadow-lg">
+        <div className="absolute right-0 top-12 z-50 w-107.5 rounded-xl border bg-white p-3 shadow-lg">
           <div className="mb-2 flex items-center justify-between">
             <div className="text-sm font-semibold text-gray-800">
               Central de notificações

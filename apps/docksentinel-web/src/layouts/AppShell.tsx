@@ -5,6 +5,8 @@ import { Button } from "../shared/components/ui/Button";
 import { NotificationsBridge } from "./NotificationsBridge";
 import { NotificationCenter } from "../features/notifications/components/NotificationCenter";
 
+import logo from '../assets/logo2.png'
+
 function SidebarLink({ to, label }: { to: string; label: string }) {
   return (
     <NavLink
@@ -48,7 +50,7 @@ export function AppShell() {
             <div className="flex items-center gap-3">
               <div className="h-10 w-10 rounded-xl bg-white p-2">
                 <img
-                  src="/logo.png"
+                  src={logo}
                   alt="DockSentinel"
                   className="h-full w-full object-contain"
                 />
@@ -73,6 +75,7 @@ export function AppShell() {
                 <SidebarLink to="/scheduler" label="Scheduler" />
                 <SidebarLink to="/notifications" label="Notifications" />
                 <SidebarLink to="/settings" label="Settings" />
+                <SidebarLink to="/teste" label="teste" />
               </nav>
             </div>
           </div>

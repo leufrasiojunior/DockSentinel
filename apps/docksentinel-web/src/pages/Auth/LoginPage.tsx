@@ -8,6 +8,7 @@ import { useToast } from "../../shared/components/ui/ToastProvider";
 
 import { getAuthStatus, login } from "../../features/auth/api/auth";
 import { buildLoginBody, loginHint, needsPassword, needsTotp } from "./loginUtils";
+import logo from '../../assets/logo2.png'
 
 export function LoginPage() {
   const nav = useNavigate();
@@ -48,7 +49,7 @@ export function LoginPage() {
     <div className="min-h-screen bg-gray-50 flex items-center justify-center p-6">
       <div className="w-full max-w-md space-y-4">
         <div className="flex items-center justify-center gap-2">
-          <img src="/logo.png" alt="DockSentinel" className="h-10 w-10" />
+          <img src={logo} alt="DockSentinel" className="h-10 w-10" />
           <div className="text-xl font-semibold">DockSentinel</div>
         </div>
 
