@@ -3,7 +3,7 @@
 import { Button } from "../../../shared/components/ui/Button";
 import { useNotifications } from "../hooks/useNotifications";
 import { columns } from "../table/columns";
-import { DataTable } from "../table/data-table";
+import { DataTable } from "../../../shared/components/ui/DataTable";
 
 export default function NewNotifications() {
   const { items, refetch, isFetching, visible } = useNotifications();
