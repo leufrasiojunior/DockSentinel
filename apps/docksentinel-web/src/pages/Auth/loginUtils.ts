@@ -1,4 +1,4 @@
-import type { AuthMode } from "../../api/auth";
+import type { AuthMode } from "../../features/auth/api/auth";
 
 export type LoginPayload = {
   password?: string;

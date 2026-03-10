@@ -15,5 +15,8 @@
     "version:current": "node scripts/version.mjs",
     "tag:latest": "node scripts/tag-latest.mjs",
     "test:scripts": "node --test scripts/tests/release-utils.test.mjs && bash scripts/tests/publish-release.integration.sh"
+  },
+  "dependencies": {
+    "@tanstack/react-table": "^8.21.3"
   }
 }

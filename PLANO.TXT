@@ -1,0 +1,108 @@
+# Plano de Reestruturação Total (Frontend-first + Shared Contracts)
+
+## Resumo
+- Escopo adotado: **reestruturação total**, com prioridade em **frontend primeiro** e criação de **`@docksentinel/shared` agora**.
+- Objetivo: separar por funcionalidade/domínio, reduzir acoplamento, padronizar contratos e maximizar reuso.
+- Estratégia: migrar em fases com compatibilidade temporária de API, sem “big-bang” de deploy.
+- Resultado esperado: arquitetura por feature/layer, menos arquivos monolíticos, contratos tipados ponta a ponta, e qualidade estável em CI.
+
+## Diagnóstico (melhorias identificadas)
+- Frontend com componentes/páginas monolíticas e mistura de responsabilidades em arquivos como [DashboardPage.tsx](/home/leonald/pessoal/DockSentinel/apps/docksentinel-web/src/pages/Dashboard/DashboardPage.tsx), [SchedulerPage.tsx](/home/leonald/pessoal/DockSentinel/apps/docksentinel-web/src/pages/Scheduler/SchedulerPage.tsx), [SettingsPage.tsx](/home/leonald/pessoal/DockSentinel/apps/docksentinel-web/src/pages/Settings/SettingsPage.tsx).
+- Duplicação de lógica de notificações entre [NotificationsPage.tsx](/home/leonald/pessoal/DockSentinel/apps/docksentinel-web/src/pages/Notifications/NotificationsPage.tsx) e [AppShell.tsx](/home/leonald/pessoal/DockSentinel/apps/docksentinel-web/src/layouts/AppShell.tsx).
+- `packages/shared` existe, mas não é usado por web/api: [package.json](/home/leonald/pessoal/DockSentinel/packages/shared/package.json).
+- Inconsistências de endpoints e clientes (`/api/notifications` vs rotas sem prefixo), além de duplicidade funcional em `scanAndEnqueue` (`scheduler.ts` e `updates.ts`).
+- Backend `updates` com sobreposição de responsabilidades e serviço sem uso direto (`UpdatesQueueService`): [updates.module.ts](/home/leonald/pessoal/DockSentinel/apps/api/src/updates/updates.module.ts).
+- Inconsistência de DI no Docker (`DockerService` cria cliente próprio ao invés de usar provider do módulo): [docker.service.ts](/home/leonald/pessoal/DockSentinel/apps/api/src/docker/docker.service.ts) e [docker.module.ts](/home/leonald/pessoal/DockSentinel/apps/api/src/docker/docker.module.ts).
+- Débito de qualidade no frontend confirmado por lint (56 erros), principalmente `any` e organização.
+
+## Arquitetura alvo
+
+## Frontend (`apps/docksentinel-web/src`)
+- `app/`: bootstrap, router, providers, query keys globais.
+- `features/`: `auth`, `dashboard`, `jobs`, `notifications`, `scheduler`, `settings`.
+- `entities/`: tipos e mapeamentos de entidades (container, job, notification, scheduler).
+- `shared/`: `api` (client/base), `ui` (design primitives), `lib` (date, errors, formatters), `hooks` genéricos.
+- Regra: página só orquestra; lógica fica em hooks/services; UI reutilizável em `features/*/components` e `shared/ui`.
+
+## Backend (`apps/api/src`)
+- `modules/<dominio>/api` (controllers/dtos), `application` (use-cases/services), `infrastructure` (repo/gateways), `domain` (tipos/regras).
+- Consolidar `updates` para uma única superfície de agendamento e fila.
+- `DockerService` 100% via DI do `DOCKER_CLIENT`.
+- Efeitos colaterais (notificações) saem de controller e entram em camada de aplicação.
+
+## Shared (`packages/shared`)
+- Pacote real com build e exports estáveis.
+- `contracts/`: tipos públicos de request/response.
+- `schemas/`: Zod para validação compartilhada quando aplicável.
+- `constants/`: enums e chaves de domínio (status, modos, níveis).
+
+## Plano de execução (decision-complete)
+
+## Fase 1 — Fundação e guardrails
+- Criar estrutura de `packages/shared/src/{contracts,schemas,constants,index.ts}`.
+- Adicionar build do shared via `tsc` e exports no `package.json`.
+- Definir aliases de import (`@web/*`, `@api/*`, `@docksentinel/shared/*`) e padronizar estilo de import.
+- Adicionar regras de boundary no ESLint para impedir import cruzado fora da camada.
+- Critério de saída: shared compilando, aliases funcionando em web e api, sem mudanças funcionais ainda.
+
+## Fase 2 — Frontend-first (refactor estrutural)
+- Criar `src/features` e mover cada domínio para sua pasta.
+- Extrair de `DashboardPage` os blocos: `DashboardToolbar`, `ContainersTable`, `ContainerRowActions`, `ContainerDetailsModal`, `ContainerIcon`.
+- Extrair de `SchedulerPage` os blocos: `SchedulerRuntimeCard`, `SchedulerConfigForm`, `CronBuilder`, `CronFieldEditor`.
+- Extrair de `SettingsPage` os blocos: `AuthTab`, `NotificationsTab`, `SmtpPresetModal`, `TotpEnrollmentPanel`.
+- Unificar notificações com hook único `useNotificationsFeed` usado por página e central.
+- Unificar utilitários repetidos (`fmt`, `toEpoch`, sorter, `errorMessage`) em `shared/lib`.
+- Consolidar clientes API por feature e remover duplicidade de `scanAndEnqueue`.
+- Critério de saída: páginas principais <= 300 linhas, sem regressão visual/funcional.
+
+## Fase 3 — Contratos compartilhados ativos
+- Migrar tipos de API usados no frontend para `@docksentinel/shared/contracts`.
+- Substituir `any` em clientes por contratos tipados.
+- Introduzir parser/normalizer explícito por endpoint onde backend ainda é flexível.
+- Critério de saída: zero `any` em `src/api` e tipagem forte entre front/back.
+
+## Fase 4 — Consolidação backend por domínio
+- Em `updates`, remover serviço não utilizado (`UpdatesQueueService`) e consolidar fluxo em `UpdatesOrchestratorService + UpdatesWorkerService + UpdatesRepository`.
+- Unificar endpoints de scheduler, mantendo camada de compatibilidade temporária para rotas antigas.
+- Refatorar `DockerService` para usar apenas cliente injetado.
+- Mover emissão de notificações para camada de aplicação (não controller).
+- Corrigir bootstrap para migrações não dependerem de `SWAGGER_ENABLED`.
+- Critério de saída: módulos coesos, sem duplicidade de rota/comportamento, testes passando.
+
+## Fase 5 — Compatibilidade, depreciação e documentação
+- Definir contrato canônico de endpoints e manter aliases legados por 1 release.
+- Registrar depreciações no `CHANGELOG.md` e docs de API.
+- Atualizar READMEs reais de `apps/api` e `apps/docksentinel-web` (remover templates genéricos).
+- Critério de saída: documentação alinhada com arquitetura e contratos atuais.
+
+## Mudanças importantes em APIs/interfaces/tipos públicos
+- Novo pacote público interno: `@docksentinel/shared` com contratos de:
+  - `auth`, `docker`, `updates`, `scheduler`, `notifications`, `settings`.
+- Frontend passa a consumir contratos do shared para requests/responses.
+- Scheduler terá uma superfície canônica única; rotas antigas ficam em compatibilidade temporária (deprecadas).
+- Notificações passam a usar cliente único com padronização de query params e retorno tipado.
+
+## Testes e cenários de validação
+- Frontend:
+  - Testes unitários para utilitários compartilhados de data/sort/error parsing.
+  - Testes de componentes extraídos (renderização, estados de loading/error, ações críticas).
+  - Cypress smoke cobrindo login, dashboard, scheduler, settings, notifications após refactor.
+- Backend:
+  - Unit para orquestração de updates (scan_only vs scan_and_update, skip por label, erro parcial).
+  - Unit para rotas canônicas + rotas de compatibilidade (mesmo comportamento).
+  - Regressão de auth/session/settings/notifications já existentes.
+- Integração:
+  - Contrato front-back validado por tipos compartilhados e cenários de erro HTTP.
+
+## Critérios de aceite finais
+- Estrutura por feature/layer implementada em web e api.
+- `@docksentinel/shared` consumido por ambos os apps.
+- Frontend sem erros de lint e com redução substancial de warnings.
+- Back-end com testes unitários verdes e sem rotas duplicadas sem dono.
+- Sem regressão funcional nos fluxos: login, listagem de containers, scan/enqueue, jobs, scheduler, settings, notifications.
+
+## Assumptions e defaults adotados
+- Manter stack atual: React + React Query + Tailwind + NestJS + Prisma.
+- Sem mudança de banco nesta etapa (apenas organização/código e compatibilidade de rotas).
+- Deploy em fases com feature parity; sem downtime planejado.
+- Compatibilidade de API mantida por uma release antes de remover legados.

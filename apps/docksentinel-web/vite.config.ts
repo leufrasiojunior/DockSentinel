@@ -1,11 +1,20 @@
 import tailwindcss from "@tailwindcss/vite";
 import { defineConfig } from "vite";
 import react from "@vitejs/plugin-react";
+import * as path from "path";
 
 const API_TARGET = "http://localhost:3000";
 
 export default defineConfig({
   plugins: [react(), tailwindcss()],
+    resolve: {
+    alias: [
+      {
+        find: "@",
+        replacement: path.resolve(__dirname, "src"),
+      },
+    ],
+  },
   server: {
     proxy: {
       // AUTH
@@ -61,4 +70,5 @@ export default defineConfig({
       },
     },
   },
+
 });

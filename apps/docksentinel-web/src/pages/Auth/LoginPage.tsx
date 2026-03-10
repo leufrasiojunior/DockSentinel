@@ -2,12 +2,13 @@ import { useState } from "react";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { useLocation, useNavigate } from "react-router-dom";
 
-import { Button } from "../../layouts/ui/Button";
-import { Card, CardHeader } from "../../layouts/ui/Card";
-import { useToast } from "../../layouts/ui/ToastProvider";
+import { Button } from "../../shared/components/ui/Button";
+import { Card, CardHeader } from "../../shared/components/ui/Card";
+import { useToast } from "../../shared/components/ui/ToastProvider";
 
-import { getAuthStatus, login } from "../../api/auth";
+import { getAuthStatus, login } from "../../features/auth/api/auth";
 import { buildLoginBody, loginHint, needsPassword, needsTotp } from "./loginUtils";
+import logo from '../../assets/logo2.png'
 
 export function LoginPage() {
   const nav = useNavigate();
@@ -48,7 +49,7 @@ export function LoginPage() {
     <div className="min-h-screen bg-gray-50 flex items-center justify-center p-6">
       <div className="w-full max-w-md space-y-4">
         <div className="flex items-center justify-center gap-2">
-          <img src="/logo.png" alt="DockSentinel" className="h-10 w-10" />
+          <img src={logo} alt="DockSentinel" className="h-10 w-10" />
           <div className="text-xl font-semibold">DockSentinel</div>
         </div>
 
