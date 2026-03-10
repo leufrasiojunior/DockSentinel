@@ -20,7 +20,7 @@ export function JobsPage() {
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <h1 className="text-2xl font-semibold">Jobs</h1>
-          <p className="mt-1 text-sm text-gray-600">
+          <p className="mt-1 text-sm text-muted-foreground">
             Fila/histórico de ações do updater. Auto-refresh:{" "}
             {visible ? "ON" : "OFF (aba oculta)"}.
           </p>

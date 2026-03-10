@@ -5,6 +5,7 @@ import { logout } from "../features/auth/api/auth";
 import { Button } from "../shared/components/ui/Button";
 import { NotificationsBridge } from "./NotificationsBridge";
 import { NotificationCenter } from "../features/notifications/components/NotificationCenter";
+import { ThemeToggle } from "../shared/components/ui/ThemeToggle";
 import { cn } from "../shared/lib/utils/cn";
 
 import { 
@@ -68,7 +69,7 @@ export function AppShell() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-background text-foreground transition-colors duration-300">
       <div className="flex">
         {/* Sidebar */}
         <aside 
@@ -142,10 +143,13 @@ export function AppShell() {
         {/* Main */}
         <main className="flex-1 min-w-0">
           <NotificationsBridge />
-          <header className="sticky top-0 z-10 border-b bg-white/80 backdrop-blur">
+          <header className="sticky top-0 z-10 border-b bg-white/80 dark:bg-slate-950/80 backdrop-blur dark:border-slate-800">
             <div className="flex items-center justify-between px-6 py-4">
-              <div className="text-sm text-gray-600">DockSentinel</div>
-              <NotificationCenter />
+              <div className="text-sm text-gray-600 dark:text-gray-400">DockSentinel</div>
+              <div className="flex items-center gap-2">
+                <ThemeToggle />
+                <NotificationCenter />
+              </div>
             </div>
           </header>
 

@@ -35,8 +35,8 @@ function FieldEditor({
   return (
     <div className="rounded-lg border p-3 space-y-3">
       <div>
-        <div className="text-sm font-medium text-gray-900">{title}</div>
-        <div className="text-xs text-gray-500">{desc}</div>
+        <div className="text-sm font-medium text-foreground">{title}</div>
+        <div className="text-xs text-muted-foreground">{desc}</div>
       </div>
 
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">

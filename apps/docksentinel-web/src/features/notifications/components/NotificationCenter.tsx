@@ -8,6 +8,8 @@ import {
 } from "../api/notifications";
 import { usePageVisibility } from "../../../hooks/usePageVisibility";
 import { sortNewestFirst } from "../utils/date";
+import { cn } from "../../../shared/lib/utils/cn";
+import { Bell, Check, ExternalLink } from "lucide-react";
 
 export function NotificationCenter() {
   const qc = useQueryClient();
@@ -60,109 +62,120 @@ export function NotificationCenter() {
       <button
         type="button"
         onClick={() => setOpen((v) => !v)}
-        className="relative inline-flex h-10 w-10 items-center justify-center rounded-full border bg-white text-gray-700 shadow-sm hover:bg-gray-50"
+        className={cn(
+          "relative inline-flex h-9 w-9 items-center justify-center rounded-full border transition-all duration-200",
+          open 
+            ? "bg-muted border-border text-foreground shadow-inner" 
+            : "bg-background border-border text-muted-foreground shadow-sm hover:bg-muted hover:text-foreground"
+        )}
         aria-label="Abrir central de notificações"
         title="Central de notificações"
       >
-        <svg
-          xmlns="http://www.w3.org/2000/svg"
-          viewBox="0 0 24 24"
-          fill="none"
-          stroke="currentColor"
-          strokeWidth="2"
-          className="h-5 w-5"
-          aria-hidden="true"
-        >
-          <path d="M15 17h5l-1.4-1.4A2 2 0 0 1 18 14.2V11a6 6 0 1 0-12 0v3.2a2 2 0 0 1-.6 1.4L4 17h5" />
-          <path d="M9 17a3 3 0 0 0 6 0" />
-        </svg>
+        <Bell className="h-4.5 w-4.5" />
         {unreadCount > 0 && (
-          <span className="absolute -right-2 -top-2 rounded-full bg-red-600 px-1.5 py-0.5 text-[10px] font-semibold text-white">
+          <span className="absolute -right-1 -top-1 flex h-4 w-4 items-center justify-center rounded-full bg-blue-600 text-[10px] font-bold text-white ring-2 ring-background">
             {unreadCount}
           </span>
         )}
       </button>
 
       {open && (
-        <div className="absolute right-0 top-12 z-50 w-107.5 rounded-xl border bg-white p-3 shadow-lg">
-          <div className="mb-2 flex items-center justify-between">
-            <div className="text-sm font-semibold text-gray-800">
-              Central de notificações
+        <div className="absolute right-0 top-11 z-50 w-80 sm:w-96 rounded-xl border border-border bg-card p-0 shadow-xl overflow-hidden animate-in fade-in zoom-in-95 duration-200">
+          <div className="flex items-center justify-between border-b border-border bg-muted/30 px-4 py-3">
+            <div className="text-sm font-semibold text-foreground flex items-center gap-2">
+              Notificações
+              {unreadCount > 0 && (
+                <span className="rounded-full bg-blue-500/10 px-2 py-0.5 text-[10px] text-blue-600 dark:text-blue-400">
+                  {unreadCount} novas
+                </span>
+              )}
             </div>
             <Link
               to="/notifications"
-              className="text-xs text-blue-600 hover:text-blue-700"
+              className="text-xs text-blue-600 hover:text-blue-700 dark:text-blue-400 dark:hover:text-blue-300 flex items-center gap-1"
               onClick={() => setOpen(false)}
             >
-              Ver todas
+              Ver todas <ExternalLink className="h-3 w-3" />
             </Link>
           </div>
 
-          <div className="mb-2 flex items-center justify-between text-xs text-gray-600">
-            <span>Não lidas: {unreadCount} • Mais novas primeiro</span>
-            <button
-              type="button"
-              onClick={() => markAllReadMutation.mutate()}
-              disabled={markAllReadMutation.isPending || unreadCount === 0}
-              className="rounded border px-2 py-1 hover:bg-gray-50 disabled:opacity-60"
-            >
-              Marcar todas como lidas
-            </button>
-          </div>
-
-          <div className="max-h-96 space-y-2 overflow-auto pr-1">
-            {notificationsQuery.isLoading && (
-              <div className="rounded-md border bg-gray-50 px-3 py-2 text-xs text-gray-600">
+          <div className="max-h-[400px] overflow-y-auto p-2 space-y-1 scrollbar-hide">
+            {notificationsQuery.isLoading ? (
+              <div className="p-8 text-center text-xs text-muted-foreground italic">
                 Carregando...
               </div>
-            )}
-
-            {!notificationsQuery.isLoading && notifications.length === 0 && (
-              <div className="rounded-md border bg-gray-50 px-3 py-2 text-xs text-gray-600">
-                Nenhuma notificação.
+            ) : notifications.length === 0 ? (
+              <div className="p-8 text-center text-xs text-muted-foreground italic">
+                Nenhuma notificação encontrada.
               </div>
-            )}
+            ) : (
+              notifications.map((n) => (
+                <div
+                  key={n.id}
+                  className={cn(
+                    "group relative rounded-lg border border-transparent p-3 transition-colors",
+                    !n.readAt 
+                      ? "bg-blue-500/5 hover:bg-blue-500/10 border-blue-500/10" 
+                      : "hover:bg-muted/50"
+                  )}
+                >
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2 mb-1">
+                        <span
+                          className={cn(
+                            "h-2 w-2 rounded-full shrink-0",
+                            n.level === "error" ? "bg-red-500" : "bg-green-500",
+                            n.readAt && "opacity-40"
+                          )}
+                        />
+                        <div className={cn(
+                          "text-xs font-semibold truncate",
+                          !n.readAt ? "text-foreground" : "text-muted-foreground"
+                        )}>
+                          {n.title}
+                        </div>
+                      </div>
+                      <div className={cn(
+                        "text-xs line-clamp-2 leading-relaxed",
+                        !n.readAt ? "text-foreground/90" : "text-muted-foreground/80"
+                      )}>
+                        {n.message}
+                      </div>
+                      <div className="mt-2 text-[10px] text-muted-foreground/60 flex items-center gap-2">
+                        {new Date(n.createdAt).toLocaleString()}
+                      </div>
+                    </div>
 
-            {notifications.map((n) => (
-              <div
-                key={n.id}
-                className={[
-                  "rounded-md border px-3 py-2",
-                  !n.readAt ? "border-blue-200 bg-blue-50/40" : "border-gray-200",
-                ].join(" ")}
-              >
-                <div className="flex items-start justify-between gap-2">
-                  <div className="text-xs font-semibold text-gray-800">{n.title}</div>
-                  <div className="flex items-center gap-2">
-                    <span
-                      className={[
-                        "rounded px-1.5 py-0.5 text-[10px] font-semibold",
-                        n.level === "error"
-                          ? "bg-red-100 text-red-700"
-                          : "bg-green-100 text-green-700",
-                      ].join(" ")}
-                    >
-                      {n.level === "error" ? "ERRO" : "INFO"}
-                    </span>
                     {!n.readAt && (
                       <button
                         type="button"
-                        className="rounded border px-1.5 py-0.5 text-[10px] hover:bg-white"
+                        className="rounded-full p-1.5 text-muted-foreground hover:bg-blue-500/20 hover:text-blue-600 transition-colors"
                         onClick={() => markReadMutation.mutate(n.id)}
                         disabled={markReadMutation.isPending}
+                        title="Marcar como lida"
                       >
-                        Lida
+                        <Check className="h-3.5 w-3.5" />
                       </button>
                     )}
                   </div>
                 </div>
-                <div className="mt-1 line-clamp-3 text-xs text-gray-700">{n.message}</div>
-                <div className="mt-1 text-[11px] text-gray-500">
-                  {new Date(n.createdAt).toLocaleString()}
-                </div>
-              </div>
-            ))}
+              ))
+            )}
           </div>
+
+          {unreadCount > 0 && (
+            <div className="border-t border-border bg-muted/30 p-2">
+              <button
+                type="button"
+                onClick={() => markAllReadMutation.mutate()}
+                disabled={markAllReadMutation.isPending}
+                className="w-full rounded-md py-2 text-xs font-medium text-muted-foreground hover:bg-muted hover:text-foreground transition-colors disabled:opacity-50"
+              >
+                Marcar todas como lidas
+              </button>
+            </div>
+          )}
         </div>
       )}
     </div>

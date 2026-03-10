@@ -1,4 +1,5 @@
 import * as React from "react";
+import { cn } from "../../lib/utils/cn";
 
 export function Select({
   className = "",
@@ -8,11 +9,11 @@ export function Select({
   return (
     <select
       {...props}
-      className={[
-        "w-full rounded-md border border-gray-200 bg-white px-3 py-2 text-sm",
-        "focus:outline-none focus:ring-2 focus:ring-blue-200 focus:border-blue-300",
+      className={cn(
+        "w-full rounded-md border border-input bg-background px-3 py-2 text-sm text-foreground",
+        "focus:outline-none focus:ring-2 focus:ring-ring focus:border-ring",
         className,
-      ].join(" ")}
+      )}
     >
       {children}
     </select>

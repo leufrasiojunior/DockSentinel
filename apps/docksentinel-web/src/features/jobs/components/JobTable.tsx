@@ -1,5 +1,13 @@
 import { Badge } from "../../../shared/components/ui/Badge";
 import { type UpdateJob } from "../api/jobs";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "../../../components/ui/table";
 
 function fmt(iso?: string | null) {
   if (!iso) return "—";
@@ -23,86 +31,84 @@ interface JobTableProps {
 
 export function JobTable({ jobs, loading }: JobTableProps) {
   return (
-    <div className="overflow-x-auto">
-      <table className="min-w-full text-left text-sm">
-        <thead className="bg-gray-50 text-xs uppercase tracking-wide text-gray-600">
-          <tr>
-            <th className="px-4 py-3">Status</th>
-            <th className="px-4 py-3">Container</th>
-            <th className="px-4 py-3">Imagem</th>
-            <th className="px-4 py-3">Timestamps</th>
-            <th className="px-4 py-3">Lock</th>
-          </tr>
-        </thead>
+    <Table>
+      <TableHeader>
+        <TableRow>
+          <TableHead className="text-left">Status</TableHead>
+          <TableHead className="text-left">Container</TableHead>
+          <TableHead className="text-left">Imagem</TableHead>
+          <TableHead className="text-left">Timestamps</TableHead>
+          <TableHead className="text-left">Lock</TableHead>
+        </TableRow>
+      </TableHeader>
 
-        <tbody className="divide-y">
-          {loading && (
-            <tr>
-              <td className="px-4 py-4 text-gray-600" colSpan={5}>
-                Carregando...
-              </td>
-            </tr>
-          )}
+      <TableBody>
+        {loading && (
+          <TableRow>
+            <TableCell colSpan={5} className="h-24 text-center text-muted-foreground">
+              Carregando...
+            </TableCell>
+          </TableRow>
+        )}
 
-          {!loading && jobs.length === 0 && (
-            <tr>
-              <td className="px-4 py-4 text-gray-600" colSpan={5}>
-                Nenhum job encontrado.
-              </td>
-            </tr>
-          )}
+        {!loading && jobs.length === 0 && (
+          <TableRow>
+            <TableCell colSpan={5} className="h-24 text-center text-muted-foreground">
+              Nenhum job encontrado.
+            </TableCell>
+          </TableRow>
+        )}
 
-          {jobs.map((j: UpdateJob) => (
-            <tr key={j.id} className="hover:bg-gray-50">
-              <td className="px-4 py-4">
-                <div className="flex items-center gap-2">
-                  <Badge tone={statusTone(String(j.status)) as any}>
-                    {String(j.status)}
-                  </Badge>
-                  <div className="text-[11px] text-gray-500 font-mono">
-                    {j.id.slice(0, 8)}
-                  </div>
+        {jobs.map((j: UpdateJob) => (
+          <TableRow key={j.id}>
+            <TableCell className="text-left">
+              <div className="flex items-center gap-2">
+                <Badge tone={statusTone(String(j.status)) as any}>
+                  {String(j.status)}
+                </Badge>
+                <div className="text-[11px] text-muted-foreground font-mono">
+                  {j.id.slice(0, 8)}
                 </div>
-                {j.error && (
-                  <div className="mt-1 text-xs text-red-600">{j.error}</div>
-                )}
-              </td>
+              </div>
+              {j.error && (
+                <div className="mt-1 text-xs text-red-500">{j.error}</div>
+              )}
+            </TableCell>
 
-              <td className="px-4 py-4">
-                <div className="font-medium text-gray-900">
-                  {j.container ?? "—"}
-                </div>
-                <div className="text-xs text-gray-500">
-                  pull: {String(!!j.pull)} • force: {String(!!j.force)}
-                </div>
-              </td>
+            <TableCell className="text-left">
+              <div className="font-medium text-foreground">
+                {j.container ?? "—"}
+              </div>
+              <div className="text-xs text-muted-foreground">
+                pull: {String(!!j.pull)} • force: {String(!!j.force)}
+              </div>
+            </TableCell>
 
-              <td className="px-4 py-4">
-                <div className="font-mono text-xs text-gray-900 max-w-130 truncate">
-                  {j.image ?? "—"}
-                </div>
-              </td>
+            <TableCell className="text-left">
+              <div className="font-mono text-xs text-foreground max-w-[400px] truncate">
+                {j.image ?? "—"}
+              </div>
+            </TableCell>
 
-              <td className="px-4 py-4">
-                <div className="text-xs text-gray-600 space-y-1">
-                  <div>created: {fmt(j.createdAt)}</div>
-                  <div>start: {fmt(j.startedAt)}</div>
-                  <div>end: {fmt(j.finishedAt ?? null)}</div>
-                </div>
-              </td>
+            <TableCell className="text-left">
+              <div className="text-xs text-muted-foreground space-y-1">
+                <div>created: {fmt(j.createdAt)}</div>
+                <div>start: {fmt(j.startedAt)}</div>
+                <div>end: {fmt(j.finishedAt ?? null)}</div>
+              </div>
+            </TableCell>
 
-              <td className="px-4 py-4">
-                <div className="text-xs text-gray-600 space-y-1">
-                  <div>lockedAt: {fmt(j.lockedAt ?? null)}</div>
-                  <div className="font-mono truncate max-w-65">
-                    lockedBy: {j.lockedBy ?? "—"}
-                  </div>
+            <TableCell className="text-left">
+              <div className="text-xs text-muted-foreground space-y-1">
+                <div>lockedAt: {fmt(j.lockedAt ?? null)}</div>
+                <div className="font-mono truncate max-w-[200px]">
+                  lockedBy: {j.lockedBy ?? "—"}
                 </div>
-              </td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
-    </div>
+              </div>
+            </TableCell>
+          </TableRow>
+        ))}
+      </TableBody>
+    </Table>
   );
 }

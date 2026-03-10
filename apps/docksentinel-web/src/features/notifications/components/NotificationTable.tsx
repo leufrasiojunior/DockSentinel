@@ -1,5 +1,13 @@
 import { Button } from "../../../shared/components/ui/Button";
-
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "../../../components/ui/table";
+import { cn } from "../../../shared/lib/utils/cn";
 
 function fmt(value: string) {
   const d = new Date(value);
@@ -14,8 +22,6 @@ interface NotificationTableProps {
   markReadPending: boolean;
 }
 
-
-
 export function NotificationTable({
   items,
   loading,
@@ -23,82 +29,80 @@ export function NotificationTable({
   markReadPending,
 }: NotificationTableProps) {
   return (
-    <div className="overflow-x-auto">
-      <table className="min-w-full text-left text-sm">
-        <thead className="bg-gray-50 text-xs uppercase tracking-wide text-gray-600">
-          <tr>
-            <th className="px-4 py-3">Quando</th>
-            <th className="px-4 py-3">Tipo</th>
-            <th className="px-4 py-3">Status</th>
-            <th className="px-4 py-3">Título</th>
-            <th className="px-4 py-3">Mensagem</th>
-            <th className="px-4 py-3">Ação</th>
-          </tr>
-        </thead>
-        <tbody className="divide-y">
-          {loading && (
-            <tr>
-              <td colSpan={6} className="px-4 py-4 text-gray-600">
-                Carregando...
-              </td>
-            </tr>
-          )}
+    <Table>
+      <TableHeader>
+        <TableRow>
+          <TableHead className="text-left">Quando</TableHead>
+          <TableHead className="text-left">Tipo</TableHead>
+          <TableHead className="text-left">Status</TableHead>
+          <TableHead className="text-left">Título</TableHead>
+          <TableHead className="text-left">Mensagem</TableHead>
+          <TableHead className="text-left">Ação</TableHead>
+        </TableRow>
+      </TableHeader>
+      <TableBody>
+        {loading && (
+          <TableRow>
+            <TableCell colSpan={6} className="h-24 text-center text-muted-foreground">
+              Carregando...
+            </TableCell>
+          </TableRow>
+        )}
 
-          {!loading && items.length === 0 && (
-            <tr>
-              <td colSpan={6} className="px-4 py-4 text-gray-600">
-                Nenhuma notificação encontrada.
-              </td>
-            </tr>
-          )}
+        {!loading && items.length === 0 && (
+          <TableRow>
+            <TableCell colSpan={6} className="h-24 text-center text-muted-foreground">
+              Nenhuma notificação encontrada.
+            </TableCell>
+          </TableRow>
+        )}
 
-          {items.map((n) => (
-            <tr
-              key={n.id}
-              className={[
-                "hover:bg-gray-50",
-                !n.readAt ? "bg-blue-50/30" : "",
-              ].join(" ")}
-            >
-              <td className="whitespace-nowrap px-4 py-3 text-gray-600">{fmt(n.createdAt)}</td>
-              <td className="px-4 py-3">
-                <span
-                  className={[
-                    "rounded px-1.5 py-0.5 text-[10px] font-semibold",
-                    n.level === "error"
-                      ? "bg-red-100 text-red-700"
-                      : "bg-green-100 text-green-700",
-                  ].join(" ")}
+        {items.map((n) => (
+          <TableRow
+            key={n.id}
+            className={cn(
+              "hover:bg-muted/50",
+              !n.readAt && "bg-blue-500/5 dark:bg-blue-500/10"
+            )}
+          >
+            <TableCell className="whitespace-nowrap text-left text-muted-foreground">{fmt(n.createdAt)}</TableCell>
+            <TableCell className="text-left">
+              <span
+                className={cn(
+                  "rounded px-1.5 py-0.5 text-[10px] font-semibold",
+                  n.level === "error"
+                    ? "bg-red-500/10 text-red-700 dark:text-red-400"
+                    : "bg-green-500/10 text-green-700 dark:text-green-400",
+                )}
+              >
+                {n.level === "error" ? "ERRO" : "INFO"}
+              </span>
+            </TableCell>
+            <TableCell className="text-left text-xs">
+              {n.readAt ? (
+                <span className="rounded bg-muted px-2 py-1 text-muted-foreground border border-border">Lida</span>
+              ) : (
+                <span className="rounded bg-blue-500/10 px-2 py-1 text-blue-700 dark:text-blue-400 border border-blue-500/20">Não lida</span>
+              )}
+            </TableCell>
+            <TableCell className="text-left font-medium text-foreground">{n.title}</TableCell>
+            <TableCell className="text-left text-foreground/80">{n.message}</TableCell>
+            <TableCell className="text-left">
+              {!n.readAt && (
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="ghost"
+                  onClick={() => onMarkRead(n.id)}
+                  disabled={markReadPending}
                 >
-                  {n.level === "error" ? "ERRO" : "INFO"}
-                </span>
-              </td>
-              <td className="px-4 py-3 text-xs">
-                {n.readAt ? (
-                  <span className="rounded bg-gray-100 px-2 py-1 text-gray-700">Lida</span>
-                ) : (
-                  <span className="rounded bg-blue-100 px-2 py-1 text-blue-700">Não lida</span>
-                )}
-              </td>
-              <td className="px-4 py-3 font-medium text-gray-900">{n.title}</td>
-              <td className="px-4 py-3 text-gray-700">{n.message}</td>
-              <td className="px-4 py-3">
-                {!n.readAt && (
-                  <Button
-                    type="button"
-                    size="sm"
-                    variant="ghost"
-                    onClick={() => onMarkRead(n.id)}
-                    disabled={markReadPending}
-                  >
-                    Marcar lida
-                  </Button>
-                )}
-              </td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
-    </div>
+                  Marcar lida
+                </Button>
+              )}
+            </TableCell>
+          </TableRow>
+        ))}
+      </TableBody>
+    </Table>
   );
 }

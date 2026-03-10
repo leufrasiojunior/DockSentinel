@@ -46,12 +46,12 @@ export function SchedulerPage() {
     setScope,
     scanLabelKey,
     setScanLabelKey,
+     cronExpr,
+    setCronExpr,
     updateLabelKey,
     setUpdateLabelKey,
     cronManual,
     setCronManual,
-    cronExpr,
-    setCronExpr,
     cronState,
     setCronState,
     cronBuilt,
@@ -67,8 +67,8 @@ export function SchedulerPage() {
     <div className="p-6 space-y-4">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <h1 className="text-2xl font-semibold">Scheduler</h1>
-          <p className="mt-1 text-sm text-gray-600">
+          <h1 className="text-2xl font-semibold text-foreground">Scheduler</h1>
+          <p className="mt-1 text-sm text-muted-foreground">
             Config + runtime (GET /updates/scheduler/scheduler). Auto-refresh:{" "}
             {visible ? "ON" : "OFF (aba oculta)"}.
           </p>
@@ -111,20 +111,20 @@ export function SchedulerPage() {
 
           <div className="p-4 grid grid-cols-1 gap-4">
             <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-              <label className="flex items-center gap-3 rounded-lg border p-3">
+              <label className="flex items-center gap-3 rounded-lg border border-border p-3 bg-muted/20">
                 <input
                   type="checkbox"
                   checked={enabled}
                   onChange={(e) => setEnabled(e.target.checked)}
                 />
                 <div>
-                  <div className="text-sm font-medium text-gray-900">Enabled</div>
-                  <div className="text-xs text-gray-500">Habilita o scheduler</div>
+                  <div className="text-sm font-medium text-foreground">Enabled</div>
+                  <div className="text-xs text-muted-foreground">Habilita o scheduler</div>
                 </div>
               </label>
 
-              <div className="rounded-lg border p-3">
-                <div className="text-sm font-medium text-gray-900">mode</div>
+              <div className="rounded-lg border border-border p-3 bg-muted/20">
+                <div className="text-sm font-medium text-foreground">mode</div>
                 <div className="mt-2">
                   <Select value={mode} onChange={(e) => setMode(e.target.value as SchedulerMode)}>
                     <option value="scan_only">scan_only</option>
@@ -133,8 +133,8 @@ export function SchedulerPage() {
                 </div>
               </div>
 
-              <div className="rounded-lg border p-3">
-                <div className="text-sm font-medium text-gray-900">scope</div>
+              <div className="rounded-lg border border-border p-3 bg-muted/20">
+                <div className="text-sm font-medium text-foreground">scope</div>
                 <div className="mt-2">
                   <Select value={scope} onChange={(e) => setScope(e.target.value as SchedulerScope)}>
                     <option value="all">all</option>
@@ -143,15 +143,15 @@ export function SchedulerPage() {
                 </div>
               </div>
 
-              <div className="rounded-lg border p-3">
-                <div className="text-sm font-medium text-gray-900">scanLabelKey</div>
+              <div className="rounded-lg border border-border p-3 bg-muted/20">
+                <div className="text-sm font-medium text-foreground">scanLabelKey</div>
                 <div className="mt-2">
                   <Input value={scanLabelKey} onChange={(e) => setScanLabelKey(e.target.value)} />
                 </div>
               </div>
 
-              <div className="rounded-lg border p-3">
-                <div className="text-sm font-medium text-gray-900">updateLabelKey</div>
+              <div className="rounded-lg border border-border p-3 bg-muted/20">
+                <div className="text-sm font-medium text-foreground">updateLabelKey</div>
                 <div className="mt-2">
                   <Input value={updateLabelKey} onChange={(e) => setUpdateLabelKey(e.target.value)} />
                 </div>
@@ -169,35 +169,35 @@ export function SchedulerPage() {
             />
 
             <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
-              <div className="rounded-lg border p-3 text-sm">
-                <div className="text-gray-600">config.running</div>
+              <div className="rounded-lg border border-border p-3 text-sm bg-muted/10">
+                <div className="text-muted-foreground">config.running</div>
                 <div className="mt-1">
                   {cfg ? <BoolBadge value={!!cfg.running} toneTrue="blue" toneFalse="gray" /> : "—"}
                 </div>
               </div>
 
-              <div className="rounded-lg border p-3 text-sm">
-                <div className="text-gray-600">config.lastRunAt</div>
-                <div className="mt-1 text-gray-900">{fmt(cfg?.lastRunAt ?? null)}</div>
+              <div className="rounded-lg border border-border p-3 text-sm bg-muted/10">
+                <div className="text-muted-foreground">config.lastRunAt</div>
+                <div className="mt-1 text-foreground">{fmt(cfg?.lastRunAt ?? null)}</div>
               </div>
 
-              <div className="rounded-lg border p-3 text-sm">
-                <div className="text-gray-600">config.lockedAt</div>
-                <div className="mt-1 text-gray-900">{fmt(cfg?.lockedAt ?? null)}</div>
+              <div className="rounded-lg border border-border p-3 text-sm bg-muted/10">
+                <div className="text-muted-foreground">config.lockedAt</div>
+                <div className="mt-1 text-foreground">{fmt(cfg?.lockedAt ?? null)}</div>
               </div>
 
-              <div className="rounded-lg border p-3 text-sm">
-                <div className="text-gray-600">config.lockedBy</div>
-                <div className="mt-1 font-mono text-xs text-gray-900 truncate">
+              <div className="rounded-lg border border-border p-3 text-sm bg-muted/10">
+                <div className="text-muted-foreground">config.lockedBy</div>
+                <div className="mt-1 font-mono text-xs text-foreground truncate">
                   {cfg?.lockedBy ?? "—"}
                 </div>
               </div>
             </div>
 
-            <div className="text-xs text-gray-500">
-              createdAt: <span className="font-mono">{cfg?.createdAt ?? "—"}</span>
+            <div className="text-xs text-muted-foreground">
+              createdAt: <span className="font-mono text-foreground">{cfg?.createdAt ?? "—"}</span>
               {" • "}
-              updatedAt: <span className="font-mono">{cfg?.updatedAt ?? "—"}</span>
+              updatedAt: <span className="font-mono text-foreground">{cfg?.updatedAt ?? "—"}</span>
             </div>
           </div>
         </Card>

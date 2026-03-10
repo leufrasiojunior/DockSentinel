@@ -61,14 +61,15 @@ export function RuntimeCard({ rt }: RuntimeCardProps) {
         </div>
 
         <div className="flex items-center justify-between gap-3">
-          <div className="text-gray-600">nextScanAt</div>
-          <div className="text-gray-900">{fmt(rt?.nextScanAt ?? null)}</div>
-        </div>
+          <div className="text-muted-foreground">nextScanAt</div>
+          <div className="text-foreground">{fmt(rt?.nextScanAt ?? null)}</div>
+          </div>
 
-        <div className="flex items-center justify-between gap-3">
-          <div className="text-gray-600">lastFinishedAt</div>
-          <div className="text-gray-900">{fmt(rt?.lastFinishedAt ?? null)}</div>
-        </div>
+          <div className="rounded-lg border p-3 text-sm">
+          <div className="text-muted-foreground">lastFinishedAt</div>
+          <div className="text-foreground">{fmt(rt?.lastFinishedAt ?? null)}</div>
+          </div>
+
 
         <div>
           <div className="text-gray-600">lastError</div>

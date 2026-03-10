@@ -5,6 +5,15 @@ import { ContainerIcon } from "./ContainerIcon";
 import { splitImageRef } from "../utils/image";
 import { getAllowAutoUpdateFromLabels, type DockerContainer } from "../api/docker";
 import { type CheckState } from "../types";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "../../../components/ui/table";
+import { cn } from "../../../shared/lib/utils/cn";
 
 interface ContainerTableProps {
   containers: DockerContainer[];
@@ -62,139 +71,139 @@ export function ContainerTable({
         }
       />
 
-      <div className="overflow-x-auto">
-        <table className="min-w-full text-left text-sm">
-          <thead className="bg-gray-50 text-xs uppercase tracking-wide text-gray-600">
-            <tr>
-              <th className="w-10 px-4 py-3">
-                <input
-                  type="checkbox"
-                  checked={allSelected}
-                  onChange={onToggleAll}
-                  disabled={containers.length === 0}
-                />
-              </th>
-              <th className="px-4 py-3">Container</th>
-              <th className="px-4 py-3">Imagem</th>
-              <th className="px-4 py-3">Estado</th>
-              <th className="px-4 py-3">Update</th>
-              <th className="px-4 py-3">Ações</th>
-            </tr>
-          </thead>
+      <Table>
+        <TableHeader>
+          <TableRow>
+            <TableHead className="w-10">
+              <input
+                type="checkbox"
+                className="cursor-pointer"
+                checked={allSelected}
+                onChange={onToggleAll}
+                disabled={containers.length === 0}
+              />
+            </TableHead>
+            <TableHead className="text-left">Container</TableHead>
+            <TableHead className="text-left">Imagem</TableHead>
+            <TableHead className="text-left">Estado</TableHead>
+            <TableHead className="text-left">Update</TableHead>
+            <TableHead className="text-left">Ações</TableHead>
+          </TableRow>
+        </TableHeader>
 
-          <tbody className="divide-y">
-            {loading && (
-              <tr>
-                <td className="px-4 py-4 text-gray-600" colSpan={6}>
-                  Carregando...
-                </td>
-              </tr>
-            )}
+        <TableBody>
+          {loading && (
+            <TableRow>
+              <TableCell colSpan={6} className="h-24 text-center text-muted-foreground">
+                Carregando...
+              </TableCell>
+            </TableRow>
+          )}
 
-            {!loading && containers.length === 0 && (
-              <tr>
-                <td className="px-4 py-4 text-gray-600" colSpan={6}>
-                  Nenhum container encontrado.
-                </td>
-              </tr>
-            )}
+          {!loading && containers.length === 0 && (
+            <TableRow>
+              <TableCell colSpan={6} className="h-24 text-center text-muted-foreground">
+                Nenhum container encontrado.
+              </TableCell>
+            </TableRow>
+          )}
 
-            {containers.map((c) => {
-              const allowAutoUpdate = getAllowAutoUpdateFromLabels(c.labels);
-              const img = splitImageRef(c.image);
+          {containers.map((c) => {
+            const allowAutoUpdate = getAllowAutoUpdateFromLabels(c.labels);
+            const img = splitImageRef(c.image);
 
-              return (
-                <tr key={c.id} className="hover:bg-gray-50">
-                  <td className="px-4 py-4">
-                    <input
-                      type="checkbox"
-                      checked={!!selected[c.name]}
-                      onChange={() => onToggleOne(c.name)}
-                    />
-                  </td>
+            return (
+              <TableRow key={c.id}>
+                <TableCell>
+                  <input
+                    type="checkbox"
+                    className="cursor-pointer"
+                    checked={!!selected[c.name]}
+                    onChange={() => onToggleOne(c.name)}
+                  />
+                </TableCell>
 
-                  <td className="px-4 py-4">
-                    <div className="flex items-center gap-3">
-                      <ContainerIcon imageRepo={img.repo} containerName={c.name} />
+                <TableCell className="text-left">
+                  <div className="flex items-center gap-3">
+                    <ContainerIcon imageRepo={img.repo} containerName={c.name} />
 
-                      <div>
-                        <div className="font-medium text-gray-900">
-                          {c.name}
-                        </div>
-                        <div className="text-xs text-gray-500 font-mono truncate max-w-55">
-                          {c.id.slice(0, 12)}
-                        </div>
+                    <div>
+                      <div className="font-medium text-foreground">
+                        {c.name}
+                      </div>
+                      <div className="text-xs text-muted-foreground font-mono truncate max-w-[200px]">
+                        {c.id.slice(0, 12)}
                       </div>
                     </div>
-                  </td>
+                  </div>
+                </TableCell>
 
-                  <td className="px-4 py-4">
-                    <div className="font-mono text-xs text-gray-900 truncate max-w-130">
-                      {img.repo}
+                <TableCell className="text-left">
+                  <div className="font-mono text-xs text-foreground truncate max-w-[400px]">
+                    {img.repo}
+                  </div>
+                  <div className="mt-1 flex items-center gap-2">
+                    <Badge tone="gray">{img.tag || "no-tag"}</Badge>
+                    {!allowAutoUpdate && <Badge tone="gray">blocked</Badge>}
+                  </div>
+                </TableCell>
+
+                <TableCell className="text-left">
+                  <div className="font-medium text-foreground">{c.state}</div>
+                  <div className="text-xs text-muted-foreground">{c.status}</div>
+                </TableCell>
+
+                <TableCell className="text-left">
+                  {renderUpdateBadge(c.name, c.labels)}
+                  {checks[c.name]?.status === "error" && (
+                    <div className="mt-1 text-[11px] text-red-500">
+                      {(checks[c.name] as any).error}
                     </div>
-                    <div className="mt-1 flex items-center gap-2">
-                      <Badge tone="gray">{img.tag || "no-tag"}</Badge>
-                      {!allowAutoUpdate && <Badge tone="gray">blocked</Badge>}
+                  )}
+                </TableCell>
+
+                <TableCell className="text-left">
+                  <div className="flex flex-wrap gap-2">
+                    <Button
+                      size="sm"
+                      onClick={() => onDetails(c.id)}
+                      disabled={busy}
+                      type="button"
+                    >
+                      Detalhes
+                    </Button>
+
+                    <Button
+                      size="sm"
+                      onClick={() => onCheck(c.name)}
+                      disabled={busy}
+                      type="button"
+                    >
+                      Checar
+                    </Button>
+
+                    <Button
+                      size="sm"
+                      variant="primary"
+                      onClick={() => onUpdate(c.name)}
+                      disabled={busy || !allowAutoUpdate}
+                      type="button"
+                    >
+                      Atualizar
+                    </Button>
+                  </div>
+
+                  {!allowAutoUpdate && (
+                    <div className="mt-1 text-[11px] text-muted-foreground">
+                      bloqueado por label
                     </div>
-                  </td>
-
-                  <td className="px-4 py-4">
-                    <div className="font-medium text-gray-900">{c.state}</div>
-                    <div className="text-xs text-gray-500">{c.status}</div>
-                  </td>
-
-                  <td className="px-4 py-4">
-                    {renderUpdateBadge(c.name, c.labels)}
-                    {checks[c.name]?.status === "error" && (
-                      <div className="mt-1 text-[11px] text-red-600">
-                        {(checks[c.name] as any).error}
-                      </div>
-                    )}
-                  </td>
-
-                  <td className="px-4 py-4">
-                    <div className="flex flex-wrap gap-2">
-                      <Button
-                        size="sm"
-                        onClick={() => onDetails(c.id)}
-                        disabled={busy}
-                        type="button"
-                      >
-                        Detalhes
-                      </Button>
-
-                      <Button
-                        size="sm"
-                        onClick={() => onCheck(c.name)}
-                        disabled={busy}
-                        type="button"
-                      >
-                        Checar
-                      </Button>
-
-                      <Button
-                        size="sm"
-                        variant="primary"
-                        onClick={() => onUpdate(c.name)}
-                        disabled={busy || !allowAutoUpdate}
-                        type="button"
-                      >
-                        Atualizar
-                      </Button>
-                    </div>
-
-                    {!allowAutoUpdate && (
-                      <div className="mt-1 text-[11px] text-gray-500">
-                        bloqueado por label
-                      </div>
-                    )}
-                  </td>
-                </tr>
-              );
-            })}
-          </tbody>
-        </table>
-      </div>
+                  )}
+                </TableCell>
+              </TableRow>
+            );
+          })}
+        </TableBody>
+      </Table>
     </Card>
   );
 }

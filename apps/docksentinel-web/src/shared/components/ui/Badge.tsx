@@ -1,4 +1,5 @@
 import * as React from "react";
+import { cn } from "../../lib/utils/cn";
 
 type Tone = "gray" | "green" | "yellow" | "red" | "blue";
 
@@ -11,24 +12,21 @@ export function Badge({
   tone?: Tone;
   className?: string;
 }) {
-  const cls =
-    tone === "green"
-      ? "bg-green-50 text-green-700 border-green-200"
-      : tone === "yellow"
-        ? "bg-yellow-50 text-yellow-800 border-yellow-200"
-        : tone === "red"
-          ? "bg-red-50 text-red-700 border-red-200"
-          : tone === "blue"
-            ? "bg-blue-50 text-blue-700 border-blue-200"
-            : "bg-gray-50 text-gray-700 border-gray-200";
+  const tones: Record<Tone, string> = {
+    green: "bg-green-500/10 text-green-700 border-green-500/20 dark:text-green-400 dark:border-green-500/30",
+    yellow: "bg-yellow-500/10 text-yellow-800 border-yellow-500/20 dark:text-yellow-500 dark:border-yellow-500/30",
+    red: "bg-red-500/10 text-red-700 border-red-500/20 dark:text-red-400 dark:border-red-500/30",
+    blue: "bg-blue-500/10 text-blue-700 border-blue-500/20 dark:text-blue-400 dark:border-blue-500/30",
+    gray: "bg-muted text-muted-foreground border-border",
+  };
 
   return (
     <span
-      className={[
-        "inline-flex items-center rounded-full border px-2.5 py-1 text-xs font-medium",
-        cls,
+      className={cn(
+        "inline-flex items-center rounded-full border px-2.5 py-1 text-xs font-medium whitespace-nowrap",
+        tones[tone],
         className,
-      ].join(" ")}
+      )}
     >
       {children}
     </span>
