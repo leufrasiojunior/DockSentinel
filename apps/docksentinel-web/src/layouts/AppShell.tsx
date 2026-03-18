@@ -74,7 +74,7 @@ export function AppShell() {
         {/* Sidebar */}
         <aside 
           className={cn(
-            "sticky top-0 h-screen bg-slate-950 text-white flex flex-col transition-all duration-300 ease-in-out z-20 shrink-0",
+            "sticky top-0 h-screen bg-slate-950 text-white flex flex-col transition-all duration-300 ease-in-out z-20 shrink-0 border-r-2",
             isCollapsed ? "w-20" : "w-72"
           )}
         >
