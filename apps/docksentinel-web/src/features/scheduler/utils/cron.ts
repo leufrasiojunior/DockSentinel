@@ -1,165 +1,419 @@
-export type CronFieldKind = "any" | "every" | "list" | "range" | "rangeStep";
+export type ScheduleEditorMode = "guided" | "advanced";
+export type GuidedScheduleKind = "interval" | "daily" | "weekly" | "monthly";
+export type GuidedIntervalUnit = "minutes" | "hours";
 
-export type CronFieldState =
-  | { kind: "any" }
-  | { kind: "every"; step: number } // */step
-  | { kind: "list"; values: string } // "1,2,3"
-  | { kind: "range"; start: number; end: number } // "a-b"
-  | { kind: "rangeStep"; start: number; end: number; step: number }; // "a-b/step"
+export type GuidedSchedule =
+  | { kind: "interval"; every: number; unit: GuidedIntervalUnit }
+  | { kind: "daily"; time: string }
+  | { kind: "weekly"; time: string; days: number[] }
+  | { kind: "monthly"; time: string; day: number };
 
-export type CronState = {
-  minute: CronFieldState;
-  hour: CronFieldState;
-  dom: CronFieldState; // day of month
-  month: CronFieldState;
-  dow: CronFieldState; // day of week (0-6)
+export type SchedulePresetId =
+  | "every-5m"
+  | "every-15m"
+  | "every-30m"
+  | "every-1h"
+  | "daily-03"
+  | "weekdays-09"
+  | "weekly"
+  | "monthly";
+
+export type SchedulePreset = {
+  id: SchedulePresetId;
+  label: string;
+  description: string;
+  schedule: GuidedSchedule;
 };
 
-export const CRON_BOUNDS = {
-  minute: { min: 0, max: 59, label: "Minuto" },
-  hour: { min: 0, max: 23, label: "Hora" },
-  dom: { min: 1, max: 31, label: "Dia do mês" },
-  month: { min: 1, max: 12, label: "Mês" },
-  dow: { min: 0, max: 6, label: "Dia da semana (0=Dom ... 6=Sáb)" },
-} as const;
+export const WEEKDAY_OPTIONS = [
+  { value: 0, shortLabel: "Dom", label: "Domingo" },
+  { value: 1, shortLabel: "Seg", label: "Segunda" },
+  { value: 2, shortLabel: "Ter", label: "Terça" },
+  { value: 3, shortLabel: "Qua", label: "Quarta" },
+  { value: 4, shortLabel: "Qui", label: "Quinta" },
+  { value: 5, shortLabel: "Sex", label: "Sexta" },
+  { value: 6, shortLabel: "Sáb", label: "Sábado" },
+] as const;
 
-export function defaultCronState(): CronState {
+export const SCHEDULE_PRESETS: SchedulePreset[] = [
+  {
+    id: "every-5m",
+    label: "A cada 5 min",
+    description: "Monitoramento contínuo com alta frequência.",
+    schedule: { kind: "interval", every: 5, unit: "minutes" },
+  },
+  {
+    id: "every-15m",
+    label: "A cada 15 min",
+    description: "Equilíbrio entre agilidade e carga.",
+    schedule: { kind: "interval", every: 15, unit: "minutes" },
+  },
+  {
+    id: "every-30m",
+    label: "A cada 30 min",
+    description: "Boa opção para ambientes mais estáveis.",
+    schedule: { kind: "interval", every: 30, unit: "minutes" },
+  },
+  {
+    id: "every-1h",
+    label: "A cada 1 hora",
+    description: "Rotina leve com checkpoints regulares.",
+    schedule: { kind: "interval", every: 1, unit: "hours" },
+  },
+  {
+    id: "daily-03",
+    label: "Todo dia às 03:00",
+    description: "Janela noturna para execução diária.",
+    schedule: { kind: "daily", time: "03:00" },
+  },
+  {
+    id: "weekdays-09",
+    label: "Dias úteis às 09:00",
+    description: "Rotina comercial em dias úteis.",
+    schedule: { kind: "weekly", time: "09:00", days: [1, 2, 3, 4, 5] },
+  },
+  {
+    id: "weekly",
+    label: "Semanal",
+    description: "Ponto de partida para recorrência semanal.",
+    schedule: { kind: "weekly", time: "09:00", days: [1] },
+  },
+  {
+    id: "monthly",
+    label: "Mensal",
+    description: "Execução mensal com dia configurável.",
+    schedule: { kind: "monthly", time: "09:00", day: 1 },
+  },
+];
+
+type TimeParts = {
+  hours: number;
+  minutes: number;
+  valid: boolean;
+};
+
+const WEEKDAY_SET = new Set<number>(WEEKDAY_OPTIONS.map((option) => option.value));
+const WORKWEEK = [1, 2, 3, 4, 5];
+
+export function clampInt(value: number, min: number, max: number) {
+  if (!Number.isFinite(value)) return min;
+  return Math.max(min, Math.min(max, Math.trunc(value)));
+}
+
+export function hasFiveCronFields(expr: string) {
+  return normalizeCronExpression(expr) !== null;
+}
+
+export function normalizeCronExpression(expr: string) {
+  const normalized = String(expr ?? "").trim().replace(/\s+/g, " ");
+  if (!normalized) return null;
+  return normalized.split(" ").length === 5 ? normalized : null;
+}
+
+export function defaultGuidedSchedule(kind: GuidedScheduleKind = "interval"): GuidedSchedule {
+  switch (kind) {
+    case "interval":
+      return { kind: "interval", every: 15, unit: "minutes" };
+    case "daily":
+      return { kind: "daily", time: "03:00" };
+    case "weekly":
+      return { kind: "weekly", time: "09:00", days: [1] };
+    case "monthly":
+      return { kind: "monthly", time: "09:00", day: 1 };
+    default:
+      return { kind: "interval", every: 15, unit: "minutes" };
+  }
+}
+
+export function buildPresetSchedule(id: SchedulePresetId): GuidedSchedule {
+  const preset = SCHEDULE_PRESETS.find((item) => item.id === id);
+  return normalizeGuidedSchedule(preset?.schedule ?? defaultGuidedSchedule());
+}
+
+export function normalizeGuidedSchedule(schedule: GuidedSchedule): GuidedSchedule {
+  if (schedule.kind === "interval") {
+    return {
+      kind: "interval",
+      every: clampInt(schedule.every, 1, schedule.unit === "minutes" ? 59 : 23),
+      unit: schedule.unit,
+    };
+  }
+
+  if (schedule.kind === "daily") {
+    return {
+      kind: "daily",
+      time: normalizeTimeValue(schedule.time, "03:00"),
+    };
+  }
+
+  if (schedule.kind === "weekly") {
+    return {
+      kind: "weekly",
+      time: normalizeTimeValue(schedule.time, "09:00"),
+      days: normalizeDays(schedule.days),
+    };
+  }
+
   return {
-    minute: { kind: "every", step: 5 },
-    hour: { kind: "any" },
-    dom: { kind: "any" },
-    month: { kind: "any" },
-    dow: { kind: "any" },
+    kind: "monthly",
+    time: normalizeTimeValue(schedule.time, "09:00"),
+    day: clampInt(schedule.day, 1, 31),
   };
 }
 
-export function clampInt(n: number, min: number, max: number) {
-  if (Number.isNaN(n)) return min;
-  return Math.max(min, Math.min(max, Math.trunc(n)));
+export function guidedScheduleToCron(schedule: GuidedSchedule) {
+  const normalized = normalizeGuidedSchedule(schedule);
+  const errors: string[] = [];
+
+  if (normalized.kind === "interval") {
+    if (normalized.unit === "minutes") {
+      return { cron: `*/${normalized.every} * * * *`, errors };
+    }
+
+    return { cron: `0 */${normalized.every} * * *`, errors };
+  }
+
+  if (normalized.kind === "daily") {
+    const time = parseTimeValue(normalized.time);
+    if (!time.valid) {
+      return { cron: "", errors: ["Horário inválido."] };
+    }
+
+    return { cron: `${time.minutes} ${time.hours} * * *`, errors };
+  }
+
+  if (normalized.kind === "weekly") {
+    const time = parseTimeValue(normalized.time);
+    if (!time.valid) {
+      errors.push("Horário inválido.");
+    }
+    if (normalized.days.length === 0) {
+      errors.push("Selecione ao menos um dia da semana.");
+    }
+
+    if (errors.length > 0) {
+      return { cron: "", errors };
+    }
+
+    return {
+      cron: `${time.minutes} ${time.hours} * * ${normalized.days.join(",")}`,
+      errors,
+    };
+  }
+
+  const time = parseTimeValue(normalized.time);
+  if (!time.valid) {
+    return { cron: "", errors: ["Horário inválido."] };
+  }
+
+  return {
+    cron: `${time.minutes} ${time.hours} ${normalized.day} * *`,
+    errors,
+  };
 }
 
-export function parseField(raw: string, min: number, max: number): CronFieldState | null {
-  const s = raw.trim();
+export function tryParseGuidedSchedule(expr: string): GuidedSchedule | null {
+  const normalized = normalizeCronExpression(expr);
+  if (!normalized) return null;
 
-  if (s === "*") return { kind: "any" };
+  const [minute, hour, dom, month, dow] = normalized.split(" ");
 
-  const every = s.match(/^\*\/(\d+)$/);
-  if (every) {
-    const step = clampInt(Number(every[1]), 1, max - min + 1);
-    return { kind: "every", step };
+  if (dom === "*" && month === "*" && dow === "*") {
+    const minuteStep = parseStepToken(minute, 1, 59);
+    if (minuteStep !== null && hour === "*") {
+      return { kind: "interval", every: minuteStep, unit: "minutes" };
+    }
+
+    const minuteValue = parseNumberToken(minute, 0, 59);
+    const hourStep = parseStepToken(hour, 1, 23);
+    if (minuteValue === 0 && hourStep !== null) {
+      return { kind: "interval", every: hourStep, unit: "hours" };
+    }
+
+    const hourValue = parseNumberToken(hour, 0, 23);
+    if (minuteValue !== null && hourValue !== null) {
+      return {
+        kind: "daily",
+        time: formatTimeParts(hourValue, minuteValue),
+      };
+    }
   }
 
-  const rangeStep = s.match(/^(\d+)-(\d+)\/(\d+)$/);
-  if (rangeStep) {
-    const start = clampInt(Number(rangeStep[1]), min, max);
-    const end = clampInt(Number(rangeStep[2]), min, max);
-    const step = clampInt(Number(rangeStep[3]), 1, max - min + 1);
-    return { kind: "rangeStep", start: Math.min(start, end), end: Math.max(start, end), step };
+  if (dom === "*" && month === "*") {
+    const minuteValue = parseNumberToken(minute, 0, 59);
+    const hourValue = parseNumberToken(hour, 0, 23);
+    const days = parseNumberListToken(dow, 0, 6);
+
+    if (minuteValue !== null && hourValue !== null && days && days.length > 0) {
+      return {
+        kind: "weekly",
+        time: formatTimeParts(hourValue, minuteValue),
+        days,
+      };
+    }
   }
 
-  const range = s.match(/^(\d+)-(\d+)$/);
-  if (range) {
-    const start = clampInt(Number(range[1]), min, max);
-    const end = clampInt(Number(range[2]), min, max);
-    return { kind: "range", start: Math.min(start, end), end: Math.max(start, end) };
-  }
+  if (month === "*" && dow === "*") {
+    const minuteValue = parseNumberToken(minute, 0, 59);
+    const hourValue = parseNumberToken(hour, 0, 23);
+    const dayValue = parseNumberToken(dom, 1, 31);
 
-  const listOk = s.match(/^\d+(,\d+)*$/);
-  if (listOk) return { kind: "list", values: s };
+    if (minuteValue !== null && hourValue !== null && dayValue !== null) {
+      return {
+        kind: "monthly",
+        time: formatTimeParts(hourValue, minuteValue),
+        day: dayValue,
+      };
+    }
+  }
 
   return null;
 }
 
-function fieldToString(
-  field: CronFieldState,
-  min: number,
-  max: number,
-): { value: string; errors: string[] } {
-  const errors: string[] = [];
+export function formatGuidedSchedule(schedule: GuidedSchedule) {
+  const normalized = normalizeGuidedSchedule(schedule);
 
-  const checkVal = (n: number) => {
-    if (!Number.isInteger(n)) return false;
-    return n >= min && n <= max;
+  if (normalized.kind === "interval") {
+    if (normalized.unit === "minutes") {
+      return normalized.every === 1 ? "A cada minuto" : `A cada ${normalized.every} minutos`;
+    }
+
+    return normalized.every === 1 ? "A cada hora" : `A cada ${normalized.every} horas`;
+  }
+
+  if (normalized.kind === "daily") {
+    return `Todo dia às ${normalized.time}`;
+  }
+
+  if (normalized.kind === "weekly") {
+    if (normalized.days.length === 0) {
+      return "Selecione um ou mais dias da semana";
+    }
+
+    if (isWorkweek(normalized.days)) {
+      return `Dias úteis às ${normalized.time}`;
+    }
+
+    const labels = normalized.days.reduce<string[]>((acc, day) => {
+      const label = WEEKDAY_OPTIONS.find((option) => option.value === day)?.label;
+      if (label) acc.push(label);
+      return acc;
+    }, []);
+
+    return `${joinHumanList(labels)} às ${normalized.time}`;
+  }
+
+  return `Todo mês no dia ${normalized.day} às ${normalized.time}`;
+}
+
+export function describeCronExpression(expr: string) {
+  const normalized = normalizeCronExpression(expr);
+  if (!normalized) {
+    return {
+      guidedSchedule: null,
+      summary: "Use uma expressão cron com 5 campos",
+      isCustom: true,
+      isValid: false,
+    };
+  }
+
+  const guidedSchedule = tryParseGuidedSchedule(normalized);
+  if (guidedSchedule) {
+    return {
+      guidedSchedule,
+      summary: formatGuidedSchedule(guidedSchedule),
+      isCustom: false,
+      isValid: true,
+    };
+  }
+
+  return {
+    guidedSchedule: null,
+    summary: "Agendamento customizado",
+    isCustom: true,
+    isValid: true,
   };
-
-  if (field.kind === "any") return { value: "*", errors };
-
-  if (field.kind === "every") {
-    const step = Math.trunc(field.step);
-    if (step < 1) errors.push("Passo inválido.");
-    return { value: `*/${step}`, errors };
-  }
-
-  if (field.kind === "list") {
-    const text = (field.values ?? "").trim();
-    if (!text) {
-      errors.push("Lista vazia.");
-      return { value: "*", errors };
-    }
-
-    const parts = text.split(",");
-    for (const p of parts) {
-      const n = Number(p);
-      if (!checkVal(n)) errors.push(`Valor fora do range (${min}-${max}): ${p}`);
-    }
-    return { value: text, errors };
-  }
-
-  if (field.kind === "range") {
-    const start = Math.trunc(field.start);
-    const end = Math.trunc(field.end);
-    if (!checkVal(start) || !checkVal(end)) errors.push(`Intervalo inválido (${min}-${max}).`);
-    return { value: `${Math.min(start, end)}-${Math.max(start, end)}`, errors };
-  }
-
-  if (field.kind === "rangeStep") {
-    const start = Math.trunc(field.start);
-    const end = Math.trunc(field.end);
-    const step = Math.trunc(field.step);
-    if (!checkVal(start) || !checkVal(end)) errors.push(`Intervalo inválido (${min}-${max}).`);
-    if (step < 1) errors.push("Passo inválido.");
-    return { value: `${Math.min(start, end)}-${Math.max(start, end)}/${step}`, errors };
-  }
-
-  return { value: "*", errors };
 }
 
-export function buildCronExpr(state: CronState) {
-  const out: string[] = [];
-  const errs: string[] = [];
+function parseTimeValue(value: string): TimeParts {
+  const match = String(value ?? "").trim().match(/^(\d{1,2}):(\d{2})$/);
+  if (!match) {
+    return { hours: 0, minutes: 0, valid: false };
+  }
 
-  const m = fieldToString(state.minute, CRON_BOUNDS.minute.min, CRON_BOUNDS.minute.max);
-  const h = fieldToString(state.hour, CRON_BOUNDS.hour.min, CRON_BOUNDS.hour.max);
-  const dom = fieldToString(state.dom, CRON_BOUNDS.dom.min, CRON_BOUNDS.dom.max);
-  const mon = fieldToString(state.month, CRON_BOUNDS.month.min, CRON_BOUNDS.month.max);
-  const dow = fieldToString(state.dow, CRON_BOUNDS.dow.min, CRON_BOUNDS.dow.max);
+  const hours = Number(match[1]);
+  const minutes = Number(match[2]);
+  const valid = hours >= 0 && hours <= 23 && minutes >= 0 && minutes <= 59;
 
-  out.push(m.value, h.value, dom.value, mon.value, dow.value);
-
-  errs.push(
-    ...m.errors.map((e) => `Minuto: ${e}`),
-    ...h.errors.map((e) => `Hora: ${e}`),
-    ...dom.errors.map((e) => `Dia do mês: ${e}`),
-    ...mon.errors.map((e) => `Mês: ${e}`),
-    ...dow.errors.map((e) => `Dia da semana: ${e}`),
-  );
-
-  return { cron: out.join(" "), errors: errs };
+  return {
+    hours: valid ? hours : 0,
+    minutes: valid ? minutes : 0,
+    valid,
+  };
 }
 
-export function tryParseCronExpr(expr: string): CronState | null {
-  const parts = expr.trim().split(/\s+/);
-  if (parts.length !== 5) return null;
+function normalizeTimeValue(value: string, fallback: string) {
+  const parsed = parseTimeValue(value);
+  if (!parsed.valid) return fallback;
+  return formatTimeParts(parsed.hours, parsed.minutes);
+}
 
-  const [mm, hh, dom, mon, dow] = parts;
+function formatTimeParts(hours: number, minutes: number) {
+  return `${String(hours).padStart(2, "0")}:${String(minutes).padStart(2, "0")}`;
+}
 
-  const m = parseField(mm, CRON_BOUNDS.minute.min, CRON_BOUNDS.minute.max);
-  const h = parseField(hh, CRON_BOUNDS.hour.min, CRON_BOUNDS.hour.max);
-  const d = parseField(dom, CRON_BOUNDS.dom.min, CRON_BOUNDS.dom.max);
-  const mo = parseField(mon, CRON_BOUNDS.month.min, CRON_BOUNDS.month.max);
-  const dw = parseField(dow, CRON_BOUNDS.dow.min, CRON_BOUNDS.dow.max);
+function parseNumberToken(token: string, min: number, max: number) {
+  if (!/^\d+$/.test(token)) return null;
+  const value = Number(token);
+  return value >= min && value <= max ? value : null;
+}
 
-  if (!m || !h || !d || !mo || !dw) return null;
+function parseStepToken(token: string, min: number, max: number) {
+  const match = token.match(/^\*\/(\d+)$/);
+  if (!match) return null;
 
-  return { minute: m, hour: h, dom: d, month: mo, dow: dw };
+  const value = Number(match[1]);
+  return value >= min && value <= max ? value : null;
+}
+
+function parseNumberListToken(token: string, min: number, max: number) {
+  const parts = token.split(",");
+  const values = new Set<number>();
+
+  for (const part of parts) {
+    const trimmed = part.trim();
+    if (!trimmed) return null;
+
+    const range = trimmed.match(/^(\d+)-(\d+)$/);
+    if (range) {
+      const start = Number(range[1]);
+      const end = Number(range[2]);
+      if (start < min || end > max || start > end) return null;
+      for (let value = start; value <= end; value += 1) {
+        values.add(value);
+      }
+      continue;
+    }
+
+    const value = parseNumberToken(trimmed, min, max);
+    if (value === null) return null;
+    values.add(value);
+  }
+
+  return Array.from(values).sort((a, b) => a - b);
+}
+
+function normalizeDays(days: number[]) {
+  return Array.from(new Set(days.filter((day) => WEEKDAY_SET.has(day)))).sort((a, b) => a - b);
+}
+
+function isWorkweek(days: number[]) {
+  return days.length === WORKWEEK.length && WORKWEEK.every((day, index) => days[index] === day);
+}
+
+function joinHumanList(values: string[]) {
+  if (values.length === 0) return "";
+  if (values.length === 1) return values[0];
+  if (values.length === 2) return `${values[0]} e ${values[1]}`;
+  return `${values.slice(0, -1).join(", ")} e ${values[values.length - 1]}`;
 }

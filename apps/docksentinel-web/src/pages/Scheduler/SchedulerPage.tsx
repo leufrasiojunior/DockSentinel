@@ -13,15 +13,15 @@ import { Input } from "../../components/ui/input";
 import { Select } from "../../components/ui/select";
 import { Switch } from "../../components/ui/switch";
 import { type SchedulerMode, type SchedulerScope } from "../../features/scheduler/api/scheduler";
-import { RuntimeCard } from "../../features/scheduler/components/RuntimeCard";
 import { CronBuilder } from "../../features/scheduler/components/CronBuilder";
+import { RuntimeCard } from "../../features/scheduler/components/RuntimeCard";
 import { useScheduler } from "../../features/scheduler/hooks/useScheduler";
 
 function fmt(iso?: string | null) {
   if (!iso) return "—";
-  const d = new Date(iso);
-  if (Number.isNaN(d.getTime())) return String(iso);
-  return d.toLocaleString();
+  const date = new Date(iso);
+  if (Number.isNaN(date.getTime())) return String(iso);
+  return date.toLocaleString();
 }
 
 export function SchedulerPage() {
@@ -39,16 +39,16 @@ export function SchedulerPage() {
     setScope,
     scanLabelKey,
     setScanLabelKey,
-    cronExpr,
-    setCronExpr,
     updateLabelKey,
     setUpdateLabelKey,
-    cronManual,
-    setCronManual,
-    cronState,
-    setCronState,
-    cronBuilt,
+    scheduleMode,
+    setScheduleMode,
+    cronExpr,
+    setCronExpr,
+    guidedSchedule,
+    setGuidedSchedule,
     effectiveCron,
+    schedulePreview,
     dirty,
     saving,
     scanning,
@@ -62,11 +62,14 @@ export function SchedulerPage() {
       <PageHeader
         eyebrow="Automation"
         title="Scheduler Control"
-        description="Configuração e runtime do agendador de scans. A UI combina builder visual de cron com edição manual quando necessário."
+        description="Ajuste a recorrência principal do scheduler com presets simples e mantenha o cron avançado separado para casos customizados."
         meta={
           <>
             <Badge variant="outline">{visible ? "Auto-refresh ON" : "Auto-refresh OFF"}</Badge>
-            <Badge variant="outline">{cfg?.cronExpr ?? "cron indisponível"}</Badge>
+            <Badge variant={schedulePreview.isCustom ? "warning" : "info"}>
+              {schedulePreview.isCustom ? "Cron customizado" : "Recorrência guiada"}
+            </Badge>
+            <Badge variant="outline">{rt?.timeZone ?? "UTC"}</Badge>
           </>
         }
         actions={
@@ -90,36 +93,59 @@ export function SchedulerPage() {
       />
 
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-        <StatCard label="Enabled" value={<StatusBadge value={enabled} />} helper="Estado atual do agendador." icon={ShieldCheck} tone={enabled ? "success" : "warning"} />
+        <StatCard
+          label="Enabled"
+          value={<StatusBadge value={enabled} />}
+          helper="Estado atual do agendador."
+          icon={ShieldCheck}
+          tone={enabled ? "success" : "warning"}
+        />
         <StatCard label="Mode" value={mode} helper="Estratégia usada pelo scan." icon={Bot} tone="info" />
         <StatCard label="Scope" value={scope} helper="Escopo monitorado pelo scheduler." icon={Clock3} />
-        <StatCard label="Next cron" value={cronManual ? "Manual" : "Builder"} helper={effectiveCron} icon={ScanSearch} tone="default" />
+        <StatCard
+          label="Editor"
+          value={scheduleMode === "guided" ? "Guiado" : "Avançado"}
+          helper={schedulePreview.summary}
+          icon={ScanSearch}
+          tone={schedulePreview.isCustom ? "warning" : "default"}
+        />
       </div>
 
-      <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
-        <RuntimeCard rt={rt} />
+      <SectionCard
+        title="Quando executar"
+        description="Escolha uma recorrência rápida para o scheduler. O save continua persistindo apenas a cron final."
+        actions={
+          <Button variant="primary" onClick={handleSave} disabled={!cfg || !dirty || saving} type="button">
+            {saving ? "Salvando..." : dirty ? "Salvar mudanças" : "Sem mudanças"}
+          </Button>
+        }
+      >
+        <CronBuilder
+          scheduleMode={scheduleMode}
+          setScheduleMode={setScheduleMode}
+          guidedSchedule={guidedSchedule}
+          setGuidedSchedule={setGuidedSchedule}
+          cronExpr={cronExpr}
+          setCronExpr={setCronExpr}
+          effectiveCron={effectiveCron}
+          timeZone={rt?.timeZone}
+        />
+      </SectionCard>
 
+      <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
         <SectionCard
           className="lg:col-span-2"
-          title="Configuração"
-          description="Persistida via PATCH /updates/scheduler/config"
-          actions={
-            <Button
-              variant="primary"
-              onClick={handleSave}
-              disabled={!cfg || !dirty || saving}
-              type="button"
-            >
-              {saving ? "Salvando..." : dirty ? "Salvar mudanças" : "Sem mudanças"}
-            </Button>
-          }
+          title="Execução e filtros"
+          description="Parâmetros técnicos do scheduler, mantidos separados da escolha de período."
         >
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
             <Card className="border-border/60 bg-muted/20 p-4">
               <div className="flex items-start justify-between gap-4">
                 <div>
                   <div className="text-sm font-medium text-foreground">Enabled</div>
-                  <div className="mt-1 text-sm text-muted-foreground">Habilita o scheduler e o loop de varredura.</div>
+                  <div className="mt-1 text-sm text-muted-foreground">
+                    Habilita o scheduler e o loop de varredura.
+                  </div>
                 </div>
                 <Switch checked={enabled} onCheckedChange={setEnabled} />
               </div>
@@ -128,7 +154,9 @@ export function SchedulerPage() {
             <FormField label="Mode" description="Define se o scheduler só escaneia ou também enfileira updates.">
               <Select
                 value={mode}
-                onChange={(e: React.ChangeEvent<HTMLSelectElement>) => setMode(e.target.value as SchedulerMode)}
+                onChange={(event: React.ChangeEvent<HTMLSelectElement>) =>
+                  setMode(event.target.value as SchedulerMode)
+                }
               >
                 <option value="scan_only">scan_only</option>
                 <option value="scan_and_update">scan_and_update</option>
@@ -138,7 +166,9 @@ export function SchedulerPage() {
             <FormField label="Scope" description="Todos os containers ou somente os etiquetados.">
               <Select
                 value={scope}
-                onChange={(e: React.ChangeEvent<HTMLSelectElement>) => setScope(e.target.value as SchedulerScope)}
+                onChange={(event: React.ChangeEvent<HTMLSelectElement>) =>
+                  setScope(event.target.value as SchedulerScope)
+                }
               >
                 <option value="all">all</option>
                 <option value="labeled">labeled</option>
@@ -148,32 +178,22 @@ export function SchedulerPage() {
             <FormField label="scanLabelKey" description="Label usada para filtrar scans quando o escopo é `labeled`.">
               <Input
                 value={scanLabelKey}
-                onChange={(e: React.ChangeEvent<HTMLInputElement>) => setScanLabelKey(e.target.value)}
+                onChange={(event: React.ChangeEvent<HTMLInputElement>) => setScanLabelKey(event.target.value)}
               />
             </FormField>
 
             <FormField label="updateLabelKey" description="Label que controla elegibilidade de update automatizado.">
               <Input
                 value={updateLabelKey}
-                onChange={(e: React.ChangeEvent<HTMLInputElement>) => setUpdateLabelKey(e.target.value)}
+                onChange={(event: React.ChangeEvent<HTMLInputElement>) => setUpdateLabelKey(event.target.value)}
               />
             </FormField>
           </div>
 
-          <CronBuilder
-            cronManual={cronManual}
-            setCronManual={setCronManual}
-            cronState={cronState}
-            setCronState={setCronState}
-            cronBuilt={cronBuilt}
-            cronExpr={cronExpr}
-            setCronExpr={setCronExpr}
-          />
-
           <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
             <Card className="border-border/60 bg-muted/20 p-4 text-sm">
               <div className="text-xs uppercase tracking-[0.16em] text-muted-foreground">config.running</div>
-              <div className="mt-2">{cfg ? <StatusBadge value={!!cfg.running} /> : "—"}</div>
+              <div className="mt-2">{cfg ? <StatusBadge value={Boolean(cfg.running)} /> : "—"}</div>
             </Card>
 
             <Card className="border-border/60 bg-muted/20 p-4 text-sm">
@@ -201,6 +221,8 @@ export function SchedulerPage() {
             </span>
           </div>
         </SectionCard>
+
+        <RuntimeCard rt={rt} />
       </div>
     </div>
   );

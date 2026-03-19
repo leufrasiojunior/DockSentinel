@@ -16,7 +16,6 @@ import {
 
 import { logout } from "../features/auth/api/auth";
 import { NotificationCenter } from "../features/notifications/components/NotificationCenter";
-import { Badge } from "../components/ui/badge";
 import { Button } from "../components/ui/button";
 import {
   Sheet,

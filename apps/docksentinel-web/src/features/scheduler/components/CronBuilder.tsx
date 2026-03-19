@@ -1,314 +1,495 @@
-import { Code2, SlidersHorizontal } from "lucide-react";
+import * as React from "react";
+import { Clock3, Code2 } from "lucide-react";
 
+import { EmptyState } from "../../../components/product/empty-state";
 import { FormField } from "../../../components/product/form-field";
 import { Badge } from "../../../components/ui/badge";
 import { Button } from "../../../components/ui/button";
-import { Card } from "../../../components/ui/card";
+import { Card, CardContent } from "../../../components/ui/card";
 import { Input } from "../../../components/ui/input";
 import { Select } from "../../../components/ui/select";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "../../../components/ui/tabs";
+import { cn } from "../../../lib/utils";
 import {
-  type CronFieldKind,
-  type CronFieldState,
-  type CronState,
-  CRON_BOUNDS,
+  type GuidedSchedule,
+  type GuidedScheduleKind,
+  type ScheduleEditorMode,
+  WEEKDAY_OPTIONS,
+  buildPresetSchedule,
   clampInt,
+  defaultGuidedSchedule,
+  describeCronExpression,
+  formatGuidedSchedule,
+  guidedScheduleToCron,
+  hasFiveCronFields,
+  type SchedulePreset,
+  SCHEDULE_PRESETS,
 } from "../utils/cron";
 
-function FieldEditor({
-  title,
-  desc,
-  bounds,
-  value,
-  onChange,
-}: {
-  title: string;
-  desc: string;
-  bounds: { min: number; max: number };
-  value: CronFieldState;
-  onChange: (next: CronFieldState) => void;
-}) {
-  const kind = value.kind;
+interface CronBuilderProps {
+  scheduleMode: ScheduleEditorMode;
+  setScheduleMode: (mode: ScheduleEditorMode) => void;
+  guidedSchedule: GuidedSchedule | null;
+  setGuidedSchedule: React.Dispatch<React.SetStateAction<GuidedSchedule | null>>;
+  cronExpr: string;
+  setCronExpr: (value: string) => void;
+  effectiveCron: string;
+  timeZone?: string | null;
+}
 
-  function setKind(nextKind: CronFieldKind) {
-    if (nextKind === "any") return onChange({ kind: "any" });
-    if (nextKind === "every") return onChange({ kind: "every", step: 5 });
-    if (nextKind === "list") return onChange({ kind: "list", values: "" });
-    if (nextKind === "range") return onChange({ kind: "range", start: bounds.min, end: bounds.max });
-    return onChange({ kind: "rangeStep", start: bounds.min, end: bounds.max, step: 5 });
+const SCHEDULE_KIND_OPTIONS: Array<{ value: GuidedScheduleKind; label: string; description: string }> = [
+  {
+    value: "interval",
+    label: "Intervalo",
+    description: "Repete a cada X minutos ou horas.",
+  },
+  {
+    value: "daily",
+    label: "Diário",
+    description: "Executa todos os dias em um horário fixo.",
+  },
+  {
+    value: "weekly",
+    label: "Semanal",
+    description: "Permite escolher um ou mais dias da semana.",
+  },
+  {
+    value: "monthly",
+    label: "Mensal",
+    description: "Executa uma vez por mês no dia escolhido.",
+  },
+];
+
+function buildScheduleForKind(kind: GuidedScheduleKind, current: GuidedSchedule | null) {
+  if (kind === "weekly" && current?.kind === "weekly") {
+    return {
+      kind: "weekly" as const,
+      time: current.time,
+      days: current.days.length > 0 ? current.days : [1],
+    };
   }
 
+  if (kind === "monthly" && current?.kind === "monthly") {
+    return {
+      kind: "monthly" as const,
+      time: current.time,
+      day: current.day,
+    };
+  }
+
+  if (kind === "daily" && current?.kind === "daily") {
+    return {
+      kind: "daily" as const,
+      time: current.time,
+    };
+  }
+
+  return defaultGuidedSchedule(kind);
+}
+
+function GuidedPresetButton({
+  preset,
+  active,
+  onClick,
+}: {
+  preset: SchedulePreset;
+  active: boolean;
+  onClick: () => void;
+}) {
   return (
-    <Card className="border-border/60 bg-muted/20 p-4">
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <div>
-          <div className="text-sm font-semibold text-foreground">{title}</div>
-          <div className="mt-1 text-sm text-muted-foreground">{desc}</div>
-        </div>
-        <Badge variant="outline">
-          {bounds.min}-{bounds.max}
-        </Badge>
-      </div>
-
-      <div className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2">
-        <FormField label="Modo">
-          <Select
-            value={kind}
-            onChange={(e: React.ChangeEvent<HTMLSelectElement>) => setKind(e.target.value as CronFieldKind)}
-          >
-            <option value="any">*</option>
-            <option value="every">*/N</option>
-            <option value="list">lista (1,2,3)</option>
-            <option value="range">intervalo (A-B)</option>
-            <option value="rangeStep">intervalo c/ passo (A-B/N)</option>
-          </Select>
-        </FormField>
-
-        {kind === "every" ? (
-          <FormField label="A cada N">
-            <Input
-              type="number"
-              min={1}
-              max={bounds.max - bounds.min + 1}
-              value={(value as { step: number }).step}
-              onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
-                onChange({
-                  kind: "every",
-                  step: clampInt(Number(e.target.value), 1, bounds.max - bounds.min + 1),
-                })
-              }
-            />
-          </FormField>
-        ) : null}
-
-        {kind === "list" ? (
-          <FormField label="Lista" className="sm:col-span-2">
-            <Input
-              value={(value as { values: string }).values}
-              onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
-                onChange({ kind: "list", values: e.target.value })
-              }
-              placeholder={`ex: ${bounds.min},${bounds.min + 1},${bounds.min + 2}`}
-            />
-          </FormField>
-        ) : null}
-
-        {kind === "range" ? (
-          <>
-            <FormField label="Início">
-              <Input
-                type="number"
-                min={bounds.min}
-                max={bounds.max}
-                value={(value as { start: number }).start}
-                onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
-                  onChange({
-                    kind: "range",
-                    start: clampInt(Number(e.target.value), bounds.min, bounds.max),
-                    end: (value as { end: number }).end,
-                  })
-                }
-              />
-            </FormField>
-            <FormField label="Fim">
-              <Input
-                type="number"
-                min={bounds.min}
-                max={bounds.max}
-                value={(value as { end: number }).end}
-                onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
-                  onChange({
-                    kind: "range",
-                    start: (value as { start: number }).start,
-                    end: clampInt(Number(e.target.value), bounds.min, bounds.max),
-                  })
-                }
-              />
-            </FormField>
-          </>
-        ) : null}
-
-        {kind === "rangeStep" ? (
-          <>
-            <FormField label="Início">
-              <Input
-                type="number"
-                min={bounds.min}
-                max={bounds.max}
-                value={(value as { start: number }).start}
-                onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
-                  onChange({
-                    kind: "rangeStep",
-                    start: clampInt(Number(e.target.value), bounds.min, bounds.max),
-                    end: (value as { end: number }).end,
-                    step: (value as { step: number }).step,
-                  })
-                }
-              />
-            </FormField>
-
-            <FormField label="Fim">
-              <Input
-                type="number"
-                min={bounds.min}
-                max={bounds.max}
-                value={(value as { end: number }).end}
-                onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
-                  onChange({
-                    kind: "rangeStep",
-                    start: (value as { start: number }).start,
-                    end: clampInt(Number(e.target.value), bounds.min, bounds.max),
-                    step: (value as { step: number }).step,
-                  })
-                }
-              />
-            </FormField>
-
-            <FormField label="Passo" className="sm:col-span-2">
-              <Input
-                type="number"
-                min={1}
-                max={bounds.max - bounds.min + 1}
-                value={(value as { step: number }).step}
-                onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
-                  onChange({
-                    kind: "rangeStep",
-                    start: (value as { start: number }).start,
-                    end: (value as { end: number }).end,
-                    step: clampInt(Number(e.target.value), 1, bounds.max - bounds.min + 1),
-                  })
-                }
-              />
-            </FormField>
-          </>
-        ) : null}
-      </div>
-    </Card>
+    <button
+      type="button"
+      onClick={onClick}
+      className={cn(
+        "rounded-3xl border p-4 text-left transition-all duration-200",
+        active
+          ? "border-primary/35 bg-primary/8 shadow-[0_18px_40px_-30px_color-mix(in_oklab,var(--color-primary)_70%,transparent)]"
+          : "border-border/60 bg-card/70 hover:-translate-y-0.5 hover:border-border hover:bg-card",
+      )}
+    >
+      <div className="text-sm font-semibold text-foreground">{preset.label}</div>
+      <div className="mt-2 text-sm leading-relaxed text-muted-foreground">{preset.description}</div>
+    </button>
   );
 }
 
-interface CronBuilderProps {
-  cronManual: boolean;
-  setCronManual: (v: boolean) => void;
-  cronState: CronState;
-  setCronState: React.Dispatch<React.SetStateAction<CronState>>;
-  cronBuilt: { cron: string; errors: string[] };
-  cronExpr: string;
-  setCronExpr: (v: string) => void;
-}
-
 export function CronBuilder({
-  cronManual,
-  setCronManual,
-  cronState,
-  setCronState,
-  cronBuilt,
+  scheduleMode,
+  setScheduleMode,
+  guidedSchedule,
+  setGuidedSchedule,
   cronExpr,
   setCronExpr,
+  effectiveCron,
+  timeZone,
 }: CronBuilderProps) {
+  const guidedBuild = React.useMemo(
+    () =>
+      guidedSchedule
+        ? guidedScheduleToCron(guidedSchedule)
+        : { cron: "", errors: ["Escolha uma recorrência para gerar o cron."] },
+    [guidedSchedule],
+  );
+
+  const preview = React.useMemo(() => {
+    if (scheduleMode === "guided") {
+      return {
+        summary: guidedSchedule ? formatGuidedSchedule(guidedSchedule) : "Selecione uma recorrência guiada",
+        isCustom: false,
+        isValid: Boolean(guidedSchedule) && guidedBuild.errors.length === 0,
+      };
+    }
+
+    return describeCronExpression(effectiveCron);
+  }, [effectiveCron, guidedBuild.errors.length, guidedSchedule, scheduleMode]);
+
+  const activePresetCron = guidedSchedule ? guidedScheduleToCron(guidedSchedule).cron : null;
+  const advancedPreview = React.useMemo(() => describeCronExpression(cronExpr), [cronExpr]);
+  const needsGuidedSelection = scheduleMode === "guided" && guidedSchedule === null;
+  const isCustomAdvanced = scheduleMode === "advanced" && advancedPreview.isCustom && advancedPreview.isValid;
+
+  function updateGuidedSchedule(next: GuidedSchedule) {
+    setGuidedSchedule(next);
+  }
+
+  function selectKind(kind: GuidedScheduleKind) {
+    setGuidedSchedule((current) => buildScheduleForKind(kind, current));
+  }
+
+  function toggleWeekday(day: number) {
+    setGuidedSchedule((current) => {
+      if (!current || current.kind !== "weekly") {
+        return {
+          kind: "weekly",
+          time: "09:00",
+          days: [day],
+        };
+      }
+
+      const exists = current.days.includes(day);
+      const nextDays = exists ? current.days.filter((value) => value !== day) : [...current.days, day];
+      return {
+        ...current,
+        days: nextDays.sort((left, right) => left - right),
+      };
+    });
+  }
+
   return (
-    <div className="space-y-4 rounded-[1.75rem] border border-border/60 bg-muted/15 p-5">
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-        <div>
-          <div className="flex items-center gap-3">
-            <Badge variant="outline">cron</Badge>
-            <div className="text-sm font-semibold text-foreground">Agendamento</div>
-          </div>
-          <div className="mt-2 text-sm text-muted-foreground">
-            O backend aceita cron normal com 5 campos: <span className="font-mono">min hour dom month dow</span>.
-          </div>
-        </div>
-
-        <div className="flex items-center gap-2">
-          <Button
-            type="button"
-            size="sm"
-            variant={cronManual ? "ghost" : "primary"}
-            onClick={() => setCronManual(false)}
-          >
-            <SlidersHorizontal className="size-4" />
-            Visual
-          </Button>
-          <Button
-            type="button"
-            size="sm"
-            variant={cronManual ? "primary" : "ghost"}
-            onClick={() => setCronManual(true)}
-          >
-            <Code2 className="size-4" />
-            Manual
-          </Button>
-        </div>
-      </div>
-
-      {!cronManual ? (
-        <div className="grid grid-cols-1 gap-4">
-          <FieldEditor
-            title="Minuto"
-            desc="0–59"
-            bounds={CRON_BOUNDS.minute}
-            value={cronState.minute}
-            onChange={(v) => setCronState((p: CronState) => ({ ...p, minute: v }))}
-          />
-          <FieldEditor
-            title="Hora"
-            desc="0–23"
-            bounds={CRON_BOUNDS.hour}
-            value={cronState.hour}
-            onChange={(v) => setCronState((p: CronState) => ({ ...p, hour: v }))}
-          />
-          <FieldEditor
-            title="Dia do mês"
-            desc="1–31"
-            bounds={CRON_BOUNDS.dom}
-            value={cronState.dom}
-            onChange={(v) => setCronState((p: CronState) => ({ ...p, dom: v }))}
-          />
-          <FieldEditor
-            title="Mês"
-            desc="1–12"
-            bounds={CRON_BOUNDS.month}
-            value={cronState.month}
-            onChange={(v) => setCronState((p: CronState) => ({ ...p, month: v }))}
-          />
-          <FieldEditor
-            title="Dia da semana"
-            desc="0–6 (0=Dom, 6=Sáb)"
-            bounds={CRON_BOUNDS.dow}
-            value={cronState.dow}
-            onChange={(v) => setCronState((p: CronState) => ({ ...p, dow: v }))}
-          />
-
-          <Card className="border-border/60 bg-card/70 p-4">
-            <div className="text-xs uppercase tracking-[0.16em] text-muted-foreground">Preview</div>
-            <div className="mt-2 font-mono text-sm text-foreground">{cronBuilt.cron}</div>
-
-            {cronBuilt.errors.length > 0 ? (
-              <div className="mt-3 space-y-1 text-sm text-destructive">
-                {cronBuilt.errors.map((error, idx) => (
-                  <div key={idx}>{error}</div>
-                ))}
-              </div>
-            ) : null}
-
-            <div className="mt-4 text-xs text-muted-foreground">
-              Exemplos: <span className="font-mono">*/5 * * * *</span>,{" "}
-              <span className="font-mono">0 3 * * *</span>,{" "}
-              <span className="font-mono">0 9 * * 1</span>.
+    <div className="space-y-6 rounded-[1.9rem] border border-border/60 bg-muted/15 p-5 sm:p-6">
+      <Tabs value={scheduleMode} onValueChange={(value) => setScheduleMode(value as ScheduleEditorMode)}>
+        <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+          <div className="space-y-2">
+            <div className="flex items-center gap-3">
+              <Badge variant="info">Agendamento</Badge>
+              <div className="text-sm font-semibold text-foreground">Quando executar</div>
             </div>
-          </Card>
+            <div className="max-w-2xl text-sm leading-relaxed text-muted-foreground">
+              Use presets para chegar rápido em uma recorrência comum e, se precisar, abra o cron avançado
+              para editar a expressão manualmente.
+            </div>
+          </div>
+
+          <TabsList>
+            <TabsTrigger value="guided">
+              <Clock3 className="size-4" />
+              Guiado
+            </TabsTrigger>
+            <TabsTrigger value="advanced">
+              <Code2 className="size-4" />
+              Cron avançado
+            </TabsTrigger>
+          </TabsList>
         </div>
-      ) : (
-        <FormField
-          label="cronExpr (manual)"
-          description="Se você usar algo que o builder não entende, tudo bem — o backend recebe a string literal."
-        >
-          <Input
-            value={cronExpr}
-            onChange={(e: React.ChangeEvent<HTMLInputElement>) => setCronExpr(e.target.value)}
-            placeholder="*/5 * * * *"
-          />
-        </FormField>
-      )}
+
+        <TabsContent value="guided" className="space-y-6">
+          <div className="space-y-3">
+            <div className="flex flex-wrap items-center gap-2">
+              <div className="text-sm font-medium text-foreground">Presets rápidos</div>
+              <Badge variant="outline">1 clique</Badge>
+            </div>
+            <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+              {SCHEDULE_PRESETS.map((preset) => {
+                const presetCron = guidedScheduleToCron(buildPresetSchedule(preset.id)).cron;
+                const active = Boolean(activePresetCron) && activePresetCron === presetCron;
+
+                return (
+                  <GuidedPresetButton
+                    key={preset.id}
+                    preset={preset}
+                    active={active}
+                    onClick={() => updateGuidedSchedule(buildPresetSchedule(preset.id))}
+                  />
+                );
+              })}
+            </div>
+          </div>
+
+          <div className="space-y-3">
+            <div className="text-sm font-medium text-foreground">Tipo de recorrência</div>
+            <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+              {SCHEDULE_KIND_OPTIONS.map((option) => {
+                const active = guidedSchedule?.kind === option.value;
+
+                return (
+                  <button
+                    key={option.value}
+                    type="button"
+                    onClick={() => selectKind(option.value)}
+                    className={cn(
+                      "rounded-3xl border p-4 text-left transition-all duration-200",
+                      active
+                        ? "border-primary/35 bg-primary/8"
+                        : "border-border/60 bg-card/70 hover:-translate-y-0.5 hover:border-border hover:bg-card",
+                    )}
+                  >
+                    <div className="text-sm font-semibold text-foreground">{option.label}</div>
+                    <div className="mt-2 text-sm leading-relaxed text-muted-foreground">{option.description}</div>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+
+          {needsGuidedSelection ? (
+            <EmptyState
+              icon={Clock3}
+              title="Seu cron atual é customizado"
+              description="Para voltar ao modo guiado, escolha um preset ou um tipo de recorrência. Ao salvar, a nova escolha substitui a expressão manual atual."
+            />
+          ) : null}
+
+          {guidedSchedule ? (
+            <div className="grid gap-4 lg:grid-cols-2">
+              {guidedSchedule.kind === "interval" ? (
+                <>
+                  <FormField label="Repetir a cada" description="Defina a frequência do scheduler.">
+                    <Input
+                      type="number"
+                      min={1}
+                      max={guidedSchedule.unit === "minutes" ? 59 : 23}
+                      value={guidedSchedule.every}
+                      onChange={(event: React.ChangeEvent<HTMLInputElement>) =>
+                        updateGuidedSchedule({
+                          ...guidedSchedule,
+                          every: clampInt(
+                            Number(event.target.value),
+                            1,
+                            guidedSchedule.unit === "minutes" ? 59 : 23,
+                          ),
+                        })
+                      }
+                    />
+                  </FormField>
+
+                  <FormField label="Unidade" description="Minutos para alta frequência, horas para rotinas mais espaçadas.">
+                    <Select
+                      value={guidedSchedule.unit}
+                      onChange={(event: React.ChangeEvent<HTMLSelectElement>) =>
+                        updateGuidedSchedule({
+                          ...guidedSchedule,
+                          unit: event.target.value as "minutes" | "hours",
+                          every: clampInt(
+                            guidedSchedule.every,
+                            1,
+                            event.target.value === "minutes" ? 59 : 23,
+                          ),
+                        })
+                      }
+                    >
+                      <option value="minutes">minutos</option>
+                      <option value="hours">horas</option>
+                    </Select>
+                  </FormField>
+                </>
+              ) : null}
+
+              {guidedSchedule.kind === "daily" ? (
+                <FormField
+                  label="Horário"
+                  description="Use a timezone ativa do scheduler para interpretar esse horário."
+                  className="lg:max-w-xs"
+                >
+                  <Input
+                    type="time"
+                    value={guidedSchedule.time}
+                    onChange={(event: React.ChangeEvent<HTMLInputElement>) =>
+                      updateGuidedSchedule({
+                        ...guidedSchedule,
+                        time: event.target.value,
+                      })
+                    }
+                  />
+                </FormField>
+              ) : null}
+
+              {guidedSchedule.kind === "weekly" ? (
+                <>
+                  <FormField
+                    label="Horário"
+                    description="O mesmo horário será usado em todos os dias selecionados."
+                    className="lg:max-w-xs"
+                  >
+                    <Input
+                      type="time"
+                      value={guidedSchedule.time}
+                      onChange={(event: React.ChangeEvent<HTMLInputElement>) =>
+                        updateGuidedSchedule({
+                          ...guidedSchedule,
+                          time: event.target.value,
+                        })
+                      }
+                    />
+                  </FormField>
+
+                  <FormField
+                    label="Dias da semana"
+                    description="Selecione um ou mais dias."
+                    error={guidedSchedule.days.length === 0 ? "Escolha pelo menos um dia." : undefined}
+                    className="lg:col-span-2"
+                  >
+                    <div className="flex flex-wrap gap-2">
+                      {WEEKDAY_OPTIONS.map((day) => {
+                        const active = guidedSchedule.days.includes(day.value);
+
+                        return (
+                          <Button
+                            key={day.value}
+                            type="button"
+                            size="sm"
+                            variant={active ? "primary" : "subtle"}
+                            onClick={() => toggleWeekday(day.value)}
+                          >
+                            {day.shortLabel}
+                          </Button>
+                        );
+                      })}
+                    </div>
+                  </FormField>
+                </>
+              ) : null}
+
+              {guidedSchedule.kind === "monthly" ? (
+                <>
+                  <FormField label="Dia do mês" description="Valor entre 1 e 31.">
+                    <Input
+                      type="number"
+                      min={1}
+                      max={31}
+                      value={guidedSchedule.day}
+                      onChange={(event: React.ChangeEvent<HTMLInputElement>) =>
+                        updateGuidedSchedule({
+                          ...guidedSchedule,
+                          day: clampInt(Number(event.target.value), 1, 31),
+                        })
+                      }
+                    />
+                  </FormField>
+
+                  <FormField
+                    label="Horário"
+                    description="A execução mensal respeita a timezone atual do scheduler."
+                    className="lg:max-w-xs"
+                  >
+                    <Input
+                      type="time"
+                      value={guidedSchedule.time}
+                      onChange={(event: React.ChangeEvent<HTMLInputElement>) =>
+                        updateGuidedSchedule({
+                          ...guidedSchedule,
+                          time: event.target.value,
+                        })
+                      }
+                    />
+                  </FormField>
+                </>
+              ) : null}
+            </div>
+          ) : null}
+        </TabsContent>
+
+        <TabsContent value="advanced" className="space-y-4">
+          <Card className="border-border/60 bg-muted/20">
+            <CardContent className="space-y-4">
+              <div className="flex flex-wrap items-center gap-3">
+                <Badge variant={isCustomAdvanced ? "warning" : "outline"}>
+                  {isCustomAdvanced ? "Cron customizado" : "Cron manual"}
+                </Badge>
+                <div className="text-sm text-muted-foreground">
+                  O backend continua recebendo uma expressão cron com 5 campos:{" "}
+                  <span className="font-mono text-foreground">min hour dom month dow</span>.
+                </div>
+              </div>
+
+              <FormField
+                label="Expressão cron"
+                description="Se a expressão bater com um padrão conhecido, ao voltar para o modo guiado os campos serão preenchidos automaticamente."
+                error={!hasFiveCronFields(cronExpr) ? "Use 5 campos separados por espaço." : undefined}
+              >
+                <Input
+                  value={cronExpr}
+                  onChange={(event: React.ChangeEvent<HTMLInputElement>) => setCronExpr(event.target.value)}
+                  placeholder="*/15 * * * *"
+                  spellCheck={false}
+                />
+              </FormField>
+
+              {isCustomAdvanced ? (
+                <div className="rounded-3xl border border-amber-500/20 bg-amber-500/8 p-4 text-sm leading-relaxed text-amber-900 dark:text-amber-200">
+                  Esse cron atual não cabe no fluxo guiado. Se você quiser voltar para a experiência simples,
+                  escolha um preset ou um tipo de recorrência antes de salvar.
+                </div>
+              ) : null}
+            </CardContent>
+          </Card>
+        </TabsContent>
+      </Tabs>
+
+      <Card className="border-primary/15 bg-primary/5">
+        <CardContent className="space-y-4">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div>
+              <div className="text-sm font-semibold text-foreground">Preview do agendamento</div>
+              <div className="mt-1 text-sm leading-relaxed text-muted-foreground">
+                Resumo humano, expressão cron gerada e timezone efetiva do scheduler.
+              </div>
+            </div>
+
+            <Badge variant={preview.isCustom ? "warning" : "info"}>
+              {preview.isCustom ? "Customizado" : "Guiado"}
+            </Badge>
+          </div>
+
+          <div className="grid gap-3 md:grid-cols-3">
+            <div className="rounded-3xl border border-border/60 bg-background/70 p-4">
+              <div className="text-xs uppercase tracking-[0.16em] text-muted-foreground">Resumo</div>
+              <div className="mt-2 text-sm font-medium text-foreground">{preview.summary}</div>
+            </div>
+
+            <div className="rounded-3xl border border-border/60 bg-background/70 p-4">
+              <div className="text-xs uppercase tracking-[0.16em] text-muted-foreground">Cron</div>
+              <div className="mt-2 break-all font-mono text-sm text-foreground">
+                {effectiveCron || "—"}
+              </div>
+            </div>
+
+            <div className="rounded-3xl border border-border/60 bg-background/70 p-4">
+              <div className="text-xs uppercase tracking-[0.16em] text-muted-foreground">Timezone</div>
+              <div className="mt-2 break-all font-mono text-sm text-foreground">
+                {timeZone ?? "UTC"}
+              </div>
+            </div>
+          </div>
+
+          {!preview.isValid ? (
+            <div className="text-sm font-medium text-destructive">
+              {scheduleMode === "guided"
+                ? guidedBuild.errors[0] ?? "Ajuste a recorrência para gerar um cron válida."
+                : "Ajuste a expressão cron antes de salvar."}
+            </div>
+          ) : null}
+        </CardContent>
+      </Card>
     </div>
   );
 }

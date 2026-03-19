@@ -1,8 +1,9 @@
 import { useEffect, useMemo, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { useToast } from "../../../shared/components/ui/ToastProvider";
-import { useConfirm } from "../../../shared/components/ui/ConfirmProvider";
+
 import { usePageVisibility } from "../../../hooks/usePageVisibility";
+import { useConfirm } from "../../../shared/components/ui/ConfirmProvider";
+import { useToast } from "../../../shared/components/ui/ToastProvider";
 import {
   getSchedulerBundle,
   patchSchedulerConfig,
@@ -11,11 +12,20 @@ import {
   type SchedulerScope,
 } from "../api/scheduler";
 import {
-  type CronState,
-  defaultCronState,
-  tryParseCronExpr,
-  buildCronExpr,
+  type GuidedSchedule,
+  type ScheduleEditorMode,
+  defaultGuidedSchedule,
+  describeCronExpression,
+  formatGuidedSchedule,
+  guidedScheduleToCron,
+  hasFiveCronFields,
+  tryParseGuidedSchedule,
 } from "../utils/cron";
+
+function getErrorMessage(error: unknown) {
+  if (error instanceof Error) return error.message;
+  return String(error);
+}
 
 export function useScheduler() {
   const qc = useQueryClient();
@@ -33,45 +43,88 @@ export function useScheduler() {
   const bundle = bundleQuery.data ?? null;
   const cfg = bundle?.config ?? null;
   const rt = bundle?.runtime ?? null;
+  const hasCfg = cfg !== null;
+  const cfgEnabled = cfg?.enabled ?? false;
+  const cfgMode = cfg?.mode ?? "scan_only";
+  const cfgScope = cfg?.scope ?? "all";
+  const cfgScanLabelKey = cfg?.scanLabelKey ?? "docksentinel.scan";
+  const cfgUpdateLabelKey = cfg?.updateLabelKey ?? "docksentinel.update";
+  const cfgCronExpr = cfg?.cronExpr ?? "";
 
-  // form state
   const [enabled, setEnabled] = useState(false);
   const [mode, setMode] = useState<SchedulerMode>("scan_only");
   const [scope, setScope] = useState<SchedulerScope>("all");
   const [scanLabelKey, setScanLabelKey] = useState("docksentinel.scan");
   const [updateLabelKey, setUpdateLabelKey] = useState("docksentinel.update");
 
-  // cron: builder + manual fallback
-  const [cronManual, setCronManual] = useState(false);
+  const [scheduleMode, setScheduleMode] = useState<ScheduleEditorMode>("guided");
   const [cronExpr, setCronExpr] = useState("*/5 * * * *");
-  const [cronState, setCronState] = useState<CronState>(() => defaultCronState());
+  const [guidedSchedule, setGuidedSchedule] = useState<GuidedSchedule | null>(() =>
+    defaultGuidedSchedule(),
+  );
 
   const [saving, setSaving] = useState(false);
   const [scanning, setScanning] = useState(false);
 
   useEffect(() => {
-    if (!cfg) return;
+    if (!hasCfg) return;
 
-    setEnabled(cfg.enabled);
-    setMode(cfg.mode);
-    setScope(cfg.scope);
-    setScanLabelKey(cfg.scanLabelKey);
-    setUpdateLabelKey(cfg.updateLabelKey);
+    setEnabled(cfgEnabled);
+    setMode(cfgMode);
+    setScope(cfgScope);
+    setScanLabelKey(cfgScanLabelKey);
+    setUpdateLabelKey(cfgUpdateLabelKey);
+    setCronExpr(cfgCronExpr);
 
-    const parsed = tryParseCronExpr(cfg.cronExpr);
+    const parsed = tryParseGuidedSchedule(cfgCronExpr);
     if (parsed) {
-      setCronManual(false);
-      setCronState(parsed);
-      setCronExpr(cfg.cronExpr);
-    } else {
-      setCronManual(true);
-      setCronExpr(cfg.cronExpr);
-      setCronState(defaultCronState());
+      setScheduleMode("guided");
+      setGuidedSchedule(parsed);
+      return;
     }
-  }, [cfg?.updatedAt]);
 
-  const cronBuilt = useMemo(() => buildCronExpr(cronState), [cronState]);
-  const effectiveCron = cronManual ? cronExpr.trim() : cronBuilt.cron;
+    setScheduleMode("advanced");
+    setGuidedSchedule(null);
+  }, [
+    cfgCronExpr,
+    cfgEnabled,
+    cfgMode,
+    cfgScope,
+    cfgScanLabelKey,
+    cfgUpdateLabelKey,
+    cfg?.updatedAt,
+    hasCfg,
+  ]);
+
+  const guidedBuild = useMemo(() => {
+    if (!guidedSchedule) {
+      return { cron: "", errors: ["Selecione uma recorrência guiada antes de salvar."] };
+    }
+
+    return guidedScheduleToCron(guidedSchedule);
+  }, [guidedSchedule]);
+
+  const effectiveCron = scheduleMode === "advanced" ? cronExpr.trim() : guidedBuild.cron;
+
+  const schedulePreview = useMemo(() => {
+    if (scheduleMode === "guided") {
+      if (!guidedSchedule) {
+        return {
+          summary: "Selecione uma recorrência para gerar o cron",
+          isCustom: false,
+          isValid: false,
+        };
+      }
+
+      return {
+        summary: formatGuidedSchedule(guidedSchedule),
+        isCustom: false,
+        isValid: guidedBuild.errors.length === 0,
+      };
+    }
+
+    return describeCronExpression(effectiveCron);
+  }, [effectiveCron, guidedBuild.errors.length, guidedSchedule, scheduleMode]);
 
   const dirty = useMemo(() => {
     if (!cfg) return false;
@@ -83,19 +136,37 @@ export function useScheduler() {
       scanLabelKey !== cfg.scanLabelKey ||
       updateLabelKey !== cfg.updateLabelKey
     );
-  }, [cfg, enabled, effectiveCron, mode, scope, scanLabelKey, updateLabelKey]);
+  }, [cfg, effectiveCron, enabled, mode, scope, scanLabelKey, updateLabelKey]);
+
+  function handleScheduleModeChange(nextMode: ScheduleEditorMode) {
+    if (nextMode === "advanced") {
+      setCronExpr(guidedBuild.cron || cronExpr.trim());
+      setScheduleMode("advanced");
+      return;
+    }
+
+    const parsed = tryParseGuidedSchedule(cronExpr);
+    setGuidedSchedule(parsed);
+    setScheduleMode("guided");
+  }
 
   async function handleSave() {
     if (!cfg || saving) return;
 
-    const parts = effectiveCron.split(/\s+/).filter(Boolean);
-    if (parts.length !== 5) {
-      toast.error("Cron inválido: precisa ter 5 campos.", "Scheduler");
-      return;
+    if (scheduleMode === "guided") {
+      if (!guidedSchedule) {
+        toast.error("Escolha uma recorrência guiada antes de salvar.", "Scheduler");
+        return;
+      }
+
+      if (guidedBuild.errors.length > 0) {
+        toast.error(guidedBuild.errors[0] ?? "Agendamento inválido.", "Scheduler");
+        return;
+      }
     }
 
-    if (!cronManual && cronBuilt.errors.length > 0) {
-      toast.error("Cron inválido: ajuste os campos.", "Scheduler");
+    if (!hasFiveCronFields(effectiveCron)) {
+      toast.error("Cron inválido: precisa ter 5 campos.", "Scheduler");
       return;
     }
 
@@ -111,8 +182,8 @@ export function useScheduler() {
       });
       toast.success("Config salva.", "Scheduler");
       await qc.invalidateQueries({ queryKey: ["updates", "scheduler", "bundle"] });
-    } catch (e: any) {
-      toast.error(e?.message ?? "Erro ao salvar.", "Scheduler");
+    } catch (error: unknown) {
+      toast.error(getErrorMessage(error) || "Erro ao salvar.", "Scheduler");
     } finally {
       setSaving(false);
     }
@@ -135,8 +206,8 @@ export function useScheduler() {
         qc.invalidateQueries({ queryKey: ["updates", "scheduler", "bundle"] }),
         qc.invalidateQueries({ queryKey: ["updates", "jobs"] }),
       ]);
-    } catch (e: any) {
-      toast.error(e?.message ?? "Falha ao executar scan.", "Updates");
+    } catch (error: unknown) {
+      toast.error(getErrorMessage(error) || "Falha ao executar scan.", "Updates");
     } finally {
       setScanning(false);
     }
@@ -160,14 +231,15 @@ export function useScheduler() {
     setScanLabelKey,
     updateLabelKey,
     setUpdateLabelKey,
-    cronManual,
-    setCronManual,
+    scheduleMode,
+    setScheduleMode: handleScheduleModeChange,
     cronExpr,
     setCronExpr,
-    cronState,
-    setCronState,
-    cronBuilt,
+    guidedSchedule,
+    setGuidedSchedule,
+    guidedBuild,
     effectiveCron,
+    schedulePreview,
     dirty,
     saving,
     scanning,

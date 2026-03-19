@@ -34,7 +34,8 @@ export class UpdatesSchedulerService implements OnModuleInit {
   private lastFinishedAt: Date | null = null;
   private lastError: string | null = null;
   private lastResult: ScanAndEnqueueResult | null = null;
-  private readonly timeZone?: string;
+  private readonly configuredTimeZone?: string;
+  private readonly timeZone: string;
 
   constructor(
     private readonly repo: UpdatesSchedulerRepository,
@@ -43,12 +44,17 @@ export class UpdatesSchedulerService implements OnModuleInit {
     private readonly config: ConfigService<Env>,
     private readonly notifications: NotificationsService,
   ) {
-    this.timeZone = this.normalizeTimeZone(
+    this.configuredTimeZone = this.normalizeTimeZone(
       this.config.get('TZ', { infer: true }),
     );
+    this.timeZone = this.resolveTimeZone(this.configuredTimeZone);
 
-    if (this.timeZone) {
+    if (this.configuredTimeZone) {
       this.logger.log(`Scheduler timezone set to ${this.timeZone} (ENV TZ)`);
+    } else {
+      this.logger.log(
+        `Scheduler timezone resolved to ${this.timeZone} (system/default)`,
+      );
     }
   }
 
@@ -76,6 +82,7 @@ export class UpdatesSchedulerService implements OnModuleInit {
         hasJob: Boolean(job),
         enabled: Boolean(cfg?.enabled),
         ticking: this.ticking,
+        timeZone: this.timeZone,
         nextScanAt,
         lastRunAt: this.lastRunAt,
         lastFinishedAt: this.lastFinishedAt,
@@ -110,7 +117,7 @@ export class UpdatesSchedulerService implements OnModuleInit {
       const job = this.getOrCreateJob();
 
       // sempre para antes de reaplicar
-      job.stop();
+      void job.stop();
 
       if (!cfg.enabled) {
         this.logger.log('Scheduler disabled (db)');
@@ -124,7 +131,7 @@ export class UpdatesSchedulerService implements OnModuleInit {
 
       const next = this.getNextDateSafe(job);
       this.logger.log(
-        `Scheduler enabled (db). cron=${cfg.cronExpr} mode=${cfg.mode} scope=${cfg.scope} tz=${this.timeZone ?? 'system'} next=${next ?? '?'}`,
+        `Scheduler enabled (db). cron=${cfg.cronExpr} mode=${cfg.mode} scope=${cfg.scope} tz=${this.timeZone} next=${this.formatDateForLog(next)}`,
       );
     } catch (err: unknown) {
       // se algo der errado ao aplicar cron, loga (e não derruba app)
@@ -142,7 +149,7 @@ export class UpdatesSchedulerService implements OnModuleInit {
   stop() {
     try {
       const job = this.schedule.getCronJob(JOB_NAME);
-      job.stop();
+      void job.stop();
       this.schedule.deleteCronJob(JOB_NAME);
       this.logger.log('Scheduler job removed');
     } catch {
@@ -197,9 +204,12 @@ export class UpdatesSchedulerService implements OnModuleInit {
           const msg = this.getErrorMessage(err);
           this.lastError = msg;
           this.logger.error(`[scheduler] tick failed: ${msg}`);
-          await this.notifications.emitSystemError(`Scheduler tick failed: ${msg}`, {
-            scope: 'scheduler_tick',
-          });
+          await this.notifications.emitSystemError(
+            `Scheduler tick failed: ${msg}`,
+            {
+              scope: 'scheduler_tick',
+            },
+          );
         } finally {
           this.lastFinishedAt = new Date();
           this.nextScanAt = this.safeNextScan(job);
@@ -244,7 +254,7 @@ export class UpdatesSchedulerService implements OnModuleInit {
     try {
       // ✅ isso valida mesmo (diferente do split em 5 campos)
       new CronTime(s, this.timeZone);
-    } catch (err: unknown) {
+    } catch {
       throw new BadRequestException(`Invalid cronExpr: ${s}`);
     }
   }
@@ -276,9 +286,14 @@ export class UpdatesSchedulerService implements OnModuleInit {
     if (typeof value === 'object') {
       const maybe = value as { toJSDate?: () => Date };
       if (typeof maybe.toJSDate === 'function') return maybe.toJSDate();
+      return null;
     }
-    const asString = String(value);
-    const parsed = new Date(asString);
+
+    if (typeof value !== 'string' && typeof value !== 'number') {
+      return null;
+    }
+
+    const parsed = new Date(value);
     return Number.isNaN(parsed.getTime()) ? null : parsed;
   }
 
@@ -286,11 +301,38 @@ export class UpdatesSchedulerService implements OnModuleInit {
     if (err instanceof Error) return err.message;
     if (!err || typeof err !== 'object') return String(err);
     const maybe = err as { message?: unknown };
-    return typeof maybe.message === 'string' ? maybe.message : String(err);
+    return typeof maybe.message === 'string'
+      ? maybe.message
+      : this.stringifyUnknown(err);
   }
 
   private normalizeTimeZone(raw?: string | null): string | undefined {
     const tz = String(raw ?? '').trim();
     return tz ? tz : undefined;
+  }
+
+  private resolveTimeZone(configured?: string): string {
+    if (configured) return configured;
+
+    try {
+      const resolved = Intl.DateTimeFormat().resolvedOptions().timeZone?.trim();
+      if (resolved) return resolved;
+    } catch {
+      // fallback abaixo
+    }
+
+    return 'UTC';
+  }
+
+  private formatDateForLog(value: Date | null): string {
+    return value ? value.toISOString() : '?';
+  }
+
+  private stringifyUnknown(value: unknown): string {
+    try {
+      return JSON.stringify(value) ?? '[unknown]';
+    } catch {
+      return '[unknown]';
+    }
   }
 }

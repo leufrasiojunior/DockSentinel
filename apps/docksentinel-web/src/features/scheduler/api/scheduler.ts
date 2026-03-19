@@ -25,6 +25,7 @@ export type SchedulerRuntime = {
   hasJob: boolean;
   enabled: boolean;
   ticking: boolean;
+  timeZone: string;
 
   nextScanAt: string | null;
 
