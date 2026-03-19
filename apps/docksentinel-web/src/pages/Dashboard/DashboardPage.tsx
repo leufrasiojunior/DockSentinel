@@ -57,9 +57,7 @@ export function DashboardPage() {
   return (
     <div className="space-y-6">
       <PageHeader
-        eyebrow="Ops"
-        title="Container Control"
-        description="Visão operacional do host Docker com checagem de imagens, disparo manual de scan e execução direta de updates."
+        title="Dashboard"
         meta={
           <>
             <Badge variant="outline">{containers.length} containers</Badge>

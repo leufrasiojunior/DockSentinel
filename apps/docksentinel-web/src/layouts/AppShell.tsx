@@ -10,7 +10,6 @@ import {
   LogOut,
   Menu,
   Settings2,
-  Sparkles,
   TerminalSquare,
   type LucideIcon,
 } from "lucide-react";
@@ -46,8 +45,6 @@ const navItems = [
     to: "/dashboard",
     label: "Dashboard",
     icon: LayoutDashboard,
-    description: "Containers, updates e ações operacionais.",
-    badge: "Ops",
   },
   {
     to: "/jobs",
@@ -139,27 +136,10 @@ function SidebarContent({
           {!isCollapsed ? (
             <div className="min-w-0">
               <div className="truncate text-lg font-semibold tracking-tight text-sidebar-foreground">DockSentinel</div>
-              <div className="mt-1 text-xs uppercase tracking-[0.18em] text-sidebar-foreground/55">
-                Docker control plane
-              </div>
             </div>
           ) : null}
         </div>
       </div>
-
-      {!isCollapsed ? (
-        <div className="px-5 pb-6">
-          <div className="rounded-[1.75rem] border border-white/8 bg-white/5 p-4">
-            <div className="flex items-center gap-2 text-[0.7rem] font-semibold uppercase tracking-[0.18em] text-sidebar-foreground/60">
-              <Sparkles className="size-3.5" />
-              Observability-first UI
-            </div>
-            <p className="mt-3 text-sm leading-relaxed text-sidebar-foreground/72">
-              Operação de containers, jobs e notificações em um fluxo único e legível.
-            </p>
-          </div>
-        </div>
-      ) : null}
 
       <div className="flex-1 overflow-y-auto px-3 pb-6">
         <nav className="space-y-1.5">
@@ -177,18 +157,6 @@ function SidebarContent({
       </div>
 
       <div className="mt-auto px-5 py-6">
-        {!isCollapsed ? (
-          <div className="mb-4 rounded-[1.5rem] border border-white/8 bg-white/5 p-4 text-sm text-sidebar-foreground/72">
-            <div className="flex items-center justify-between gap-3">
-              <span>Theme & alerts</span>
-              <Badge variant="info">Live</Badge>
-            </div>
-            <p className="mt-2 text-xs leading-relaxed text-sidebar-foreground/55">
-              O header concentra tema, notificações e contexto da rota ativa.
-            </p>
-          </div>
-        ) : null}
-
         <Button
           variant="ghost"
           className={cn(
@@ -278,14 +246,12 @@ export function AppShell() {
 
               <div className="min-w-0 flex-1">
                 <div className="flex flex-wrap items-center gap-2">
-                  <Badge variant="outline">{currentNav.badge}</Badge>
                   <span className="text-[0.7rem] font-semibold uppercase tracking-[0.18em] text-muted-foreground">
                     {currentNav.label}
                   </span>
                 </div>
                 <div className="mt-2 flex flex-col gap-1 lg:flex-row lg:items-baseline lg:gap-4">
                   <div className="text-lg font-semibold tracking-tight text-foreground">{currentNav.label}</div>
-                  <div className="text-sm text-muted-foreground">{currentNav.description}</div>
                 </div>
               </div>
 
