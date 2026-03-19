@@ -1,4 +1,9 @@
-import React, { createContext, useContext, useMemo, useState } from "react";
+/* eslint-disable react-refresh/only-export-components */
+import React, { createContext, useCallback, useContext, useMemo, useState } from "react";
+import { AlertCircle, CheckCircle2, Info, X } from "lucide-react";
+
+import { ToastCard } from "../../../components/ui/toast";
+import { cn } from "../../lib/utils/cn";
 
 type ToastKind = "success" | "error" | "info";
 
@@ -18,26 +23,28 @@ type ToastContextValue = {
 
 const ToastContext = createContext<ToastContextValue | null>(null);
 
-function tone(kind: ToastKind) {
-  if (kind === "success") return "border-green-200 bg-green-50 text-green-800";
-  if (kind === "error") return "border-red-200 bg-red-50 text-red-800";
-  return "border-gray-200 bg-white text-gray-800";
+function meta(kind: ToastKind) {
+  if (kind === "success") {
+    return { variant: "success" as const, icon: CheckCircle2, label: "Success" };
+  }
+  if (kind === "error") {
+    return { variant: "error" as const, icon: AlertCircle, label: "Error" };
+  }
+  return { variant: "info" as const, icon: Info, label: "Info" };
 }
 
 export function ToastProvider({ children }: { children: React.ReactNode }) {
   const [toasts, setToasts] = useState<Toast[]>([]);
 
-  function remove(id: string) {
+  const remove = useCallback((id: string) => {
     setToasts((prev) => prev.filter((t) => t.id !== id));
-  }
+  }, []);
 
-  function push(t: Omit<Toast, "id">) {
+  const push = useCallback((t: Omit<Toast, "id">) => {
     const id = `${Date.now()}_${Math.random().toString(16).slice(2)}`;
     setToasts((prev) => [...prev, { ...t, id }]);
-
-    // auto dismiss
     setTimeout(() => remove(id), 4500);
-  }
+  }, [remove]);
 
   const api = useMemo<ToastContextValue>(
     () => ({
@@ -46,39 +53,43 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
       error: (message, title) => push({ kind: "error", message, title }),
       info: (message, title) => push({ kind: "info", message, title }),
     }),
-    [],
+    [push],
   );
 
   return (
     <ToastContext.Provider value={api}>
       {children}
 
-      {/* Toast stack */}
-      <div className="fixed right-4 top-4 z-[9999] w-full max-w-sm space-y-2">
+      <div className="fixed right-4 top-4 z-[9999] w-full max-w-sm space-y-3">
         {toasts.map((t) => (
-          <div
-            key={t.id}
-            className={[
-              "rounded-xl border px-4 py-3 shadow-sm",
-              tone(t.kind),
-            ].join(" ")}
-          >
-            <div className="flex items-start justify-between gap-3">
-              <div>
-                {t.title && <div className="text-sm font-semibold">{t.title}</div>}
-                <div className="mt-0.5 text-sm">{t.message}</div>
+          <ToastCard key={t.id} variant={meta(t.kind).variant}>
+            <div className="flex items-start gap-3">
+              <div className="mt-0.5 rounded-2xl border border-current/10 bg-current/8 p-2">
+                {React.createElement(meta(t.kind).icon, { className: "size-4" })}
+              </div>
+
+              <div className="min-w-0 flex-1">
+                <div className="flex items-center gap-2">
+                  {t.title ? <div className="text-sm font-semibold">{t.title}</div> : null}
+                  <div className="text-[0.65rem] font-semibold uppercase tracking-[0.16em] opacity-70">
+                    {meta(t.kind).label}
+                  </div>
+                </div>
+                <div className="mt-1 text-sm leading-relaxed opacity-90">{t.message}</div>
               </div>
 
               <button
                 type="button"
-                className="text-xs text-gray-500 hover:text-gray-800"
+                className={cn(
+                  "rounded-full p-1 text-current/60 transition-colors hover:bg-current/10 hover:text-current",
+                )}
                 onClick={() => remove(t.id)}
                 aria-label="Fechar"
               >
-                ✕
+                <X className="size-4" />
               </button>
             </div>
-          </div>
+          </ToastCard>
         ))}
       </div>
     </ToastContext.Provider>

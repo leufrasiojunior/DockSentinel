@@ -1,5 +1,15 @@
+/* eslint-disable react-refresh/only-export-components */
 import React, { createContext, useContext, useMemo, useState } from "react";
-import { Button } from "./Button";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "../../../components/ui/alert-dialog";
 
 type ConfirmOptions = {
   title: string;
@@ -42,37 +52,30 @@ export function ConfirmProvider({ children }: { children: React.ReactNode }) {
       {children}
 
       {pending && (
-        <div className="fixed inset-0 z-[9998]">
-          <div className="absolute inset-0 bg-black/40" onClick={() => close(false)} />
-          <div className="absolute inset-0 flex items-center justify-center p-4">
-            <div className="w-full max-w-lg rounded-2xl border bg-white shadow-xl">
-              <div className="p-5">
-                <div className="text-lg font-semibold text-gray-900">
-                  {pending.opts.title}
-                </div>
-                {pending.opts.description && (
-                  <div className="mt-2 text-sm text-gray-600 whitespace-pre-wrap">
-                    {pending.opts.description}
-                  </div>
-                )}
-              </div>
-
-              <div className="flex items-center justify-end gap-2 border-t p-4">
-                <Button type="button" onClick={() => close(false)}>
-                  {pending.opts.cancelText ?? "Cancelar"}
-                </Button>
-
-                <Button
-                  type="button"
-                  variant={pending.opts.danger ? "danger" : "primary"}
-                  onClick={() => close(true)}
-                >
-                  {pending.opts.confirmText ?? "Confirmar"}
-                </Button>
-              </div>
-            </div>
-          </div>
-        </div>
+        <AlertDialog open onOpenChange={(open) => (!open ? close(false) : undefined)}>
+          <AlertDialogContent className="max-w-xl">
+            <AlertDialogHeader>
+              <AlertDialogTitle>{pending.opts.title}</AlertDialogTitle>
+              {pending.opts.description ? (
+                <AlertDialogDescription className="whitespace-pre-wrap">
+                  {pending.opts.description}
+                </AlertDialogDescription>
+              ) : null}
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel type="button" onClick={() => close(false)}>
+                {pending.opts.cancelText ?? "Cancelar"}
+              </AlertDialogCancel>
+              <AlertDialogAction
+                type="button"
+                variant={pending.opts.danger ? "danger" : "primary"}
+                onClick={() => close(true)}
+              >
+                {pending.opts.confirmText ?? "Confirmar"}
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
       )}
     </ConfirmContext.Provider>
   );

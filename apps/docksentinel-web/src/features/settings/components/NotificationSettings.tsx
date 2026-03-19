@@ -1,7 +1,23 @@
 import { useState } from "react";
-import { CardHeader } from "../../../shared/components/ui/Card";
-import { Button } from "../../../shared/components/ui/Button";
-import { type NotificationLevel, type SmtpSecureMode, type SafeSettings } from "../api/settings";
+import { BellRing, MailCheck, MailOpen } from "lucide-react";
+
+import { FormField } from "../../../components/product/form-field";
+import { SectionCard } from "../../../components/product/section-card";
+import { Badge } from "../../../components/ui/badge";
+import { Button } from "../../../components/ui/button";
+import { Card } from "../../../components/ui/card";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "../../../components/ui/dialog";
+import { Input } from "../../../components/ui/input";
+import { Select } from "../../../components/ui/select";
+import { Switch } from "../../../components/ui/switch";
+import { type SafeSettings, type NotificationLevel, type SmtpSecureMode } from "../api/settings";
 
 type ProviderPreset = {
   id: "gmail" | "outlook" | "hotmail" | "yahoo" | "custom";
@@ -13,20 +29,8 @@ type ProviderPreset = {
 
 const PROVIDERS: ProviderPreset[] = [
   { id: "gmail", label: "Gmail", host: "smtp.gmail.com", port: 587, secureMode: "starttls" },
-  {
-    id: "outlook",
-    label: "Outlook",
-    host: "smtp-mail.outlook.com",
-    port: 587,
-    secureMode: "starttls",
-  },
-  {
-    id: "hotmail",
-    label: "Hotmail",
-    host: "smtp-mail.outlook.com",
-    port: 587,
-    secureMode: "starttls",
-  },
+  { id: "outlook", label: "Outlook", host: "smtp-mail.outlook.com", port: 587, secureMode: "starttls" },
+  { id: "hotmail", label: "Hotmail", host: "smtp-mail.outlook.com", port: 587, secureMode: "starttls" },
   { id: "yahoo", label: "Yahoo", host: "smtp.mail.yahoo.com", port: 587, secureMode: "starttls" },
   { id: "custom", label: "Personalizado", host: "", port: 587, secureMode: "starttls" },
 ];
@@ -116,235 +120,225 @@ export function NotificationSettings({
   }
 
   return (
-    <div className="space-y-4">
-      <CardHeader title="Notificações" subtitle="Canal na tela + e-mail SMTP com presets." />
-
-      <div className="grid gap-4 md:grid-cols-2">
-        <label className="flex items-center gap-2">
-          <input
-            type="checkbox"
-            checked={notificationsInAppEnabled}
-            onChange={(e) => setNotificationsInAppEnabled(e.target.checked)}
-          />
-          <span className="text-sm text-gray-700">Notificações na tela</span>
-        </label>
-
-        <label className="flex items-center gap-2">
-          <input
-            type="checkbox"
-            checked={notificationsEmailEnabled}
-            onChange={(e) => setNotificationsEmailEnabled(e.target.checked)}
-          />
-          <span className="text-sm text-gray-700">Notificações por e-mail</span>
-        </label>
-
-        <label className="space-y-1">
-          <div className="text-sm font-medium text-gray-700">Nível de notificação</div>
-          <select
-            className="w-full rounded-md border px-3 py-2 text-sm"
-            value={notificationLevel}
-            onChange={(e) => setNotificationLevel(e.target.value as NotificationLevel)}
-          >
-            <option value="all">Todas</option>
-            <option value="errors_only">Somente erros</option>
-          </select>
-        </label>
-
-        <label className="space-y-1">
-          <div className="text-sm font-medium text-gray-700">Retenção de lidas (dias)</div>
-          <input
-            className="w-full rounded-md border px-3 py-2 text-sm"
-            type="number"
-            min={1}
-            max={3650}
-            value={notificationReadRetentionDays}
-            onChange={(e) => setNotificationReadRetentionDays(e.target.value)}
-          />
-        </label>
-
-        <label className="space-y-1">
-          <div className="text-sm font-medium text-gray-700">
-            Retenção de não lidas (dias)
-          </div>
-          <input
-            className="w-full rounded-md border px-3 py-2 text-sm"
-            type="number"
-            min={1}
-            max={3650}
-            value={notificationUnreadRetentionDays}
-            onChange={(e) => setNotificationUnreadRetentionDays(e.target.value)}
-          />
-        </label>
-
-        <div className="space-y-2">
-          <div className="text-sm font-medium text-gray-700">Presets SMTP</div>
+    <>
+      <SectionCard
+        title="Notifications delivery"
+        description="Canal visual na aplicação e envio por SMTP com presets rápidos."
+        actions={
           <div className="flex flex-wrap gap-2">
-            {PROVIDERS.map((p) => (
-              <Button key={p.id} type="button" size="sm" variant="ghost" onClick={() => openProviderModal(p)}>
-                {p.label}
-              </Button>
-            ))}
+            <Button type="button" variant="outline" onClick={onTestSmtp} disabled={isTestingSmtp}>
+              {isTestingSmtp ? "Testando..." : "Testar SMTP"}
+            </Button>
+            <Button type="button" variant="primary" onClick={onSave} disabled={isSaving}>
+              {isSaving ? "Salvando..." : "Salvar notificações"}
+            </Button>
           </div>
-        </div>
+        }
+      >
+        <div className="grid gap-4 md:grid-cols-2">
+          <Card className="border-border/60 bg-muted/20 p-5">
+            <div className="flex items-start justify-between gap-4">
+              <div>
+                <div className="flex items-center gap-3">
+                  <BellRing className="size-4.5 text-foreground" />
+                  <div className="text-sm font-semibold text-foreground">Notificações na tela</div>
+                </div>
+                <div className="mt-2 text-sm text-muted-foreground">
+                  Toasts e centro de notificações dentro do painel.
+                </div>
+              </div>
+              <Switch checked={notificationsInAppEnabled} onCheckedChange={setNotificationsInAppEnabled} />
+            </div>
+          </Card>
 
-        <label className="space-y-1">
-          <div className="text-sm font-medium text-gray-700">SMTP host</div>
-          <input
-            className="w-full rounded-md border px-3 py-2 text-sm"
-            value={smtpHost}
-            onChange={(e) => setSmtpHost(e.target.value)}
-            placeholder="smtp.gmail.com"
-          />
-        </label>
+          <Card className="border-border/60 bg-muted/20 p-5">
+            <div className="flex items-start justify-between gap-4">
+              <div>
+                <div className="flex items-center gap-3">
+                  <MailCheck className="size-4.5 text-foreground" />
+                  <div className="text-sm font-semibold text-foreground">Notificações por e-mail</div>
+                </div>
+                <div className="mt-2 text-sm text-muted-foreground">
+                  Usa a configuração SMTP definida abaixo para alertas automatizados.
+                </div>
+              </div>
+              <Switch checked={notificationsEmailEnabled} onCheckedChange={setNotificationsEmailEnabled} />
+            </div>
+          </Card>
 
-        <label className="space-y-1">
-          <div className="text-sm font-medium text-gray-700">SMTP port</div>
-          <input
-            className="w-full rounded-md border px-3 py-2 text-sm"
-            type="number"
-            min={1}
-            max={65535}
-            value={smtpPort}
-            onChange={(e) => setSmtpPort(e.target.value)}
-          />
-        </label>
+          <FormField label="Nível de notificação" description="Escolhe entre fluxo completo ou apenas erros.">
+            <Select
+              value={notificationLevel}
+              onChange={(e: React.ChangeEvent<HTMLSelectElement>) =>
+                setNotificationLevel(e.target.value as NotificationLevel)
+              }
+            >
+              <option value="all">Todas</option>
+              <option value="errors_only">Somente erros</option>
+            </Select>
+          </FormField>
 
-        <label className="space-y-1">
-          <div className="text-sm font-medium text-gray-700">Segurança</div>
-          <select
-            className="w-full rounded-md border px-3 py-2 text-sm"
-            value={smtpSecureMode}
-            onChange={(e) => setSmtpSecureMode(e.target.value as SmtpSecureMode)}
+          <div className="grid gap-4 sm:grid-cols-2">
+            <FormField label="Retenção lidas (dias)">
+              <Input
+                type="number"
+                min={1}
+                max={3650}
+                value={notificationReadRetentionDays}
+                onChange={(e: React.ChangeEvent<HTMLInputElement>) => setNotificationReadRetentionDays(e.target.value)}
+              />
+            </FormField>
+            <FormField label="Retenção não lidas (dias)">
+              <Input
+                type="number"
+                min={1}
+                max={3650}
+                value={notificationUnreadRetentionDays}
+                onChange={(e: React.ChangeEvent<HTMLInputElement>) => setNotificationUnreadRetentionDays(e.target.value)}
+              />
+            </FormField>
+          </div>
+
+          <div className="md:col-span-2">
+            <FormField
+              label="Presets SMTP"
+              description="Aplica rapidamente host, porta e segurança do provedor."
+            >
+              <div className="flex flex-wrap gap-2">
+                {PROVIDERS.map((preset) => (
+                  <Button key={preset.id} type="button" size="sm" variant="outline" onClick={() => openProviderModal(preset)}>
+                    {preset.label}
+                  </Button>
+                ))}
+              </div>
+            </FormField>
+          </div>
+
+          <FormField label="SMTP host" description="Endpoint do provedor de e-mail.">
+            <Input
+              value={smtpHost}
+              onChange={(e: React.ChangeEvent<HTMLInputElement>) => setSmtpHost(e.target.value)}
+              placeholder="smtp.gmail.com"
+            />
+          </FormField>
+
+          <FormField label="SMTP port">
+            <Input
+              type="number"
+              min={1}
+              max={65535}
+              value={smtpPort}
+              onChange={(e: React.ChangeEvent<HTMLInputElement>) => setSmtpPort(e.target.value)}
+            />
+          </FormField>
+
+          <FormField label="Segurança">
+            <Select
+              value={smtpSecureMode}
+              onChange={(e: React.ChangeEvent<HTMLSelectElement>) => setSmtpSecureMode(e.target.value as SmtpSecureMode)}
+            >
+              <option value="starttls">STARTTLS</option>
+              <option value="tls">SSL/TLS</option>
+            </Select>
+          </FormField>
+
+          <FormField
+            label="SMTP usuário"
+            description={safe?.hasSmtpPassword ? "Senha já cadastrada no backend." : "Credencial do provedor SMTP."}
           >
-            <option value="starttls">STARTTLS</option>
-            <option value="tls">SSL/TLS</option>
-          </select>
-        </label>
+            <Input
+              value={smtpUsername}
+              onChange={(e: React.ChangeEvent<HTMLInputElement>) => setSmtpUsername(e.target.value)}
+              placeholder="usuario"
+            />
+          </FormField>
 
-        <label className="space-y-1">
-          <div className="text-sm font-medium text-gray-700">
-            SMTP usuário
-            {safe?.hasSmtpPassword && (
-              <span className="ml-2 text-xs text-gray-500">senha já cadastrada</span>
-            )}
-          </div>
-          <input
-            className="w-full rounded-md border px-3 py-2 text-sm"
-            value={smtpUsername}
-            onChange={(e) => setSmtpUsername(e.target.value)}
-            placeholder="usuario"
-          />
-        </label>
+          <FormField
+            className="md:col-span-2"
+            label="SMTP senha"
+            description={safe?.hasSmtpPassword ? "Deixe em branco para manter a senha atual." : "Opcional para testes imediatos."}
+          >
+            <Input
+              type="password"
+              value={smtpPassword}
+              onChange={(e: React.ChangeEvent<HTMLInputElement>) => setSmtpPassword(e.target.value)}
+              placeholder={safe?.hasSmtpPassword ? "Senha atual protegida" : "Senha"}
+            />
+          </FormField>
 
-        <label className="space-y-1 md:col-span-2">
-          <div className="text-sm font-medium text-gray-700">SMTP senha (opcional)</div>
-          <input
-            className="w-full rounded-md border px-3 py-2 text-sm"
-            type="password"
-            value={smtpPassword}
-            onChange={(e) => setSmtpPassword(e.target.value)}
-            placeholder={safe?.hasSmtpPassword ? "Deixe em branco para manter a senha atual" : ""}
-          />
-        </label>
+          <FormField label="From name">
+            <Input
+              value={smtpFromName}
+              onChange={(e: React.ChangeEvent<HTMLInputElement>) => setSmtpFromName(e.target.value)}
+              placeholder="DockSentinel"
+            />
+          </FormField>
 
-        <label className="space-y-1">
-          <div className="text-sm font-medium text-gray-700">From name</div>
-          <input
-            className="w-full rounded-md border px-3 py-2 text-sm"
-            value={smtpFromName}
-            onChange={(e) => setSmtpFromName(e.target.value)}
-            placeholder="DockSentinel"
-          />
-        </label>
-
-        <label className="space-y-1">
-          <div className="text-sm font-medium text-gray-700">From email</div>
-          <input
-            className="w-full rounded-md border px-3 py-2 text-sm"
-            type="email"
-            value={smtpFromEmail}
-            onChange={(e) => setSmtpFromEmail(e.target.value)}
-            placeholder="seuemail@provedor.com"
-          />
-          <div className="text-xs text-gray-500">
-            O destinatário será sempre este mesmo e-mail (auto-notificação).
-          </div>
-        </label>
-      </div>
-
-      <div className="mt-4 flex flex-wrap gap-2">
-        <Button type="button" variant="ghost" onClick={onTestSmtp} disabled={isTestingSmtp}>
-          {isTestingSmtp ? "Testando..." : "Testar envio SMTP"}
-        </Button>
-
-        <Button
-          type="button"
-          variant="primary"
-          onClick={onSave}
-          disabled={isSaving}
-        >
-          {isSaving ? "Salvando..." : "Salvar notificações"}
-        </Button>
-      </div>
-
-      {presetModalOpen && (
-        <div className="fixed inset-0 z-[1000] flex items-center justify-center bg-black/40 p-4">
-          <div className="w-full max-w-lg rounded-xl border bg-white p-4 shadow-xl">
-            <div className="mb-3 flex items-center justify-between">
-              <h3 className="text-base font-semibold">Preset SMTP: {presetSelected?.label ?? ""}</h3>
-              <button
-                type="button"
-                onClick={() => setPresetModalOpen(false)}
-                className="rounded border px-2 py-1 text-xs"
-              >
-                Fechar
-              </button>
-            </div>
-
-            <div className="grid gap-3 md:grid-cols-2">
-              <label className="space-y-1 md:col-span-2">
-                <div className="text-sm font-medium text-gray-700">Host</div>
-                <input
-                  className="w-full rounded-md border px-3 py-2 text-sm"
-                  value={presetHost}
-                  onChange={(e) => setPresetHost(e.target.value)}
-                />
-              </label>
-
-              <label className="space-y-1">
-                <div className="text-sm font-medium text-gray-700">Porta</div>
-                <input
-                  className="w-full rounded-md border px-3 py-2 text-sm"
-                  type="number"
-                  value={presetPort}
-                  onChange={(e) => setPresetPort(e.target.value)}
-                />
-              </label>
-
-              <label className="space-y-1">
-                <div className="text-sm font-medium text-gray-700">Segurança</div>
-                <select
-                  className="w-full rounded-md border px-3 py-2 text-sm"
-                  value={presetMode}
-                  onChange={(e) => setPresetMode(e.target.value as SmtpSecureMode)}
-                >
-                  <option value="starttls">STARTTLS</option>
-                  <option value="tls">SSL/TLS</option>
-                </select>
-              </label>
-            </div>
-
-            <div className="mt-4 flex justify-end gap-2">
-              <Button type="button" variant="ghost" onClick={() => setPresetModalOpen(false)}>
-                Cancelar
-              </Button>
-              <Button type="button" variant="primary" onClick={applyProviderPreset}>
-                Aplicar preset
-              </Button>
-            </div>
-          </div>
+          <FormField
+            label="From email"
+            description="O destinatário de auto-notificação será este mesmo e-mail."
+          >
+            <Input
+              type="email"
+              value={smtpFromEmail}
+              onChange={(e: React.ChangeEvent<HTMLInputElement>) => setSmtpFromEmail(e.target.value)}
+              placeholder="seuemail@provedor.com"
+            />
+          </FormField>
         </div>
-      )}
-    </div>
+
+        <div className="flex items-center gap-2 text-xs uppercase tracking-[0.16em] text-muted-foreground">
+          <MailOpen className="size-3.5" />
+          <span>SMTP password stored: {safe.hasSmtpPassword ? "yes" : "no"}</span>
+          <Badge variant={safe.hasSmtpPassword ? "success" : "outline"}>
+            {safe.hasSmtpPassword ? "Ready" : "Pending"}
+          </Badge>
+        </div>
+      </SectionCard>
+
+      <Dialog open={presetModalOpen} onOpenChange={setPresetModalOpen}>
+        <DialogContent className="max-w-lg">
+          <DialogHeader>
+            <DialogTitle>Preset SMTP: {presetSelected?.label ?? ""}</DialogTitle>
+            <DialogDescription>
+              Ajuste host, porta e modo de segurança antes de aplicar o preset ao formulário principal.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="grid gap-4 md:grid-cols-2">
+            <FormField className="md:col-span-2" label="Host">
+              <Input value={presetHost} onChange={(e: React.ChangeEvent<HTMLInputElement>) => setPresetHost(e.target.value)} />
+            </FormField>
+
+            <FormField label="Porta">
+              <Input
+                type="number"
+                value={presetPort}
+                onChange={(e: React.ChangeEvent<HTMLInputElement>) => setPresetPort(e.target.value)}
+              />
+            </FormField>
+
+            <FormField label="Segurança">
+              <Select
+                value={presetMode}
+                onChange={(e: React.ChangeEvent<HTMLSelectElement>) => setPresetMode(e.target.value as SmtpSecureMode)}
+              >
+                <option value="starttls">STARTTLS</option>
+                <option value="tls">SSL/TLS</option>
+              </Select>
+            </FormField>
+          </div>
+
+          <DialogFooter>
+            <Button type="button" variant="outline" onClick={() => setPresetModalOpen(false)}>
+              Cancelar
+            </Button>
+            <Button type="button" variant="primary" onClick={applyProviderPreset}>
+              Aplicar preset
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </>
   );
 }

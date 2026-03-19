@@ -1,4 +1,6 @@
 import { Button } from "../../../shared/components/ui/Button";
+import { Badge } from "../../../shared/components/ui/Badge";
+import { type InAppNotification } from "../api/notifications";
 import {
   Table,
   TableBody,
@@ -16,7 +18,7 @@ function fmt(value: string) {
 }
 
 interface NotificationTableProps {
-  items: any[];
+  items: InAppNotification[];
   loading: boolean;
   onMarkRead: (id: string) => void;
   markReadPending: boolean;
@@ -67,22 +69,15 @@ export function NotificationTable({
           >
             <TableCell className="whitespace-nowrap text-left text-muted-foreground">{fmt(n.createdAt)}</TableCell>
             <TableCell className="text-left">
-              <span
-                className={cn(
-                  "rounded px-1.5 py-0.5 text-[10px] font-semibold",
-                  n.level === "error"
-                    ? "bg-red-500/10 text-red-700 dark:text-red-400"
-                    : "bg-green-500/10 text-green-700 dark:text-green-400",
-                )}
-              >
+              <Badge tone={n.level === "error" ? "red" : "green"}>
                 {n.level === "error" ? "ERRO" : "INFO"}
-              </span>
+              </Badge>
             </TableCell>
             <TableCell className="text-left text-xs">
               {n.readAt ? (
-                <span className="rounded bg-muted px-2 py-1 text-muted-foreground border border-border">Lida</span>
+                <Badge tone="gray">Lida</Badge>
               ) : (
-                <span className="rounded bg-blue-500/10 px-2 py-1 text-blue-700 dark:text-blue-400 border border-blue-500/20">Não lida</span>
+                <Badge tone="blue">Não lida</Badge>
               )}
             </TableCell>
             <TableCell className="text-left font-medium text-foreground">{n.title}</TableCell>

@@ -2,7 +2,6 @@ import { useEffect, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useNavigate } from "react-router-dom";
 import { useToast } from "../../../shared/components/ui/ToastProvider";
-import { useConfirm } from "../../../shared/components/ui/ConfirmProvider";
 import { getAuthStatus, logout, type AuthMode } from "../../auth/api/auth";
 import {
   getSettings,
@@ -28,7 +27,6 @@ function errorMessage(error: unknown, fallback: string) {
 
 export function useSettings() {
   const toast = useToast();
-  const confirm = useConfirm();
   const nav = useNavigate();
   const qc = useQueryClient();
 

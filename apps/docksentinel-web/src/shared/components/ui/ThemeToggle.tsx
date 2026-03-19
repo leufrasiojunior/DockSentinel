@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Moon, Sun } from "lucide-react";
+import { MoonStar, SunMedium } from "lucide-react";
 import { Button } from "./Button";
 
 export function ThemeToggle() {
@@ -35,16 +35,16 @@ export function ThemeToggle() {
 
   return (
     <Button
-      variant="ghost"
-      size="sm"
+      variant="outline"
+      size="icon-sm"
       onClick={toggleTheme}
-      className="h-9 w-9 p-0 rounded-full text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800"
+      className="rounded-full border-border/70 bg-card/75 text-muted-foreground hover:bg-accent/70 hover:text-foreground"
       title={theme === "light" ? "Mudar para modo escuro" : "Mudar para modo claro"}
     >
       {theme === "light" ? (
-        <Moon className="h-[1.2rem] w-[1.2rem] rotate-0 scale-100 transition-all" />
+        <MoonStar className="size-4.5 transition-all" />
       ) : (
-        <Sun className="h-[1.2rem] w-[1.2rem] rotate-0 scale-100 transition-all" />
+        <SunMedium className="size-4.5 transition-all" />
       )}
       <span className="sr-only">Alternar tema</span>
     </Button>

@@ -1,8 +1,12 @@
-import { Card } from "../../shared/components/ui/Card";
-import { Button } from "../../shared/components/ui/Button";
-import { useSettings } from "../../features/settings/hooks/useSettings";
+import { LockKeyhole, Mail, ShieldAlert } from "lucide-react";
+
+import { EmptyState } from "../../components/product/empty-state";
+import { PageHeader } from "../../components/product/page-header";
+import { Badge } from "../../components/ui/badge";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "../../components/ui/tabs";
 import { AuthSettings } from "../../features/settings/components/AuthSettings";
 import { NotificationSettings } from "../../features/settings/components/NotificationSettings";
+import { useSettings } from "../../features/settings/hooks/useSettings";
 import { useConfirm } from "../../shared/components/ui/ConfirmProvider";
 
 export function SettingsPage() {
@@ -84,46 +88,49 @@ export function SettingsPage() {
   const hasError = statusQuery.isError || settingsQuery.isError;
 
   return (
-    <div className="p-6 space-y-4">
-      <div>
-        <h1 className="text-2xl font-semibold">Configurações</h1>
-        <p className="mt-1 text-sm text-gray-600">Auth e Notificações em abas separadas.</p>
-      </div>
+    <div className="space-y-6">
+      <PageHeader
+        eyebrow="Control"
+        title="Workspace Settings"
+        description="Autenticação, SMTP e retenção de notificações, organizados em uma linguagem única de configuração."
+        meta={
+          <>
+            <Badge variant="outline">modo atual: {currentMode}</Badge>
+            <Badge variant="outline">auth + notifications</Badge>
+          </>
+        }
+      />
 
-      <div className="flex gap-2">
-        <Button
-          type="button"
-          variant={activeTab === "auth" ? "primary" : "ghost"}
-          onClick={() => setActiveTab("auth")}
-        >
-          Autenticação
-        </Button>
-        <Button
-          type="button"
-          variant={activeTab === "notifications" ? "primary" : "ghost"}
-          onClick={() => setActiveTab("notifications")}
-        >
-          Notificações
-        </Button>
-      </div>
+      {loading ? (
+        <EmptyState
+          title="Carregando configurações"
+          description="Buscando status de autenticação e parâmetros seguros do backend."
+          icon={ShieldAlert}
+        />
+      ) : null}
 
-      {loading && (
-        <Card className="px-4 py-3">
-          <div className="text-sm text-gray-600">Carregando...</div>
-        </Card>
-      )}
+      {hasError ? (
+        <EmptyState
+          title="Erro ao carregar configurações"
+          description="Não foi possível sincronizar as preferências do ambiente."
+          icon={ShieldAlert}
+        />
+      ) : null}
 
-      {hasError && (
-        <Card className="border-red-200 bg-red-50 px-4 py-3">
-          <div className="text-sm text-red-700">
-            Erro ao carregar configurações.
-          </div>
-        </Card>
-      )}
+      {safe ? (
+        <Tabs value={activeTab} onValueChange={(value) => setActiveTab(value as "auth" | "notifications")}>
+          <TabsList>
+            <TabsTrigger value="auth">
+              <LockKeyhole className="size-4" />
+              Autenticação
+            </TabsTrigger>
+            <TabsTrigger value="notifications">
+              <Mail className="size-4" />
+              Notificações
+            </TabsTrigger>
+          </TabsList>
 
-      {safe && (
-        <Card className="p-4">
-          {activeTab === "auth" ? (
+          <TabsContent value="auth">
             <AuthSettings
               safe={safe}
               currentMode={currentMode}
@@ -138,7 +145,9 @@ export function SettingsPage() {
               onSave={handleSaveAuth}
               isSaving={saveMutation.isPending}
             />
-          ) : (
+          </TabsContent>
+
+          <TabsContent value="notifications">
             <NotificationSettings
               safe={safe}
               notificationsInAppEnabled={notificationsInAppEnabled}
@@ -165,14 +174,14 @@ export function SettingsPage() {
               setSmtpFromName={setSmtpFromName}
               smtpFromEmail={smtpFromEmail}
               setSmtpFromEmail={setSmtpFromEmail}
-              onSave={() => saveMutation.mutate()}
+              onSave={() => saveMutation.mutate(undefined)}
               isSaving={saveMutation.isPending}
-              onTestSmtp={() => smtpTestMutation.mutate()}
+              onTestSmtp={() => smtpTestMutation.mutate(undefined)}
               isTestingSmtp={smtpTestMutation.isPending}
             />
-          )}
-        </Card>
-      )}
+          </TabsContent>
+        </Tabs>
+      ) : null}
     </div>
   );
 }

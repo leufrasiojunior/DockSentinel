@@ -1,4 +1,5 @@
 import { Badge } from "../../../shared/components/ui/Badge";
+import { StatusBadge } from "../../../components/product/status-badge";
 import { type UpdateJob } from "../api/jobs";
 import {
   Table,
@@ -14,14 +15,6 @@ function fmt(iso?: string | null) {
   const d = new Date(iso);
   if (Number.isNaN(d.getTime())) return String(iso);
   return d.toLocaleString();
-}
-
-function statusTone(status: string) {
-  const s = status.toLowerCase();
-  if (s.includes("fail")) return "red";
-  if (s.includes("run")) return "blue";
-  if (s.includes("done") || s.includes("success")) return "green";
-  return "gray";
 }
 
 interface JobTableProps {
@@ -63,9 +56,7 @@ export function JobTable({ jobs, loading }: JobTableProps) {
           <TableRow key={j.id}>
             <TableCell className="text-left">
               <div className="flex items-center gap-2">
-                <Badge tone={statusTone(String(j.status)) as any}>
-                  {String(j.status)}
-                </Badge>
+                <StatusBadge value={j.status} />
                 <div className="text-[11px] text-muted-foreground font-mono">
                   {j.id.slice(0, 8)}
                 </div>
@@ -80,7 +71,9 @@ export function JobTable({ jobs, loading }: JobTableProps) {
                 {j.container ?? "—"}
               </div>
               <div className="text-xs text-muted-foreground">
-                pull: {String(!!j.pull)} • force: {String(!!j.force)}
+                <Badge tone={j.pull ? "green" : "gray"}>{j.pull ? "pull" : "no pull"}</Badge>
+                {" "}
+                <Badge tone={j.force ? "yellow" : "gray"}>{j.force ? "force" : "safe"}</Badge>
               </div>
             </TableCell>
 

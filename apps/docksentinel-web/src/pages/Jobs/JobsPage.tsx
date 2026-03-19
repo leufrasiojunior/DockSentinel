@@ -1,7 +1,13 @@
-import { Button } from "../../shared/components/ui/Button";
-import { Card, CardHeader } from "../../shared/components/ui/Card";
-import { useJobs } from "../../features/jobs/hooks/useJobs";
+import { CircleCheckBig, Clock3, ListOrdered, OctagonX, RefreshCcw, Workflow } from "lucide-react";
+
+import { FilterBar } from "../../components/product/filter-bar";
+import { PageHeader } from "../../components/product/page-header";
+import { SectionCard } from "../../components/product/section-card";
+import { StatCard } from "../../components/product/stat-card";
+import { Badge } from "../../components/ui/badge";
+import { Button } from "../../components/ui/button";
 import { JobTable } from "../../features/jobs/components/JobTable";
+import { useJobs } from "../../features/jobs/hooks/useJobs";
 
 export function JobsPage() {
   const {
@@ -16,102 +22,84 @@ export function JobsPage() {
   } = useJobs();
 
   return (
-    <div className="p-6 space-y-4">
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-        <div>
-          <h1 className="text-2xl font-semibold">Jobs</h1>
-          <p className="mt-1 text-sm text-muted-foreground">
-            Fila/histórico de ações do updater. Auto-refresh:{" "}
-            {visible ? "ON" : "OFF (aba oculta)"}.
-          </p>
-        </div>
-
-        <div className="flex flex-wrap gap-2">
-          <Button
-            onClick={() => refetch()}
-            disabled={isFetching}
-            type="button"
-          >
+    <div className="space-y-6">
+      <PageHeader
+        eyebrow="Queue"
+        title="Execution Stream"
+        description="Fila e histórico das ações disparadas pelo updater, com auto-refresh pausando quando a aba fica oculta."
+        meta={
+          <>
+            <Badge variant="outline">{visible ? "Auto-refresh ON" : "Auto-refresh OFF"}</Badge>
+            <Badge variant="outline">{filtered.length} itens filtrados</Badge>
+          </>
+        }
+        actions={
+          <Button onClick={() => refetch()} disabled={isFetching} type="button" variant="outline">
+            <RefreshCcw className="size-4" />
             Recarregar
           </Button>
+        }
+      />
+
+      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-5">
+        <StatCard label="Total" value={counters.total} helper="Todos os jobs retornados pela API." icon={ListOrdered} />
+        <StatCard label="Queued" value={counters.queued} helper="Aguardando execução." icon={Clock3} tone="warning" />
+        <StatCard label="Running" value={counters.running} helper="Execuções em andamento." icon={Workflow} tone="info" />
+        <StatCard label="Done" value={counters.done} helper="Execuções concluídas." icon={CircleCheckBig} tone="success" />
+        <StatCard label="Failed" value={counters.failed} helper="Execuções com erro." icon={OctagonX} tone="destructive" />
+      </div>
+
+      <SectionCard
+        title={`Lista (${filtered.length})`}
+        description="Fluxo somente-leitura por enquanto, voltado a acompanhamento operacional."
+      >
+        <FilterBar helper={`${counters.total} jobs totais`}>
+          <Button
+            type="button"
+            size="sm"
+            variant={filter === "all" ? "primary" : "ghost"}
+            onClick={() => setFilter("all")}
+          >
+            All
+          </Button>
+          <Button
+            type="button"
+            size="sm"
+            variant={filter === "queued" ? "primary" : "ghost"}
+            onClick={() => setFilter("queued")}
+          >
+            Queued
+          </Button>
+          <Button
+            type="button"
+            size="sm"
+            variant={filter === "running" ? "primary" : "ghost"}
+            onClick={() => setFilter("running")}
+          >
+            Running
+          </Button>
+          <Button
+            type="button"
+            size="sm"
+            variant={filter === "done" ? "primary" : "ghost"}
+            onClick={() => setFilter("done")}
+          >
+            Done
+          </Button>
+          <Button
+            type="button"
+            size="sm"
+            variant={filter === "failed" ? "primary" : "ghost"}
+            onClick={() => setFilter("failed")}
+          >
+            Failed
+          </Button>
+        </FilterBar>
+
+        <div className="-mx-6">
+          <JobTable jobs={filtered} loading={loading} />
         </div>
-      </div>
-
-      <div className="grid grid-cols-2 gap-3 sm:grid-cols-5">
-        <Card className="px-4 py-3">
-          <div className="text-xs text-gray-500">Total</div>
-          <div className="text-lg font-semibold">{counters.total}</div>
-        </Card>
-        <Card className="px-4 py-3">
-          <div className="text-xs text-gray-500">Queued</div>
-          <div className="text-lg font-semibold">{counters.queued}</div>
-        </Card>
-        <Card className="px-4 py-3">
-          <div className="text-xs text-gray-500">Running</div>
-          <div className="text-lg font-semibold">{counters.running}</div>
-        </Card>
-        <Card className="px-4 py-3">
-          <div className="text-xs text-gray-500">Done</div>
-          <div className="text-lg font-semibold">{counters.done}</div>
-        </Card>
-        <Card className="px-4 py-3">
-          <div className="text-xs text-gray-500">Failed</div>
-          <div className="text-lg font-semibold">{counters.failed}</div>
-        </Card>
-      </div>
-
-      <Card className="overflow-hidden">
-        <CardHeader
-          title={`Lista (${filtered.length})`}
-          subtitle="Visualização somente-leitura por enquanto (sem ações)."
-          right={
-            <div className="flex flex-wrap gap-2">
-              <Button
-                type="button"
-                size="sm"
-                variant={filter === "all" ? "primary" : "ghost"}
-                onClick={() => setFilter("all")}
-              >
-                All
-              </Button>
-              <Button
-                type="button"
-                size="sm"
-                variant={filter === "queued" ? "primary" : "ghost"}
-                onClick={() => setFilter("queued")}
-              >
-                Queued
-              </Button>
-              <Button
-                type="button"
-                size="sm"
-                variant={filter === "running" ? "primary" : "ghost"}
-                onClick={() => setFilter("running")}
-              >
-                Running
-              </Button>
-              <Button
-                type="button"
-                size="sm"
-                variant={filter === "done" ? "primary" : "ghost"}
-                onClick={() => setFilter("done")}
-              >
-                Done
-              </Button>
-              <Button
-                type="button"
-                size="sm"
-                variant={filter === "failed" ? "primary" : "ghost"}
-                onClick={() => setFilter("failed")}
-              >
-                Failed
-              </Button>
-            </div>
-          }
-        />
-
-        <JobTable jobs={filtered} loading={loading} />
-      </Card>
+      </SectionCard>
     </div>
   );
 }

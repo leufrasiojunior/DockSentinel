@@ -1,5 +1,5 @@
 import { http } from "../../../shared/api/http";
-import type { AuthMode } from "./auth";
+import type { AuthMode } from "../../auth/api/auth";
 
 export type LogLevel = "error" | "warn" | "info" | "debug";
 export type SmtpSecureMode = "starttls" | "tls";
