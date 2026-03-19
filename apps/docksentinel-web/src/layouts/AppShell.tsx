@@ -157,6 +157,23 @@ function SidebarContent({
       </div>
 
       <div className="mt-auto px-5 py-6">
+        {!isCollapsed ? (
+          <div className="mb-4 border-white/8 p-4 text-sm text-sidebar-foreground/72">
+            <p className="mt-2 text-xs leading-relaxed text-sidebar-foreground/55">
+              v2.0 - DockSentinel é um projeto de código aberto. Confira o repositório no{" "}
+              <a
+                href="https://github.com/leufrasiojunior/DockSentinel"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-primary hover:underline"
+              >
+                GitHub
+              </a>
+
+            </p>
+          </div>
+        ) : null}
+
         <Button
           variant="ghost"
           className={cn(
