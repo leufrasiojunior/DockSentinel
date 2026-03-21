@@ -53,6 +53,7 @@ COPY apps/api/prisma/schema.prisma apps/api/prisma/schema.prisma
 RUN npm ci --omit=dev --workspace apps/api \
   && PRISMA_VERSION=$(node -p 'require("./apps/api/package.json").devDependencies.prisma') \
   && npm install --no-save --omit=dev --workspace apps/api "prisma@${PRISMA_VERSION}" \
+  && npm install --no-save --workspace apps/api tsconfig-paths \
   && cd /app/apps/api \
   && ../../node_modules/.bin/prisma generate --config=prisma.config.ts \
   && npm cache clean --force

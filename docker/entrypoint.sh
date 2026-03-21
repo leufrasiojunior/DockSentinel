@@ -10,7 +10,7 @@ if [ -n "${TZ:-}" ] && [ -f "/usr/share/zoneinfo/${TZ}" ]; then
 fi
 
 cd /app/apps/api
-node dist/src/main.js &
+node -r tsconfig-paths/register dist/src/main.js &
 api_pid=$!
 
 term_handler() {
