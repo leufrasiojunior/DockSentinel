@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { NavLink, Outlet, useLocation, useNavigate } from "react-router-dom";
 import { useQueryClient } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
@@ -200,6 +200,11 @@ export function AppShell() {
       navItems[0]
     );
   }, [location.pathname]);
+  const currentTitle = t(currentNav.labelKey);
+
+  useEffect(() => {
+    document.title = `DockSentinel | ${currentTitle}`;
+  }, [currentTitle]);
 
   async function handleLogout() {
     try {
@@ -259,12 +264,12 @@ export function AppShell() {
               <div className="min-w-0 flex-1">
                 <div className="flex flex-wrap items-center gap-2">
                   <span className="text-[0.7rem] font-semibold uppercase tracking-[0.18em] text-muted-foreground">
-                    {t(currentNav.labelKey)}
+                    {currentTitle}
                   </span>
                 </div>
                 <div className="mt-2 flex flex-col gap-1 lg:flex-row lg:items-baseline lg:gap-4">
                   <div className="text-lg font-semibold tracking-tight text-foreground">
-                    {t(currentNav.labelKey)}
+                    {currentTitle}
                   </div>
                 </div>
               </div>
