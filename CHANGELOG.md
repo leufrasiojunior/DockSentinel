@@ -1,5 +1,28 @@
 # Changelog
 
+## [1.4.1](https://github.com/leufrasiojunior/DockSentinel/compare/v1.4.0...v1.4.1) (2026-02-22)
+
+
+### Bug Fixes
+
+* atualiza mensagem de carregamento para maior clareza na página d… ([1e7a355](https://github.com/leufrasiojunior/DockSentinel/commit/1e7a355059ff09eb31b63a2dc29f98a5e128c595))
+* atualiza mensagem de carregamento para maior clareza na página do dashboard ([f3e0382](https://github.com/leufrasiojunior/DockSentinel/commit/f3e0382d17922a3c3d57cc46ef4a1adc7f07e638))
+
+## [1.4.0](https://github.com/leufrasiojunior/DockSentinel/compare/v1.3.0...v1.4.0) (2026-02-22)
+
+
+### Features
+
+* adiciona variáveis de ambiente para o fluxo de trabalho de lanç… ([f3b8423](https://github.com/leufrasiojunior/DockSentinel/commit/f3b84235e4b64718918a37b491c68911c9595692))
+* adiciona variáveis de ambiente para o fluxo de trabalho de lançamento ([9c2da9b](https://github.com/leufrasiojunior/DockSentinel/commit/9c2da9b87b55eb365f2f023538ec395ba3c95168))
+
+## [1.3.0](https://github.com/leufrasiojunior/DockSentinel/compare/v1.2.0...v1.3.0) (2026-02-22)
+
+
+### Features
+
+* adiciona documentação e scripts de publicação para gerenciamento de versões no DockSentinel ([d7e7410](https://github.com/leufrasiojunior/DockSentinel/commit/d7e741038523b500a1d229c323fcbcc4cc3a722c))
+
 ## [1.2.0](https://github.com/leufrasiojunior/DockSentinel/compare/v1.1.0...v1.2.0) (2026-02-07)
 
 
