@@ -1,15 +1,28 @@
 import { useState } from "react";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { useLocation, useNavigate } from "react-router-dom";
+import { useTranslation } from "react-i18next";
 
-import { Button } from "../../layouts/ui/Button";
-import { Card, CardHeader } from "../../layouts/ui/Card";
-import { useToast } from "../../layouts/ui/ToastProvider";
-
-import { getAuthStatus, login } from "../../api/auth";
+import { getAuthStatus, login } from "../../features/auth/api/auth";
+import { Button } from "../../components/ui/button";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "../../components/ui/card";
+import { Input } from "../../components/ui/input";
+import { useToast } from "../../shared/components/ui/ToastProvider";
 import { buildLoginBody, loginHint, needsPassword, needsTotp } from "./loginUtils";
+import logo from "../../assets/logo2.png";
+
+function errorMessage(error: unknown, fallback: string) {
+  if (typeof error === "object" && error !== null && "message" in error) {
+    const maybeMessage = (error as { message?: unknown }).message;
+    if (typeof maybeMessage === "string" && maybeMessage.length > 0) {
+      return maybeMessage;
+    }
+  }
+  return fallback;
+}
 
 export function LoginPage() {
+  const { t } = useTranslation();
   const nav = useNavigate();
   const location = useLocation();
   const toast = useToast();
@@ -24,97 +37,94 @@ export function LoginPage() {
   });
 
   const authMode = statusQuery.data?.authMode ?? "password";
-  const from = (location.state as any)?.from ?? "/dashboard";
-
+  const from = ((location.state as { from?: string } | null)?.from) ?? "/dashboard";
   const hints = loginHint(authMode);
 
   const loginMutation = useMutation({
     mutationFn: async () => {
       const body = buildLoginBody(authMode, password, totp);
-
-      // em authMode=none, body vazio (LoginDto permite campos opcionais)
       await login(body);
     },
     onSuccess: () => {
-      toast.success("Login OK.", "Auth");
+      toast.success(t("login.success"), "Auth");
       nav(from, { replace: true });
     },
-    onError: (e: any) => {
-      toast.error(e?.message ?? "Falha no login", "Auth");
+    onError: (error: unknown) => {
+      toast.error(errorMessage(error, t("login.error")), "Auth");
     },
   });
 
   return (
-    <div className="min-h-screen bg-gray-50 flex items-center justify-center p-6">
-      <div className="w-full max-w-md space-y-4">
-        <div className="flex items-center justify-center gap-2">
-          <img src="/logo.png" alt="DockSentinel" className="h-10 w-10" />
-          <div className="text-xl font-semibold">DockSentinel</div>
+    <div className="flex min-h-screen items-center justify-center px-4 py-8 sm:px-6">
+      <div className="w-full max-w-md space-y-6">
+        <div className="flex flex-col items-center gap-3 text-center">
+          <div className="flex h-16 w-16 items-center justify-center rounded-[1.75rem] border border-border/60 bg-card p-3 shadow-sm">
+            <img src={logo} alt="DockSentinel" className="h-full w-full object-contain" />
+          </div>
+          <div>
+            <div className="text-2xl font-semibold tracking-tight text-foreground">{t("login.appName")}</div>
+            <div className="mt-1 text-sm text-muted-foreground">{t("login.enterPanel")}</div>
+          </div>
         </div>
 
-        <Card className="p-4">
-          <CardHeader
-            title="Login"
-            subtitle={
-              statusQuery.isLoading
-                ? "Carregando modo de autenticação..."
-                : hints
-            }
-          />
+        <Card className="overflow-hidden">
+          <CardHeader className="border-b border-border/60">
+            <CardTitle>{t("login.title")}</CardTitle>
+            <CardDescription>
+              {statusQuery.isLoading ? t("login.loadingAuthMode") : hints}
+            </CardDescription>
+          </CardHeader>
 
-          {statusQuery.isError && (
-            <div className="mb-3 rounded-md border border-red-200 bg-red-50 p-3 text-sm text-red-700">
-              Falha ao carregar <span className="font-mono">/auth/status</span>:{" "}
-              {(statusQuery.error as any)?.message ?? "erro"}
-            </div>
-          )}
+          <CardContent className="space-y-5">
+            {statusQuery.isError ? (
+              <Card className="border-destructive/20 bg-destructive/10 p-4 text-sm text-destructive">
+                {t("login.loadStatusError", {
+                  message: errorMessage(statusQuery.error, t("common.states.unknown")),
+                })}
+              </Card>
+            ) : null}
 
-          <div className="space-y-3">
-            {needsPassword(authMode) && (
-              <label className="space-y-1 block">
-                <div className="text-sm font-medium text-gray-700">Senha</div>
-                <input
-                  className="w-full rounded-md border px-3 py-2 text-sm"
-                  type="password"
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  placeholder="Sua senha"
-                />
-              </label>
-            )}
+            <div className="space-y-4">
+              {needsPassword(authMode) ? (
+                <div className="space-y-2">
+                  <div className="text-sm font-medium text-foreground">{t("login.password")}</div>
+                  <Input
+                    type="password"
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    placeholder={t("login.passwordPlaceholder")}
+                  />
+                </div>
+              ) : null}
 
-            {needsTotp(authMode) && (
-              <label className="space-y-1 block">
-                <div className="text-sm font-medium text-gray-700">TOTP</div>
-                <input
-                  className="w-full rounded-md border px-3 py-2 text-sm font-mono"
-                  value={totp}
-                  onChange={(e) => setTotp(e.target.value)}
-                  placeholder="123456"
-                  maxLength={6}
-                />
-              </label>
-            )}
-
-            <div className="flex gap-2">
-              <Button
-                variant="primary"
-                type="button"
-                onClick={() => loginMutation.mutate()}
-                disabled={loginMutation.isPending || statusQuery.isLoading}
-              >
-                Entrar
-              </Button>
-
-              <Button type="button" onClick={() => nav("/settings")}>
-                Configurar
-              </Button>
+              {needsTotp(authMode) ? (
+                <div className="space-y-2">
+                  <div className="text-sm font-medium text-foreground">{t("login.totp")}</div>
+                  <Input
+                    className="font-mono"
+                    value={totp}
+                    onChange={(e) => setTotp(e.target.value)}
+                    placeholder={t("login.totpPlaceholder")}
+                    maxLength={6}
+                  />
+                </div>
+              ) : null}
             </div>
 
-            {loginMutation.isPending && (
-              <div className="text-sm text-gray-600">Entrando...</div>
-            )}
-          </div>
+            <Button
+              variant="primary"
+              type="button"
+              onClick={() => loginMutation.mutate()}
+              disabled={loginMutation.isPending || statusQuery.isLoading}
+              className="w-full"
+            >
+              {t("login.submit")}
+            </Button>
+
+            {loginMutation.isPending ? (
+              <div className="text-sm text-muted-foreground">{t("login.submitting")}</div>
+            ) : null}
+          </CardContent>
         </Card>
       </div>
     </div>

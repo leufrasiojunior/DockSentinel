@@ -14,6 +14,14 @@ COPY apps/docksentinel-web/package.json apps/docksentinel-web/package.json
 COPY packages/shared/package.json packages/shared/package.json
 
 RUN npm ci
+# Work around npm optionalDependencies bug for native binaries in cross-platform Docker builds.
+RUN ROLLUP_VERSION=$(node -p 'require("./node_modules/rollup/package.json").version') \
+  && ROLLUP_PKG=$(node -e 'const { platform, arch, report } = process; const isMusl = platform === "linux" && !report.getReport().header.glibcVersionRuntime; const targets = { x64: { gnu: "linux-x64-gnu", musl: "linux-x64-musl" }, arm64: { gnu: "linux-arm64-gnu", musl: "linux-arm64-musl" } }; const target = targets[arch]; if (platform !== "linux" || !target) { console.error(`Unsupported platform/arch for Rollup native package: ${platform}/${arch}`); process.exit(1); } console.log(`@rollup/rollup-${isMusl ? target.musl : target.gnu}`);') \
+  && LIGHTNINGCSS_VERSION=$(node -p 'require("./node_modules/lightningcss/package.json").version') \
+  && LIGHTNINGCSS_PKG=$(node -e 'const { platform, arch, report } = process; const isMusl = platform === "linux" && !report.getReport().header.glibcVersionRuntime; const targets = { x64: { gnu: "linux-x64-gnu", musl: "linux-x64-musl" }, arm64: { gnu: "linux-arm64-gnu", musl: "linux-arm64-musl" }, arm: { gnu: "linux-arm-gnueabihf" } }; const target = targets[arch]; if (platform !== "linux" || !target || (isMusl && !target.musl)) { console.error(`Unsupported platform/arch for lightningcss native package: ${platform}/${arch}`); process.exit(1); } console.log(`lightningcss-${isMusl ? target.musl : target.gnu}`);') \
+  && OXIDE_VERSION=$(node -p 'require("./node_modules/@tailwindcss/oxide/package.json").version') \
+  && OXIDE_PKG=$(node -e 'const { platform, arch, report } = process; const isMusl = platform === "linux" && !report.getReport().header.glibcVersionRuntime; const targets = { x64: { gnu: "linux-x64-gnu", musl: "linux-x64-musl" }, arm64: { gnu: "linux-arm64-gnu", musl: "linux-arm64-musl" }, arm: { gnu: "linux-arm-gnueabihf", musl: "linux-arm-musleabihf" } }; const target = targets[arch]; if (platform !== "linux" || !target || (isMusl && !target.musl)) { console.error(`Unsupported platform/arch for @tailwindcss/oxide native package: ${platform}/${arch}`); process.exit(1); } console.log(`@tailwindcss/oxide-${isMusl ? target.musl : target.gnu}`);') \
+  && npm install --no-save "${ROLLUP_PKG}@${ROLLUP_VERSION}" "${LIGHTNINGCSS_PKG}@${LIGHTNINGCSS_VERSION}" "${OXIDE_PKG}@${OXIDE_VERSION}"
 
 COPY . .
 
@@ -38,11 +46,16 @@ RUN apk add --no-cache \
 COPY package.json package-lock.json ./
 COPY apps/api/package.json apps/api/package.json
 COPY packages/shared/package.json packages/shared/package.json
+COPY apps/api/prisma.config.ts apps/api/prisma.config.ts
+COPY apps/api/prisma/schema.prisma apps/api/prisma/schema.prisma
 
 # Install only production deps needed by the API workspace
 RUN npm ci --omit=dev --workspace apps/api \
   && PRISMA_VERSION=$(node -p 'require("./apps/api/package.json").devDependencies.prisma') \
   && npm install --no-save --omit=dev --workspace apps/api "prisma@${PRISMA_VERSION}" \
+  && npm install --no-save --workspace apps/api tsconfig-paths \
+  && cd /app/apps/api \
+  && ../../node_modules/.bin/prisma generate --config=prisma.config.ts \
   && npm cache clean --force
 
 FROM node:20-alpine AS runtime
@@ -61,17 +74,12 @@ ENV NODE_ENV=production \
   LOG_LEVEL=info \
   DATABASE_URL=file:/data/docksentinel.db \
   SCHEDULER_INTERVAL_MIN=5 \
-  DOCKSENTINEL_SECRET=CHANGE_ME_CHANGE_ME_CHANGE_ME_32CHARS_MIN \
   AUTO_MIGRATE=true \
   SWAGGER_ENABLED=true \
   CORS_ORIGINS=* \
   TZ=UTC
 
 COPY --from=prod-deps /app/node_modules /app/node_modules
-COPY --from=build /app/node_modules/.prisma /app/node_modules/.prisma
-COPY --from=build /app/node_modules/@prisma /app/node_modules/@prisma
-COPY --from=build /app/package.json /app/package-lock.json /app/
-COPY --from=build /app/apps/api/package.json /app/apps/api/package.json
 COPY --from=build /app/apps/api/prisma.config.ts /app/apps/api/prisma.config.ts
 COPY --from=build /app/apps/api/dist /app/apps/api/dist
 COPY --from=build /app/apps/api/prisma/schema.prisma /app/apps/api/prisma/schema.prisma

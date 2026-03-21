@@ -39,6 +39,8 @@ import {
   UpdateContainerNoopDto,
   UpdateContainerResultDto,
 } from './dto/update-result.dto';
+import { NotificationsService } from '../notifications/notifications.service';
+import { t } from '../i18n/translate';
 
 @ApiTags('Docker')
 @ApiExtraModels(
@@ -56,6 +58,7 @@ export class DockerController {
     private readonly updater: DockerUpdateService,
     @Inject(DOCKER_CLIENT) private readonly docker: Docker,
     private readonly digests: DockerDigestService,
+    private readonly notifications: NotificationsService,
   ) {}
 
   @Get('containers')
@@ -130,7 +133,7 @@ export class DockerController {
     }
 
     if (!targetImage) {
-      throw new BadRequestException('Unable to determine target image.');
+      throw new BadRequestException(t('docker.targetImageRequired'));
     }
 
     // 2) Regra simples do MVP:
@@ -141,7 +144,10 @@ export class DockerController {
     const isChangingImage = targetFromBody && targetFromBody !== check.imageRef;
     if (isChangingImage && !force) {
       throw new BadRequestException(
-        `Changing container image requires force=true (current=${check.imageRef}, requested=${targetFromBody}).`,
+        t('docker.forceRequiredForImageChange', {
+          current: check.imageRef,
+          requested: targetFromBody,
+        }),
       );
     }
 
@@ -191,43 +197,68 @@ export class DockerController {
   })
   @ApiNotFoundResponse({ description: 'Container não encontrado.' })
   async updateCheck(@Param('name') name: string) {
-    const c = this.docker.getContainer(name);
-    const inspect = await c.inspect();
+    try {
+      const c = this.docker.getContainer(name);
+      const inspect = await c.inspect();
 
-    const imageRef = inspect?.Config?.Image as string;
-    const localImageId = inspect?.Image as string;
+      const imageRef = inspect?.Config?.Image as string;
+      const localImageId = inspect?.Image as string;
 
-    const remoteDigest = await this.digests.getRemoteDigest(imageRef);
+      const remoteDigest = await this.digests.getRemoteDigest(imageRef);
 
-    if (!remoteDigest) {
+      if (!remoteDigest) {
+        await this.notifications.emitScanError({
+          mode: 'manual_check',
+          scanned: 1,
+          errors: 1,
+          container: name,
+          imageRef,
+          reason: 'remote_digest_not_found',
+          scannedImages: [`${name} => ${imageRef}`],
+          updateCandidates: [],
+        });
+        return {
+          container: name,
+          imageRef,
+          localImageId,
+          canCheckRemote: false,
+          canCheckLocal: true,
+          hasUpdate: false,
+          reason: 'remote_digest_not_found',
+        };
+      }
+
+      const img = this.docker.getImage(localImageId);
+      const imgInspect = await img.inspect();
+
+      const repoDigests: string[] = imgInspect?.RepoDigests ?? [];
+
+      const hasUpdate = this.updater.hasUpdate(repoDigests, remoteDigest);
+
+      await this.notifications.emitScanInfo({
+        mode: 'manual_check',
+        scanned: 1,
+        scannedImages: [`${name} => ${imageRef}`],
+        updateCandidates: hasUpdate ? [`${name} => ${imageRef}`] : [],
+      });
+
       return {
         container: name,
         imageRef,
         localImageId,
-        canCheckRemote: false,
+        remoteDigest,
+        repoDigests,
+        canCheckRemote: true,
         canCheckLocal: true,
-        hasUpdate: false,
-        reason: 'remote_digest_not_found',
+        hasUpdate,
       };
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : String(err);
+      await this.notifications.emitSystemError(`Falha em update-check manual: ${name} -> ${msg}`, {
+        container: name,
+      });
+      throw err;
     }
-
-    const img = this.docker.getImage(localImageId);
-    const imgInspect = await img.inspect();
-
-    const repoDigests: string[] = imgInspect?.RepoDigests ?? [];
-
-    const hasUpdate = this.updater.hasUpdate(repoDigests, remoteDigest);
-
-    return {
-      container: name,
-      imageRef,
-      localImageId,
-      remoteDigest,
-      repoDigests,
-      canCheckRemote: true,
-      canCheckLocal: true,
-      hasUpdate,
-    };
   }
 
   @Post('containers/:name/update')
@@ -290,9 +321,7 @@ export class DockerController {
     //    Atualiza usando a MESMA tag do container (imageRef atual)
     const targetImage = check.imageRef;
     if (!targetImage) {
-      throw new BadRequestException(
-        'Unable to determine container imageRef for update.',
-      );
+      throw new BadRequestException(t('docker.imageRefRequired'));
     }
 
     const result = await this.updater.recreateContainerWithImage(

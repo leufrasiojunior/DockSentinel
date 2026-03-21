@@ -4,6 +4,7 @@ import { randomUUID } from "crypto"
 import { SettingsRepository } from "./settings.repository"
 import { CryptoService } from "../crypto/crypto.service"
 import { SettingsService } from "./settings.service"
+import { t } from "../i18n/translate"
 
 type PendingTotp = {
   secret: string
@@ -62,16 +63,16 @@ export class TotpEnrollmentService {
    */
   async confirm(challengeId: string, token: string) {
     const p = this.pending.get(challengeId)
-    if (!p) throw new BadRequestException("Invalid or expired challengeId")
+    if (!p) throw new BadRequestException(t("totp.invalidOrExpiredChallenge"))
 
     // expirou?
     if (Date.now() > p.expiresAt) {
       this.pending.delete(challengeId)
-      throw new BadRequestException("Challenge expired")
+      throw new BadRequestException(t("totp.challengeExpired"))
     }
 
     const ok = authenticator.verify({ token, secret: p.secret })
-    if (!ok) throw new UnauthorizedException("Invalid TOTP token")
+    if (!ok) throw new UnauthorizedException(t("totp.invalidToken"))
 
     // ok -> persistir
     const enc = this.crypto.encrypt(p.secret)

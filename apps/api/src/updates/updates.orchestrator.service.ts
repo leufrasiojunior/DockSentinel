@@ -7,6 +7,7 @@ import {
 import { UpdatesRepository } from './updates.repository';
 import { UpdatesWorkerService } from './updates.worker.service';
 import { UpdatesSchedulerRepository } from './updates.scheduler.repository';
+import { NotificationsService } from '../notifications/notifications.service';
 
 export type ScanMode = 'scan_only' | 'scan_and_update';
 export type ScanScope = 'all' | 'labeled';
@@ -43,6 +44,7 @@ export class UpdatesOrchestratorService {
     private readonly repo: UpdatesRepository,
     private readonly worker: UpdatesWorkerService,
     private readonly schedRepo: UpdatesSchedulerRepository,
+    private readonly notifications: NotificationsService,
   ) {}
 
   async scanAndEnqueueFromDb(): Promise<ScanAndEnqueueResult> {
@@ -137,6 +139,19 @@ export class UpdatesOrchestratorService {
       }
     }
 
+    const errored = results.filter((r) => 'error' in r).length;
+    const hasAnyError = errored > 0;
+    const scannedImages = results.map((r) => {
+      if ('error' in r) return `${r.name} (erro)`;
+      const image = r.imageRef ?? 'n/a';
+      return `${r.name} => ${image}`;
+    });
+    const updateCandidates: string[] = [];
+    for (const r of results) {
+      if (!('error' in r) && r.hasUpdate) {
+        updateCandidates.push(`${r.name} => ${r.imageRef ?? 'n/a'}`);
+      }
+    }
     if (input.mode === 'scan_and_update' && toQueue.length > 0) {
       const enq = await this.repo.enqueueMany(toQueue);
 
@@ -147,12 +162,48 @@ export class UpdatesOrchestratorService {
           this.logger.error(`worker kick failed: ${this.getErrorMessage(e)}`),
         );
 
+      if (hasAnyError) {
+        await this.notifications.emitScanError({
+          mode: input.mode,
+          scanned: results.length,
+          queued: enq.queued.length,
+          errors: errored,
+          scannedImages,
+          updateCandidates,
+        });
+      } else {
+        await this.notifications.emitScanInfo({
+          mode: input.mode,
+          scanned: results.length,
+          queued: enq.queued.length,
+          scannedImages,
+          updateCandidates,
+        });
+      }
+
       return {
         scanned: results.length,
         mode: input.mode,
         queued: enq,
         results,
       };
+    }
+
+    if (hasAnyError) {
+      await this.notifications.emitScanError({
+        mode: input.mode,
+        scanned: results.length,
+        errors: errored,
+        scannedImages,
+        updateCandidates,
+      });
+    } else {
+      await this.notifications.emitScanInfo({
+        mode: input.mode,
+        scanned: results.length,
+        scannedImages,
+        updateCandidates,
+      });
     }
 
     return { scanned: results.length, mode: input.mode, queued: null, results };

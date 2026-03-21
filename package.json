@@ -1,17 +1,22 @@
 {
   "name": "docksentinel",
   "private": true,
-  "version": "1.4.1",
+  "version": "2.0",
   "workspaces": [
     "apps/*",
     "packages/*"
   ],
   "scripts": {
+    "dev": "bash scripts/dev-all.sh",
     "publish": "node scripts/publish.mjs",
     "publish:beta": "node scripts/publish.mjs beta",
     "publish:alpha": "node scripts/publish.mjs alpha",
     "publish:release": "node scripts/publish.mjs release",
     "version:current": "node scripts/version.mjs",
-    "tag:latest": "node scripts/tag-latest.mjs"
+    "tag:latest": "node scripts/tag-latest.mjs",
+    "test:scripts": "node --test scripts/tests/release-utils.test.mjs && bash scripts/tests/publish-release.integration.sh"
+  },
+  "dependencies": {
+    "@tanstack/react-table": "^8.21.3"
   }
 }

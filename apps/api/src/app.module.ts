@@ -11,10 +11,22 @@ import { CryptoModule } from "./crypto/crypto.module"
 import { DockerModule } from "./docker/docker.module"
 import { UpdatesModule } from "./updates/updates.module"
 import { ScheduleModule } from "@nestjs/schedule"
+import { NotificationsModule } from "./notifications/notifications.module"
 
 
 @Module({
-  imports: [ScheduleModule.forRoot(),AppConfigModule, SettingsModule, AuthModule, HealthModule, PrismaModule, CryptoModule, DockerModule, UpdatesModule],
+  imports: [
+    ScheduleModule.forRoot(),
+    AppConfigModule,
+    SettingsModule,
+    AuthModule,
+    HealthModule,
+    PrismaModule,
+    CryptoModule,
+    DockerModule,
+    NotificationsModule,
+    UpdatesModule,
+  ],
   providers: [
     {
       provide: APP_GUARD,

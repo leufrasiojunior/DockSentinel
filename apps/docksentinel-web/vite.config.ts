@@ -1,11 +1,20 @@
 import tailwindcss from "@tailwindcss/vite";
 import { defineConfig } from "vite";
 import react from "@vitejs/plugin-react";
+import * as path from "path";
 
 const API_TARGET = "http://localhost:3000";
 
 export default defineConfig({
   plugins: [react(), tailwindcss()],
+    resolve: {
+    alias: [
+      {
+        find: "@",
+        replacement: path.resolve(__dirname, "src"),
+      },
+    ],
+  },
   server: {
     proxy: {
       // AUTH
@@ -27,6 +36,14 @@ export default defineConfig({
         target: API_TARGET,
         changeOrigin: true,
         secure: false,
+      },
+
+      // NOTIFICATIONS API (avoid clash with SPA route /notifications)
+      "/api/notifications": {
+        target: API_TARGET,
+        changeOrigin: true,
+        secure: false,
+        rewrite: (path) => path.replace(/^\/api/, ""),
       },
 
       // SETTINGS/SETUP/HEALTH
@@ -53,4 +70,5 @@ export default defineConfig({
       },
     },
   },
+
 });

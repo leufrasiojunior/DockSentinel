@@ -84,8 +84,17 @@ export class SchedulerRuntimeDto {
   @ApiProperty({ description: 'Scheduler habilitado', example: true })
   enabled!: boolean;
 
-  @ApiProperty({ description: 'Indica se está executando agora', example: false })
+  @ApiProperty({
+    description: 'Indica se está executando agora',
+    example: false,
+  })
   ticking!: boolean;
+
+  @ApiProperty({
+    description: 'Timezone efetiva usada para interpretar a cron',
+    example: 'America/Sao_Paulo',
+  })
+  timeZone!: string;
 
   @ApiPropertyOptional({
     description: 'Próxima execução prevista (ISO)',
@@ -120,7 +129,10 @@ export class SchedulerRuntimeDto {
 }
 
 export class SchedulerStatusDto {
-  @ApiProperty({ description: 'Configuração atual', type: SchedulerConfigResponseDto })
+  @ApiProperty({
+    description: 'Configuração atual',
+    type: SchedulerConfigResponseDto,
+  })
   config!: SchedulerConfigResponseDto;
 
   @ApiProperty({ description: 'Status em runtime', type: SchedulerRuntimeDto })
