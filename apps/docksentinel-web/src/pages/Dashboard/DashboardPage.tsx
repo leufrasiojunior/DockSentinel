@@ -35,6 +35,7 @@ export function DashboardPage() {
     anySelected,
     selectedBlocked,
     busy,
+    updatingNames,
     checks,
     detailsId,
     setDetailsId,
@@ -178,6 +179,7 @@ export function DashboardPage() {
           onDetails={setDetailsId}
           onCheck={runUpdateCheckOne}
           onUpdate={handleUpdateOne}
+          updatingNames={updatingNames}
           checks={checks}
           busy={!!busy}
         />
