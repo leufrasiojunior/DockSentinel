@@ -152,15 +152,6 @@ export class UpdatesOrchestratorService {
         updateCandidates.push(`${r.name} => ${r.imageRef ?? 'n/a'}`);
       }
     }
-    const scannedSummary =
-      scannedImages.length > 0
-        ? scannedImages.slice(0, 8).join(' | ')
-        : 'nenhum container';
-    const updatesSummary =
-      updateCandidates.length > 0
-        ? updateCandidates.slice(0, 8).join(' | ')
-        : 'nenhuma atualização';
-
     if (input.mode === 'scan_and_update' && toQueue.length > 0) {
       const enq = await this.repo.enqueueMany(toQueue);
 
@@ -171,11 +162,8 @@ export class UpdatesOrchestratorService {
           this.logger.error(`worker kick failed: ${this.getErrorMessage(e)}`),
         );
 
-      const message = hasAnyError
-        ? `Scan concluído com erros. mode=${input.mode}, scanned=${results.length}, queued=${enq.queued.length}, errors=${errored}. Imagens: ${scannedSummary}. Updates: ${updatesSummary}.`
-        : `Scan concluído. mode=${input.mode}, scanned=${results.length}, queued=${enq.queued.length}. Imagens: ${scannedSummary}. Updates: ${updatesSummary}.`;
       if (hasAnyError) {
-        await this.notifications.emitScanError(message, {
+        await this.notifications.emitScanError({
           mode: input.mode,
           scanned: results.length,
           queued: enq.queued.length,
@@ -184,7 +172,7 @@ export class UpdatesOrchestratorService {
           updateCandidates,
         });
       } else {
-        await this.notifications.emitScanInfo(message, {
+        await this.notifications.emitScanInfo({
           mode: input.mode,
           scanned: results.length,
           queued: enq.queued.length,
@@ -201,11 +189,8 @@ export class UpdatesOrchestratorService {
       };
     }
 
-    const message = hasAnyError
-      ? `Scan concluído com erros. mode=${input.mode}, scanned=${results.length}, errors=${errored}. Imagens: ${scannedSummary}. Updates: ${updatesSummary}.`
-      : `Scan concluído sem enqueue. mode=${input.mode}, scanned=${results.length}. Imagens: ${scannedSummary}. Updates: ${updatesSummary}.`;
     if (hasAnyError) {
-      await this.notifications.emitScanError(message, {
+      await this.notifications.emitScanError({
         mode: input.mode,
         scanned: results.length,
         errors: errored,
@@ -213,7 +198,7 @@ export class UpdatesOrchestratorService {
         updateCandidates,
       });
     } else {
-      await this.notifications.emitScanInfo(message, {
+      await this.notifications.emitScanInfo({
         mode: input.mode,
         scanned: results.length,
         scannedImages,

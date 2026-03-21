@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Bell, Check, ExternalLink } from "lucide-react";
+import { useTranslation } from "react-i18next";
 
 import { Badge } from "../../../components/ui/badge";
 import { Button } from "../../../components/ui/button";
@@ -14,8 +15,10 @@ import {
   markNotificationRead,
 } from "../api/notifications";
 import { sortNewestFirst } from "../utils/date";
+import { formatDateTime } from "../../../i18n/format";
 
 export function NotificationCenter() {
+  const { t } = useTranslation();
   const qc = useQueryClient();
   const visible = usePageVisibility();
   const [open, setOpen] = useState(false);
@@ -72,8 +75,8 @@ export function NotificationCenter() {
           "relative rounded-full border-border/70 bg-card/75 text-muted-foreground hover:bg-accent/70 hover:text-foreground",
           open && "bg-accent text-foreground",
         )}
-        aria-label="Abrir central de notificações"
-        title="Central de notificações"
+        aria-label={t("notifications.center.openAria")}
+        title={t("notifications.center.title")}
       >
         <Bell className="size-4.5" />
         {unreadCount > 0 ? (
@@ -87,24 +90,24 @@ export function NotificationCenter() {
         <Card className="absolute right-0 top-12 z-50 w-[22rem] overflow-hidden border-border/70 bg-card/95 p-0 shadow-[0_30px_90px_-45px_rgba(8,13,24,0.75)] backdrop-blur-xl sm:w-[25rem]">
           <div className="flex items-center justify-between border-b border-border/60 bg-muted/30 px-4 py-3">
             <div className="flex items-center gap-2">
-              <div className="text-sm font-semibold text-foreground">Notificações</div>
-              {unreadCount > 0 ? <Badge variant="info">{unreadCount} novas</Badge> : null}
+              <div className="text-sm font-semibold text-foreground">{t("notifications.center.title")}</div>
+              {unreadCount > 0 ? <Badge variant="info">{t("notifications.center.badgeNew", { count: unreadCount })}</Badge> : null}
             </div>
             <Link
               to="/notifications"
               className="inline-flex items-center gap-1 text-xs text-primary transition-colors hover:text-primary/80"
               onClick={() => setOpen(false)}
             >
-              Ver todas <ExternalLink className="size-3" />
+              {t("notifications.center.viewAll")} <ExternalLink className="size-3" />
             </Link>
           </div>
 
           <div className="max-h-[420px] space-y-2 overflow-y-auto p-3">
             {notificationsQuery.isLoading ? (
-              <div className="p-8 text-center text-xs italic text-muted-foreground">Carregando...</div>
+              <div className="p-8 text-center text-xs italic text-muted-foreground">{t("notifications.center.loading")}</div>
             ) : notifications.length === 0 ? (
               <div className="p-8 text-center text-xs italic text-muted-foreground">
-                Nenhuma notificação encontrada.
+                {t("notifications.center.empty")}
               </div>
             ) : (
               notifications.map((notification) => (
@@ -119,7 +122,7 @@ export function NotificationCenter() {
                     <div className="min-w-0 flex-1">
                       <div className="flex items-center gap-2">
                         <Badge variant={notification.level === "error" ? "destructive" : "success"}>
-                          {notification.level === "error" ? "ERRO" : "INFO"}
+                          {notification.level === "error" ? t("common.states.error") : t("common.states.info")}
                         </Badge>
                         <div className="truncate text-sm font-semibold text-foreground">{notification.title}</div>
                       </div>
@@ -127,7 +130,7 @@ export function NotificationCenter() {
                         {notification.message}
                       </div>
                       <div className="mt-3 text-[0.72rem] uppercase tracking-[0.14em] text-muted-foreground">
-                        {new Date(notification.createdAt).toLocaleString()}
+                        {formatDateTime(notification.createdAt) ?? notification.createdAt}
                       </div>
                     </div>
 
@@ -138,7 +141,7 @@ export function NotificationCenter() {
                         variant="ghost"
                         onClick={() => markReadMutation.mutate(notification.id)}
                         disabled={markReadMutation.isPending}
-                        title="Marcar como lida"
+                        title={t("notifications.center.markRead")}
                         className="rounded-full"
                       >
                         <Check className="size-4" />
@@ -159,7 +162,7 @@ export function NotificationCenter() {
                 variant="outline"
                 className="w-full"
               >
-                Marcar todas como lidas
+                {t("notifications.center.markAllRead")}
               </Button>
             </div>
           ) : null}

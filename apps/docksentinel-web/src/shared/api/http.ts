@@ -1,3 +1,5 @@
+import { getCurrentLocale } from "../../i18n/format";
+
 export class ApiError extends Error {
   status: number;
   details?: unknown;
@@ -49,6 +51,7 @@ export async function http<T>(path: string, options: HttpOptions = {}): Promise<
   const url = `${baseUrl}${path.startsWith("/") ? path : `/${path}`}`;
 
   const headers: Record<string, string> = {
+    "Accept-Language": getCurrentLocale(),
     ...(options.headers ?? {}),
   };
 

@@ -1,5 +1,6 @@
 import * as React from "react";
 import { Clock3, Code2 } from "lucide-react";
+import { useTranslation } from "react-i18next";
 
 import { EmptyState } from "../../../components/product/empty-state";
 import { FormField } from "../../../components/product/form-field";
@@ -14,16 +15,16 @@ import {
   type GuidedSchedule,
   type GuidedScheduleKind,
   type ScheduleEditorMode,
-  WEEKDAY_OPTIONS,
   buildPresetSchedule,
   clampInt,
   defaultGuidedSchedule,
   describeCronExpression,
   formatGuidedSchedule,
+  getSchedulePresets,
+  getWeekdayOptions,
   guidedScheduleToCron,
   hasFiveCronFields,
   type SchedulePreset,
-  SCHEDULE_PRESETS,
 } from "../utils/cron";
 
 interface CronBuilderProps {
@@ -36,29 +37,6 @@ interface CronBuilderProps {
   effectiveCron: string;
   timeZone?: string | null;
 }
-
-const SCHEDULE_KIND_OPTIONS: Array<{ value: GuidedScheduleKind; label: string; description: string }> = [
-  {
-    value: "interval",
-    label: "Intervalo",
-    description: "Repete a cada X minutos ou horas.",
-  },
-  {
-    value: "daily",
-    label: "Diário",
-    description: "Executa todos os dias em um horário fixo.",
-  },
-  {
-    value: "weekly",
-    label: "Semanal",
-    description: "Permite escolher um ou mais dias da semana.",
-  },
-  {
-    value: "monthly",
-    label: "Mensal",
-    description: "Executa uma vez por mês no dia escolhido.",
-  },
-];
 
 function buildScheduleForKind(kind: GuidedScheduleKind, current: GuidedSchedule | null) {
   if (kind === "weekly" && current?.kind === "weekly") {
@@ -123,25 +101,38 @@ export function CronBuilder({
   effectiveCron,
   timeZone,
 }: CronBuilderProps) {
+  const { t } = useTranslation();
+  const scheduleKindOptions = React.useMemo(
+    () =>
+      (["interval", "daily", "weekly", "monthly"] as const).map((value) => ({
+        value,
+        label: t(`scheduler.cron.kinds.${value}.label`),
+        description: t(`scheduler.cron.kinds.${value}.description`),
+      })),
+    [t],
+  );
+  const weekdayOptions = React.useMemo(() => getWeekdayOptions(), [t]);
+  const schedulePresets = React.useMemo(() => getSchedulePresets(), [t]);
+
   const guidedBuild = React.useMemo(
     () =>
       guidedSchedule
         ? guidedScheduleToCron(guidedSchedule)
-        : { cron: "", errors: ["Escolha uma recorrência para gerar o cron."] },
-    [guidedSchedule],
+        : { cron: "", errors: [t("scheduler.cron.guidedRequired")] },
+    [guidedSchedule, t],
   );
 
   const preview = React.useMemo(() => {
     if (scheduleMode === "guided") {
       return {
-        summary: guidedSchedule ? formatGuidedSchedule(guidedSchedule) : "Selecione uma recorrência guiada",
+        summary: guidedSchedule ? formatGuidedSchedule(guidedSchedule) : t("scheduler.cron.guidedSummaryFallback"),
         isCustom: false,
         isValid: Boolean(guidedSchedule) && guidedBuild.errors.length === 0,
       };
     }
 
     return describeCronExpression(effectiveCron);
-  }, [effectiveCron, guidedBuild.errors.length, guidedSchedule, scheduleMode]);
+  }, [effectiveCron, guidedBuild.errors.length, guidedSchedule, scheduleMode, t]);
 
   const activePresetCron = guidedSchedule ? guidedScheduleToCron(guidedSchedule).cron : null;
   const advancedPreview = React.useMemo(() => describeCronExpression(cronExpr), [cronExpr]);
@@ -181,23 +172,22 @@ export function CronBuilder({
         <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
           <div className="space-y-2">
             <div className="flex items-center gap-3">
-              <Badge variant="info">Agendamento</Badge>
-              <div className="text-sm font-semibold text-foreground">Quando executar</div>
+              <Badge variant="info">{t("scheduler.cron.badge")}</Badge>
+              <div className="text-sm font-semibold text-foreground">{t("scheduler.cron.title")}</div>
             </div>
             <div className="max-w-2xl text-sm leading-relaxed text-muted-foreground">
-              Use presets para chegar rápido em uma recorrência comum e, se precisar, abra o cron avançado
-              para editar a expressão manualmente.
+              {t("scheduler.cron.description")}
             </div>
           </div>
 
           <TabsList>
             <TabsTrigger value="guided">
               <Clock3 className="size-4" />
-              Guiado
+              {t("scheduler.cron.guided")}
             </TabsTrigger>
             <TabsTrigger value="advanced">
               <Code2 className="size-4" />
-              Cron avançado
+              {t("scheduler.cron.advanced")}
             </TabsTrigger>
           </TabsList>
         </div>
@@ -205,11 +195,11 @@ export function CronBuilder({
         <TabsContent value="guided" className="space-y-6">
           <div className="space-y-3">
             <div className="flex flex-wrap items-center gap-2">
-              <div className="text-sm font-medium text-foreground">Presets rápidos</div>
-              <Badge variant="outline">1 clique</Badge>
+              <div className="text-sm font-medium text-foreground">{t("scheduler.cron.quickPresets")}</div>
+              <Badge variant="outline">{t("scheduler.cron.oneClick")}</Badge>
             </div>
             <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
-              {SCHEDULE_PRESETS.map((preset) => {
+              {schedulePresets.map((preset) => {
                 const presetCron = guidedScheduleToCron(buildPresetSchedule(preset.id)).cron;
                 const active = Boolean(activePresetCron) && activePresetCron === presetCron;
 
@@ -226,9 +216,9 @@ export function CronBuilder({
           </div>
 
           <div className="space-y-3">
-            <div className="text-sm font-medium text-foreground">Tipo de recorrência</div>
+            <div className="text-sm font-medium text-foreground">{t("scheduler.cron.recurrenceType")}</div>
             <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
-              {SCHEDULE_KIND_OPTIONS.map((option) => {
+              {scheduleKindOptions.map((option) => {
                 const active = guidedSchedule?.kind === option.value;
 
                 return (
@@ -254,8 +244,8 @@ export function CronBuilder({
           {needsGuidedSelection ? (
             <EmptyState
               icon={Clock3}
-              title="Seu cron atual é customizado"
-              description="Para voltar ao modo guiado, escolha um preset ou um tipo de recorrência. Ao salvar, a nova escolha substitui a expressão manual atual."
+              title={t("scheduler.cron.customCronTitle")}
+              description={t("scheduler.cron.customCronDescription")}
             />
           ) : null}
 
@@ -263,7 +253,7 @@ export function CronBuilder({
             <div className="grid gap-4 lg:grid-cols-2">
               {guidedSchedule.kind === "interval" ? (
                 <>
-                  <FormField label="Repetir a cada" description="Defina a frequência do scheduler.">
+                  <FormField label={t("scheduler.cron.repeatEvery")} description={t("scheduler.cron.repeatEveryDescription")}>
                     <Input
                       type="number"
                       min={1}
@@ -282,7 +272,7 @@ export function CronBuilder({
                     />
                   </FormField>
 
-                  <FormField label="Unidade" description="Minutos para alta frequência, horas para rotinas mais espaçadas.">
+                  <FormField label={t("scheduler.cron.unit")} description={t("scheduler.cron.unitDescription")}>
                     <Select
                       value={guidedSchedule.unit}
                       onChange={(event: React.ChangeEvent<HTMLSelectElement>) =>
@@ -297,8 +287,8 @@ export function CronBuilder({
                         })
                       }
                     >
-                      <option value="minutes">minutos</option>
-                      <option value="hours">horas</option>
+                      <option value="minutes">{t("scheduler.cron.units.minutes")}</option>
+                      <option value="hours">{t("scheduler.cron.units.hours")}</option>
                     </Select>
                   </FormField>
                 </>
@@ -306,8 +296,8 @@ export function CronBuilder({
 
               {guidedSchedule.kind === "daily" ? (
                 <FormField
-                  label="Horário"
-                  description="Use a timezone ativa do scheduler para interpretar esse horário."
+                  label={t("scheduler.cron.time")}
+                  description={t("scheduler.cron.timeDescription")}
                   className="lg:max-w-xs"
                 >
                   <Input
@@ -326,8 +316,8 @@ export function CronBuilder({
               {guidedSchedule.kind === "weekly" ? (
                 <>
                   <FormField
-                    label="Horário"
-                    description="O mesmo horário será usado em todos os dias selecionados."
+                    label={t("scheduler.cron.time")}
+                    description={t("scheduler.cron.weeklyTimeDescription")}
                     className="lg:max-w-xs"
                   >
                     <Input
@@ -343,13 +333,13 @@ export function CronBuilder({
                   </FormField>
 
                   <FormField
-                    label="Dias da semana"
-                    description="Selecione um ou mais dias."
-                    error={guidedSchedule.days.length === 0 ? "Escolha pelo menos um dia." : undefined}
+                    label={t("scheduler.cron.weekdayLabel")}
+                    description={t("scheduler.cron.weekdayDescription")}
+                    error={guidedSchedule.days.length === 0 ? t("scheduler.cron.weekdayError") : undefined}
                     className="lg:col-span-2"
                   >
                     <div className="flex flex-wrap gap-2">
-                      {WEEKDAY_OPTIONS.map((day) => {
+                      {weekdayOptions.map((day) => {
                         const active = guidedSchedule.days.includes(day.value);
 
                         return (
@@ -371,7 +361,7 @@ export function CronBuilder({
 
               {guidedSchedule.kind === "monthly" ? (
                 <>
-                  <FormField label="Dia do mês" description="Valor entre 1 e 31.">
+                  <FormField label={t("scheduler.cron.monthDay")} description={t("scheduler.cron.monthDayDescription")}>
                     <Input
                       type="number"
                       min={1}
@@ -387,8 +377,8 @@ export function CronBuilder({
                   </FormField>
 
                   <FormField
-                    label="Horário"
-                    description="A execução mensal respeita a timezone atual do scheduler."
+                    label={t("scheduler.cron.time")}
+                    description={t("scheduler.cron.monthTimeDescription")}
                     className="lg:max-w-xs"
                   >
                     <Input
@@ -413,18 +403,18 @@ export function CronBuilder({
             <CardContent className="space-y-4">
               <div className="flex flex-wrap items-center gap-3">
                 <Badge variant={isCustomAdvanced ? "warning" : "outline"}>
-                  {isCustomAdvanced ? "Cron customizado" : "Cron manual"}
+                  {isCustomAdvanced ? t("common.states.customCron") : t("common.states.manualCron")}
                 </Badge>
                 <div className="text-sm text-muted-foreground">
-                  O backend continua recebendo uma expressão cron com 5 campos:{" "}
+                  {t("scheduler.cron.advancedManualDescription")}{" "}
                   <span className="font-mono text-foreground">min hour dom month dow</span>.
                 </div>
               </div>
 
               <FormField
-                label="Expressão cron"
-                description="Se a expressão bater com um padrão conhecido, ao voltar para o modo guiado os campos serão preenchidos automaticamente."
-                error={!hasFiveCronFields(cronExpr) ? "Use 5 campos separados por espaço." : undefined}
+                label={t("scheduler.cron.cronExpression")}
+                description={t("scheduler.cron.cronExpressionDescription")}
+                error={!hasFiveCronFields(cronExpr) ? t("scheduler.cron.cronExpressionError") : undefined}
               >
                 <Input
                   value={cronExpr}
@@ -436,8 +426,7 @@ export function CronBuilder({
 
               {isCustomAdvanced ? (
                 <div className="rounded-3xl border border-amber-500/20 bg-amber-500/8 p-4 text-sm leading-relaxed text-amber-900 dark:text-amber-200">
-                  Esse cron atual não cabe no fluxo guiado. Se você quiser voltar para a experiência simples,
-                  escolha um preset ou um tipo de recorrência antes de salvar.
+                  {t("scheduler.cron.advancedWarning")}
                 </div>
               ) : null}
             </CardContent>
@@ -449,32 +438,32 @@ export function CronBuilder({
         <CardContent className="space-y-4">
           <div className="flex flex-wrap items-center justify-between gap-3">
             <div>
-              <div className="text-sm font-semibold text-foreground">Preview do agendamento</div>
+              <div className="text-sm font-semibold text-foreground">{t("scheduler.cron.previewTitle")}</div>
               <div className="mt-1 text-sm leading-relaxed text-muted-foreground">
-                Resumo humano, expressão cron gerada e timezone efetiva do scheduler.
+                {t("scheduler.cron.previewDescription")}
               </div>
             </div>
 
             <Badge variant={preview.isCustom ? "warning" : "info"}>
-              {preview.isCustom ? "Customizado" : "Guiado"}
+              {preview.isCustom ? t("common.states.custom") : t("common.states.guided")}
             </Badge>
           </div>
 
           <div className="grid gap-3 md:grid-cols-3">
             <div className="rounded-3xl border border-border/60 bg-background/70 p-4">
-              <div className="text-xs uppercase tracking-[0.16em] text-muted-foreground">Resumo</div>
+              <div className="text-xs uppercase tracking-[0.16em] text-muted-foreground">{t("common.labels.summary")}</div>
               <div className="mt-2 text-sm font-medium text-foreground">{preview.summary}</div>
             </div>
 
             <div className="rounded-3xl border border-border/60 bg-background/70 p-4">
-              <div className="text-xs uppercase tracking-[0.16em] text-muted-foreground">Cron</div>
+              <div className="text-xs uppercase tracking-[0.16em] text-muted-foreground">{t("common.labels.cron")}</div>
               <div className="mt-2 break-all font-mono text-sm text-foreground">
                 {effectiveCron || "—"}
               </div>
             </div>
 
             <div className="rounded-3xl border border-border/60 bg-background/70 p-4">
-              <div className="text-xs uppercase tracking-[0.16em] text-muted-foreground">Timezone</div>
+              <div className="text-xs uppercase tracking-[0.16em] text-muted-foreground">{t("common.labels.timezone")}</div>
               <div className="mt-2 break-all font-mono text-sm text-foreground">
                 {timeZone ?? "UTC"}
               </div>
@@ -484,8 +473,8 @@ export function CronBuilder({
           {!preview.isValid ? (
             <div className="text-sm font-medium text-destructive">
               {scheduleMode === "guided"
-                ? guidedBuild.errors[0] ?? "Ajuste a recorrência para gerar um cron válida."
-                : "Ajuste a expressão cron antes de salvar."}
+                ? guidedBuild.errors[0] ?? t("scheduler.cron.previewInvalidGuided")
+                : t("scheduler.cron.previewInvalidAdvanced")}
             </div>
           ) : null}
         </CardContent>

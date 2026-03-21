@@ -1,6 +1,7 @@
 /* eslint-disable react-refresh/only-export-components */
 import React, { createContext, useCallback, useContext, useMemo, useState } from "react";
 import { AlertCircle, CheckCircle2, Info, X } from "lucide-react";
+import { useTranslation } from "react-i18next";
 
 import { ToastCard } from "../../../components/ui/toast";
 import { cn } from "../../lib/utils/cn";
@@ -23,17 +24,19 @@ type ToastContextValue = {
 
 const ToastContext = createContext<ToastContextValue | null>(null);
 
-function meta(kind: ToastKind) {
+function meta(kind: ToastKind, t: (key: string) => string) {
   if (kind === "success") {
-    return { variant: "success" as const, icon: CheckCircle2, label: "Success" };
+    return { variant: "success" as const, icon: CheckCircle2, label: t("toast.success") };
   }
   if (kind === "error") {
-    return { variant: "error" as const, icon: AlertCircle, label: "Error" };
+    return { variant: "error" as const, icon: AlertCircle, label: t("toast.error") };
   }
-  return { variant: "info" as const, icon: Info, label: "Info" };
+  return { variant: "info" as const, icon: Info, label: t("toast.info") };
 }
 
 export function ToastProvider({ children }: { children: React.ReactNode }) {
+  const { t } = useTranslation();
+  const tr = useCallback((key: string) => t(key as never) as string, [t]);
   const [toasts, setToasts] = useState<Toast[]>([]);
 
   const remove = useCallback((id: string) => {
@@ -61,21 +64,21 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
       {children}
 
       <div className="fixed right-4 top-4 z-[9999] w-full max-w-sm space-y-3">
-        {toasts.map((t) => (
-          <ToastCard key={t.id} variant={meta(t.kind).variant}>
+        {toasts.map((toastItem) => (
+          <ToastCard key={toastItem.id} variant={meta(toastItem.kind, tr).variant}>
             <div className="flex items-start gap-3">
               <div className="mt-0.5 rounded-2xl border border-current/10 bg-current/8 p-2">
-                {React.createElement(meta(t.kind).icon, { className: "size-4" })}
+                {React.createElement(meta(toastItem.kind, tr).icon, { className: "size-4" })}
               </div>
 
               <div className="min-w-0 flex-1">
                 <div className="flex items-center gap-2">
-                  {t.title ? <div className="text-sm font-semibold">{t.title}</div> : null}
+                  {toastItem.title ? <div className="text-sm font-semibold">{toastItem.title}</div> : null}
                   <div className="text-[0.65rem] font-semibold uppercase tracking-[0.16em] opacity-70">
-                    {meta(t.kind).label}
+                    {meta(toastItem.kind, tr).label}
                   </div>
                 </div>
-                <div className="mt-1 text-sm leading-relaxed opacity-90">{t.message}</div>
+                <div className="mt-1 text-sm leading-relaxed opacity-90">{toastItem.message}</div>
               </div>
 
               <button
@@ -83,8 +86,8 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
                 className={cn(
                   "rounded-full p-1 text-current/60 transition-colors hover:bg-current/10 hover:text-current",
                 )}
-                onClick={() => remove(t.id)}
-                aria-label="Fechar"
+                onClick={() => remove(toastItem.id)}
+                aria-label={t("toast.close")}
               >
                 <X className="size-4" />
               </button>

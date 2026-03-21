@@ -33,6 +33,16 @@ export class UpdateSettingsDto {
   logLevel?: 'error' | 'warn' | 'info' | 'debug';
 
   @ApiProperty({
+    description: 'Idioma padrão da aplicação',
+    enum: ['pt-BR', 'en-US'],
+    required: false,
+    example: 'pt-BR',
+  })
+  @IsEnum(['pt-BR', 'en-US'])
+  @IsOptional()
+  defaultLocale?: 'pt-BR' | 'en-US';
+
+  @ApiProperty({
     description: 'Senha do admin (mínimo 8 caracteres)',
     required: false,
     example: 'MinhaSenha123!',

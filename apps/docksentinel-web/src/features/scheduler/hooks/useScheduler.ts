@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useTranslation } from "react-i18next";
 
 import { usePageVisibility } from "../../../hooks/usePageVisibility";
 import { useConfirm } from "../../../shared/components/ui/ConfirmProvider";
@@ -28,6 +29,7 @@ function getErrorMessage(error: unknown) {
 }
 
 export function useScheduler() {
+  const { t } = useTranslation();
   const qc = useQueryClient();
   const toast = useToast();
   const confirm = useConfirm();
@@ -98,7 +100,7 @@ export function useScheduler() {
 
   const guidedBuild = useMemo(() => {
     if (!guidedSchedule) {
-      return { cron: "", errors: ["Selecione uma recorrência guiada antes de salvar."] };
+      return { cron: "", errors: [t("scheduler.errors.pickGuidedSchedule")] };
     }
 
     return guidedScheduleToCron(guidedSchedule);
@@ -110,7 +112,7 @@ export function useScheduler() {
     if (scheduleMode === "guided") {
       if (!guidedSchedule) {
         return {
-          summary: "Selecione uma recorrência para gerar o cron",
+          summary: t("scheduler.cron.guidedSummaryFallback"),
           isCustom: false,
           isValid: false,
         };
@@ -155,18 +157,18 @@ export function useScheduler() {
 
     if (scheduleMode === "guided") {
       if (!guidedSchedule) {
-        toast.error("Escolha uma recorrência guiada antes de salvar.", "Scheduler");
+        toast.error(t("scheduler.errors.pickGuidedSchedule"), "Scheduler");
         return;
       }
 
       if (guidedBuild.errors.length > 0) {
-        toast.error(guidedBuild.errors[0] ?? "Agendamento inválido.", "Scheduler");
+        toast.error(guidedBuild.errors[0] ?? t("scheduler.errors.invalidSchedule"), "Scheduler");
         return;
       }
     }
 
     if (!hasFiveCronFields(effectiveCron)) {
-      toast.error("Cron inválido: precisa ter 5 campos.", "Scheduler");
+      toast.error(t("scheduler.errors.invalidCron"), "Scheduler");
       return;
     }
 
@@ -180,10 +182,10 @@ export function useScheduler() {
         scanLabelKey,
         updateLabelKey,
       });
-      toast.success("Config salva.", "Scheduler");
+      toast.success(t("scheduler.success.saved"), "Scheduler");
       await qc.invalidateQueries({ queryKey: ["updates", "scheduler", "bundle"] });
     } catch (error: unknown) {
-      toast.error(getErrorMessage(error) || "Erro ao salvar.", "Scheduler");
+      toast.error(getErrorMessage(error) || t("scheduler.errors.saveError"), "Scheduler");
     } finally {
       setSaving(false);
     }
@@ -191,23 +193,23 @@ export function useScheduler() {
 
   async function handleScanAndEnqueue() {
     const ok = await confirm.confirm({
-      title: "Executar scan agora?",
-      description: "Vai escanear containers e enfileirar jobs.",
-      confirmText: "Executar",
-      cancelText: "Cancelar",
+      title: t("scheduler.executeScanTitle"),
+      description: t("scheduler.executeScanDescription"),
+      confirmText: t("common.actions.execute"),
+      cancelText: t("common.actions.cancel"),
     });
     if (!ok) return;
 
     setScanning(true);
     try {
       await scanAndEnqueue();
-      toast.success("Scan disparado.", "Updates");
+      toast.success(t("scheduler.success.scanTriggered"), "Updates");
       await Promise.all([
         qc.invalidateQueries({ queryKey: ["updates", "scheduler", "bundle"] }),
         qc.invalidateQueries({ queryKey: ["updates", "jobs"] }),
       ]);
     } catch (error: unknown) {
-      toast.error(getErrorMessage(error) || "Falha ao executar scan.", "Updates");
+      toast.error(getErrorMessage(error) || t("scheduler.errors.scanError"), "Updates");
     } finally {
       setScanning(false);
     }

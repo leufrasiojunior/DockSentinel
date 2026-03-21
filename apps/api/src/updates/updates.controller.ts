@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Param, Post, Put, Query } from '@nestjs/common';
+import { BadRequestException, Body, Controller, Get, Param, Post, Put, Query } from '@nestjs/common';
 import {
   ApiAcceptedResponse,
   ApiBadRequestResponse,
@@ -40,6 +40,7 @@ import {
 } from './dto/scan-and-enqueue.dto';
 import { SchedulerConfigResponseDto } from './dto/scheduler-status.dto';
 import { OkResponseDto } from '../common/dto/ok-response.dto';
+import { t } from '../i18n/translate';
 
 @ApiTags('Updates')
 @ApiExtraModels(ScanResultOkDto, ScanResultErrorDto)
@@ -198,8 +199,9 @@ export class UpdatesController {
       body.mode !== 'scan_only' &&
       body.mode !== 'scan_and_update'
     ) {
-      // use BadRequestException se quiser status 400 bonitinho
-      throw new Error(`Invalid mode: ${String(body.mode)}`);
+      throw new BadRequestException(
+        t('updates.invalidMode', { value: String(body.mode) }),
+      );
     }
 
     // ✅ 3) override manual (útil pra Postman)

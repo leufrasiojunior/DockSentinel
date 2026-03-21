@@ -3,6 +3,7 @@ import { PrismaService } from 'src/prisma/prisma.service';
 import type { Prisma } from '@prisma/client';
 import type { ContainerUpdateResult } from '../docker/docker-update.service';
 import { JobsQuery } from './dto/updates.dto';
+import { t } from '../i18n/translate';
 
 type EnqueueInput = {
   container: string;
@@ -36,7 +37,7 @@ export class UpdatesRepository {
 
   async getJobOrThrow(id: string) {
     const job = await this.prisma.client.updateJob.findUnique({ where: { id } })
-    if (!job) throw new NotFoundException(`Job not found: ${id}`)
+    if (!job) throw new NotFoundException(t('updates.jobNotFound', { id }))
     return job
   }
 

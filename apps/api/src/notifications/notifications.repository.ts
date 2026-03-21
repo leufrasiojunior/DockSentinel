@@ -1,5 +1,6 @@
 import { Injectable, NotFoundException } from "@nestjs/common"
 import { PrismaService } from "../prisma/prisma.service"
+import { t } from "../i18n/translate"
 
 @Injectable()
 export class NotificationsRepository {
@@ -68,7 +69,7 @@ export class NotificationsRepository {
       where: { id },
       select: { id: true, readAt: true },
     })
-    if (!existing) throw new NotFoundException(`Notification not found: ${id}`)
+    if (!existing) throw new NotFoundException(t("notifications.notFound", { id }))
     if (existing.readAt) return { ok: true as const }
 
     await this.prisma.client.notificationEvent.update({

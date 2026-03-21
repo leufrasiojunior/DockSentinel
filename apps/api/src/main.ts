@@ -8,6 +8,8 @@ import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 import { execFileSync } from 'node:child_process';
 import { mkdirSync } from 'node:fs';
 import { join, resolve } from 'node:path';
+import { SettingsService } from './settings/settings.service';
+import { resolveLocaleFromAcceptLanguage, runWithLocale } from './i18n/locale';
 
 function ensureMigrations(config: ConfigService<Env>, logger: Logger) {
   const auto = config.get('AUTO_MIGRATE', { infer: true });
@@ -79,7 +81,7 @@ async function bootstrap() {
     },
     credentials: true,
     methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
-    allowedHeaders: ['Content-Type', 'Authorization'],
+    allowedHeaders: ['Content-Type', 'Authorization', 'Accept-Language'],
   });
 
 
@@ -91,6 +93,21 @@ async function bootstrap() {
    * Doc oficial Nest Cookies: :contentReference[oaicite:7]{index=7}
    */
   app.use(cookieParser(secret));
+  const settings = app.get(SettingsService);
+
+  app.use((req, _res, next) => {
+    void settings
+      .getDefaultLocale()
+      .then((defaultLocale) => {
+        const locale = resolveLocaleFromAcceptLanguage(
+          req.headers["accept-language"],
+          defaultLocale,
+        );
+
+        runWithLocale(locale, () => next());
+      })
+      .catch(next);
+  });
 
   /**
    * Níveis de log do Nest:

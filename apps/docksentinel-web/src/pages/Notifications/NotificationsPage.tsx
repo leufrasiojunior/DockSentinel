@@ -1,4 +1,5 @@
 import { BellRing, Eye, Inbox, RefreshCcw, SendHorizontal } from "lucide-react";
+import { useTranslation } from "react-i18next";
 
 import { PageHeader } from "../../components/product/page-header";
 import { SectionCard } from "../../components/product/section-card";
@@ -9,6 +10,7 @@ import { NotificationTable } from "../../features/notifications/components/Notif
 import { useNotifications } from "../../features/notifications/hooks/useNotifications";
 
 export function NotificationsPage() {
+  const { t } = useTranslation();
   const {
     items,
     unreadCount,
@@ -25,33 +27,35 @@ export function NotificationsPage() {
   return (
     <div className="space-y-6">
       <PageHeader
-        eyebrow="Events"
-        title="Notification Center"
-        description="Histórico in-app em ordem cronológica decrescente, com leitura individual ou em lote."
+        eyebrow={t("notifications.eyebrow")}
+        title={t("notifications.title")}
+        description={t("notifications.description")}
         meta={
           <>
-            <Badge variant="outline">{visible ? "Auto-refresh ON" : "Auto-refresh OFF"}</Badge>
-            <Badge variant="outline">{unreadCount} não lidas</Badge>
+            <Badge variant="outline">
+              {visible ? t("common.states.autoRefreshOn") : t("common.states.autoRefreshOff")}
+            </Badge>
+            <Badge variant="outline">{t("notifications.unreadCount", { count: unreadCount })}</Badge>
           </>
         }
         actions={
           <Button type="button" onClick={() => refetch()} disabled={isFetching} variant="outline">
             <RefreshCcw className="size-4" />
-            Recarregar
+            {t("common.actions.reload")}
           </Button>
         }
       />
 
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-        <StatCard label="Total" value={items.length} helper="Eventos recebidos do backend." icon={Inbox} />
-        <StatCard label="Unread" value={unreadCount} helper="Aguardando leitura." icon={BellRing} tone="info" />
-        <StatCard label="Read" value={items.length - unreadCount} helper="Já consolidadas na UI." icon={Eye} tone="success" />
-        <StatCard label="Flow" value={visible ? "Live" : "Paused"} helper="Polling depende da visibilidade da aba." icon={SendHorizontal} tone="default" />
+        <StatCard label={t("common.labels.total")} value={items.length} helper={t("notifications.stats.totalHelper")} icon={Inbox} />
+        <StatCard label={t("notifications.stats.unreadLabel")} value={unreadCount} helper={t("notifications.stats.unreadHelper")} icon={BellRing} tone="info" />
+        <StatCard label={t("notifications.stats.readLabel")} value={items.length - unreadCount} helper={t("notifications.stats.readHelper")} icon={Eye} tone="success" />
+        <StatCard label={t("common.labels.flow")} value={visible ? t("notifications.flowLive") : t("notifications.flowPaused")} helper={t("notifications.stats.flowHelper")} icon={SendHorizontal} tone="default" />
       </div>
 
       <SectionCard
-        title={`Lista (${items.length})`}
-        description={`Últimas notificações registradas pelo backend • não lidas: ${unreadCount}`}
+        title={t("notifications.sectionTitle", { count: items.length })}
+        description={t("notifications.sectionDescription", { count: unreadCount })}
         actions={
           <Button
             type="button"
@@ -60,7 +64,7 @@ export function NotificationsPage() {
             onClick={() => markAllRead()}
             disabled={markAllReadPending || unreadCount === 0}
           >
-            Marcar todas como lidas
+            {t("common.actions.markAllAsRead")}
           </Button>
         }
       >

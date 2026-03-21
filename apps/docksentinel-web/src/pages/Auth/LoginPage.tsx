@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { useLocation, useNavigate } from "react-router-dom";
+import { useTranslation } from "react-i18next";
 
 import { getAuthStatus, login } from "../../features/auth/api/auth";
 import { Button } from "../../components/ui/button";
@@ -21,6 +22,7 @@ function errorMessage(error: unknown, fallback: string) {
 }
 
 export function LoginPage() {
+  const { t } = useTranslation();
   const nav = useNavigate();
   const location = useLocation();
   const toast = useToast();
@@ -44,11 +46,11 @@ export function LoginPage() {
       await login(body);
     },
     onSuccess: () => {
-      toast.success("Login OK.", "Auth");
+      toast.success(t("login.success"), "Auth");
       nav(from, { replace: true });
     },
     onError: (error: unknown) => {
-      toast.error(errorMessage(error, "Falha no login"), "Auth");
+      toast.error(errorMessage(error, t("login.error")), "Auth");
     },
   });
 
@@ -60,48 +62,49 @@ export function LoginPage() {
             <img src={logo} alt="DockSentinel" className="h-full w-full object-contain" />
           </div>
           <div>
-            <div className="text-2xl font-semibold tracking-tight text-foreground">DockSentinel</div>
-            <div className="mt-1 text-sm text-muted-foreground">Entrar no painel</div>
+            <div className="text-2xl font-semibold tracking-tight text-foreground">{t("login.appName")}</div>
+            <div className="mt-1 text-sm text-muted-foreground">{t("login.enterPanel")}</div>
           </div>
         </div>
 
         <Card className="overflow-hidden">
           <CardHeader className="border-b border-border/60">
-            <CardTitle>Login</CardTitle>
+            <CardTitle>{t("login.title")}</CardTitle>
             <CardDescription>
-              {statusQuery.isLoading ? "Carregando modo de autenticação..." : hints}
+              {statusQuery.isLoading ? t("login.loadingAuthMode") : hints}
             </CardDescription>
           </CardHeader>
 
           <CardContent className="space-y-5">
             {statusQuery.isError ? (
               <Card className="border-destructive/20 bg-destructive/10 p-4 text-sm text-destructive">
-                Falha ao carregar <span className="font-mono">/auth/status</span>:{" "}
-                {errorMessage(statusQuery.error, "erro")}
+                {t("login.loadStatusError", {
+                  message: errorMessage(statusQuery.error, t("common.states.unknown")),
+                })}
               </Card>
             ) : null}
 
             <div className="space-y-4">
               {needsPassword(authMode) ? (
                 <div className="space-y-2">
-                  <div className="text-sm font-medium text-foreground">Senha</div>
+                  <div className="text-sm font-medium text-foreground">{t("login.password")}</div>
                   <Input
                     type="password"
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
-                    placeholder="Sua senha"
+                    placeholder={t("login.passwordPlaceholder")}
                   />
                 </div>
               ) : null}
 
               {needsTotp(authMode) ? (
                 <div className="space-y-2">
-                  <div className="text-sm font-medium text-foreground">TOTP</div>
+                  <div className="text-sm font-medium text-foreground">{t("login.totp")}</div>
                   <Input
                     className="font-mono"
                     value={totp}
                     onChange={(e) => setTotp(e.target.value)}
-                    placeholder="123456"
+                    placeholder={t("login.totpPlaceholder")}
                     maxLength={6}
                   />
                 </div>
@@ -115,11 +118,11 @@ export function LoginPage() {
               disabled={loginMutation.isPending || statusQuery.isLoading}
               className="w-full"
             >
-              Entrar
+              {t("login.submit")}
             </Button>
 
             {loginMutation.isPending ? (
-              <div className="text-sm text-muted-foreground">Entrando...</div>
+              <div className="text-sm text-muted-foreground">{t("login.submitting")}</div>
             ) : null}
           </CardContent>
         </Card>

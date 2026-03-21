@@ -1,6 +1,7 @@
 import { useMemo, useState } from "react";
 import { NavLink, Outlet, useLocation, useNavigate } from "react-router-dom";
 import { useQueryClient } from "@tanstack/react-query";
+import { useTranslation } from "react-i18next";
 import {
   Bell,
   ChevronLeft,
@@ -28,6 +29,7 @@ import {
 import { NotificationsBridge } from "./NotificationsBridge";
 import { ThemeToggle } from "../shared/components/ui/ThemeToggle";
 import { cn } from "../shared/lib/utils/cn";
+import { LanguageSelector } from "../shared/components/ui/LanguageSelector";
 
 import logo from "../assets/logo2.png";
 
@@ -42,36 +44,28 @@ interface SidebarLinkProps {
 const navItems = [
   {
     to: "/dashboard",
-    label: "Dashboard",
+    labelKey: "navigation.dashboard",
     icon: LayoutDashboard,
   },
   {
     to: "/jobs",
-    label: "Jobs",
+    labelKey: "navigation.jobs",
     icon: TerminalSquare,
-    description: "Fila, histórico e execução do updater.",
-    badge: "Queue",
   },
   {
     to: "/scheduler",
-    label: "Scheduler",
+    labelKey: "navigation.scheduler",
     icon: Clock3,
-    description: "Agendamento, cron e runtime do scan.",
-    badge: "Automation",
   },
   {
     to: "/notifications",
-    label: "Notifications",
+    labelKey: "navigation.notifications",
     icon: Bell,
-    description: "Fluxo in-app e histórico operacional.",
-    badge: "Events",
   },
   {
     to: "/settings",
-    label: "Settings",
+    labelKey: "navigation.settings",
     icon: Settings2,
-    description: "Autenticação, SMTP e defaults globais.",
-    badge: "Control",
   },
 ] as const;
 
@@ -115,12 +109,14 @@ function SidebarContent({
   onLogout: () => void;
   onNavigate?: () => void;
 }) {
+  const { t } = useTranslation();
+
   return (
     <>
       <button
         onClick={onToggleCollapse}
         className="absolute -right-3 top-8 z-50 hidden h-7 w-7 items-center justify-center rounded-full border border-sidebar-border bg-sidebar text-sidebar-foreground shadow-md transition-colors hover:bg-sidebar-accent lg:flex"
-        title={isCollapsed ? "Expandir" : "Recolher"}
+        title={isCollapsed ? t("navigation.expand") : t("navigation.collapse")}
         type="button"
       >
         {isCollapsed ? <ChevronRight size={14} /> : <ChevronLeft size={14} />}
@@ -146,7 +142,7 @@ function SidebarContent({
             <SidebarLink
               key={item.to}
               to={item.to}
-              label={item.label}
+              label={t(item.labelKey)}
               icon={item.icon}
               isCollapsed={isCollapsed}
               onNavigate={onNavigate}
@@ -159,7 +155,7 @@ function SidebarContent({
         {!isCollapsed ? (
           <div className="mb-4 border-white/8 p-4 text-sm text-sidebar-foreground/72">
             <p className="mt-2 text-xs leading-relaxed text-sidebar-foreground/55">
-              v2.0 - DockSentinel é um projeto de código aberto. Confira o repositório no{" "}
+              {t("navigation.projectBlurb")}{" "}
               <a
                 href="https://github.com/leufrasiojunior/DockSentinel"
                 target="_blank"
@@ -168,7 +164,6 @@ function SidebarContent({
               >
                 GitHub
               </a>
-
             </p>
           </div>
         ) : null}
@@ -181,10 +176,10 @@ function SidebarContent({
           )}
           onClick={onLogout}
           type="button"
-          title={isCollapsed ? "Sair" : undefined}
+          title={isCollapsed ? t("navigation.logout") : undefined}
         >
           <LogOut className="size-4.5" />
-          {!isCollapsed ? <span>Sair</span> : null}
+          {!isCollapsed ? <span>{t("navigation.logout")}</span> : null}
         </Button>
       </div>
     </>
@@ -192,6 +187,7 @@ function SidebarContent({
 }
 
 export function AppShell() {
+  const { t } = useTranslation();
   const navigate = useNavigate();
   const location = useLocation();
   const qc = useQueryClient();
@@ -235,9 +231,9 @@ export function AppShell() {
           <header className="sticky top-0 z-10 border-b border-border/60 bg-background/80 backdrop-blur-xl">
             <div className="mx-auto flex w-full max-w-[1600px] items-center gap-4 px-4 py-4 sm:px-6 lg:px-8">
               <div className="lg:hidden">
-                <Sheet open={mobileOpen} onOpenChange={setMobileOpen}>
+                  <Sheet open={mobileOpen} onOpenChange={setMobileOpen}>
                   <SheetTrigger asChild>
-                    <Button variant="outline" size="icon-sm" aria-label="Abrir navegação">
+                    <Button variant="outline" size="icon-sm" aria-label={t("navigation.openNavigation")}>
                       <Menu className="size-4" />
                     </Button>
                   </SheetTrigger>
@@ -245,7 +241,7 @@ export function AppShell() {
                     <SheetHeader className="border-b border-sidebar-border/80 pb-5">
                       <SheetTitle className="text-sidebar-foreground">DockSentinel</SheetTitle>
                       <SheetDescription className="text-sidebar-foreground/65">
-                        Navegação principal do painel operacional.
+                        {t("navigation.primaryNavigation")}
                       </SheetDescription>
                     </SheetHeader>
                     <div className="flex h-full flex-col">
@@ -263,15 +259,18 @@ export function AppShell() {
               <div className="min-w-0 flex-1">
                 <div className="flex flex-wrap items-center gap-2">
                   <span className="text-[0.7rem] font-semibold uppercase tracking-[0.18em] text-muted-foreground">
-                    {currentNav.label}
+                    {t(currentNav.labelKey)}
                   </span>
                 </div>
                 <div className="mt-2 flex flex-col gap-1 lg:flex-row lg:items-baseline lg:gap-4">
-                  <div className="text-lg font-semibold tracking-tight text-foreground">{currentNav.label}</div>
+                  <div className="text-lg font-semibold tracking-tight text-foreground">
+                    {t(currentNav.labelKey)}
+                  </div>
                 </div>
               </div>
 
               <div className="flex items-center gap-2">
+                <LanguageSelector />
                 <ThemeToggle />
                 <NotificationCenter />
               </div>

@@ -1,4 +1,5 @@
 import { Boxes, CircleCheckBig, RefreshCcw, ShieldAlert, Sparkles } from "lucide-react";
+import { useTranslation } from "react-i18next";
 
 import { ActionBar } from "../../components/product/action-bar";
 import { EmptyState } from "../../components/product/empty-state";
@@ -22,6 +23,7 @@ function errorMessage(error: unknown, fallback: string) {
 }
 
 export function DashboardPage() {
+  const { t } = useTranslation();
   const {
     containers,
     loading,
@@ -57,19 +59,19 @@ export function DashboardPage() {
   return (
     <div className="space-y-6">
       <PageHeader
-        title="Dashboard"
+        title={t("dashboard.title")}
         meta={
           <>
-            <Badge variant="outline">{containers.length} containers</Badge>
-            <Badge variant="outline">{runningCount} running</Badge>
-            <Badge variant="outline">{updateAvailable} updates detectados</Badge>
+            <Badge variant="outline">{t("dashboard.containersMeta", { count: containers.length })}</Badge>
+            <Badge variant="outline">{t("dashboard.runningMeta", { count: runningCount })}</Badge>
+            <Badge variant="outline">{t("dashboard.updatesDetectedMeta", { count: updateAvailable })}</Badge>
           </>
         }
         actions={
           <ActionBar className="justify-end">
             <Button onClick={() => refetch()} disabled={loading || !!busy} type="button" variant="outline">
               <RefreshCcw className="size-4" />
-              Recarregar
+              {t("common.actions.reload")}
             </Button>
 
             <Button
@@ -77,9 +79,9 @@ export function DashboardPage() {
               disabled={loading || !!busy}
               type="button"
               variant="secondary"
-              title="Roda scan manual (não enfileira jobs)"
+              title={t("dashboard.manualScanTitle")}
             >
-              Scan
+              {t("dashboard.scan")}
             </Button>
 
             <Button
@@ -87,9 +89,9 @@ export function DashboardPage() {
               onClick={handleScanAndUpdate}
               disabled={loading || !!busy}
               type="button"
-              title="Roda scan e enfileira jobs para atualizar"
+              title={t("dashboard.scanAndEnqueueTitle")}
             >
-              Scan + enqueue
+              {t("dashboard.scanAndEnqueue")}
             </Button>
 
             <Button
@@ -98,7 +100,7 @@ export function DashboardPage() {
               type="button"
               variant="secondary"
             >
-              Checar todos
+              {t("dashboard.checkAll")}
             </Button>
 
             <Button
@@ -108,11 +110,11 @@ export function DashboardPage() {
               type="button"
               title={
                 selectedBlocked.length > 0
-                  ? "Alguns selecionados estão bloqueados por label"
+                  ? t("dashboard.selectedBlockedTitle")
                   : undefined
               }
             >
-              Atualizar selecionados
+              {t("dashboard.updateSelected")}
             </Button>
           </ActionBar>
         }
@@ -120,29 +122,29 @@ export function DashboardPage() {
 
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
         <StatCard
-          label="Containers"
+          label={t("dashboard.statContainersLabel")}
           value={containers.length}
-          helper="Inventário atual do host monitorado."
+          helper={t("dashboard.statContainersHelper")}
           icon={Boxes}
         />
         <StatCard
-          label="Running"
+          label={t("dashboard.statRunningLabel")}
           value={runningCount}
-          helper="Containers com estado ativo no momento."
+          helper={t("dashboard.statRunningHelper")}
           icon={CircleCheckBig}
           tone="success"
         />
         <StatCard
-          label="Checks concluídos"
+          label={t("dashboard.statChecksLabel")}
           value={checkedCount}
-          helper="Quantidade de verificações manuais já consolidadas."
+          helper={t("dashboard.statChecksHelper")}
           icon={Sparkles}
           tone="info"
         />
         <StatCard
-          label="Bloqueados"
+          label={t("dashboard.statBlockedLabel")}
           value={selectedBlocked.length}
-          helper="Selecionados que não podem ser atualizados automaticamente."
+          helper={t("dashboard.statBlockedHelper")}
           icon={ShieldAlert}
           tone={selectedBlocked.length > 0 ? "warning" : "default"}
         />
@@ -156,12 +158,12 @@ export function DashboardPage() {
 
       {error ? (
         <EmptyState
-          title="Falha ao carregar containers"
-          description={errorMessage(error, "Erro desconhecido ao consultar o Docker host.")}
+          title={t("dashboard.loadErrorTitle")}
+          description={errorMessage(error, t("dashboard.loadErrorDescription"))}
           icon={ShieldAlert}
           actions={
             <Button onClick={() => refetch()} variant="primary">
-              Tentar novamente
+              {t("common.actions.retry")}
             </Button>
           }
         />
@@ -184,7 +186,7 @@ export function DashboardPage() {
       {anySelected ? (
         <Card className="px-5 py-4">
           <div className="text-xs font-semibold uppercase tracking-[0.16em] text-muted-foreground">
-            Selecionados
+            {t("dashboard.selectedTitle")}
           </div>
           <div className="mt-2 text-sm text-foreground">{selectedNames.join(", ")}</div>
         </Card>

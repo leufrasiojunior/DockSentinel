@@ -1,4 +1,5 @@
 import { http } from "../../../shared/api/http";
+import type { Locale } from "../../../i18n/locale";
 import type { AuthMode } from "../../auth/api/auth";
 
 export type LogLevel = "error" | "warn" | "info" | "debug";
@@ -10,6 +11,7 @@ export type SafeSettings = {
   logLevel: LogLevel;
   hasPassword: boolean;
   hasTotp: boolean;
+  defaultLocale: Locale;
   notificationsInAppEnabled: boolean;
   notificationsEmailEnabled: boolean;
   notificationLevel: NotificationLevel;
@@ -28,7 +30,7 @@ export type SafeSettings = {
   [key: string]: unknown;
 };
 
-export type UpdateSettingsBody = Partial<Pick<SafeSettings, "authMode" | "logLevel">> & {
+export type UpdateSettingsBody = Partial<Pick<SafeSettings, "authMode" | "logLevel" | "defaultLocale">> & {
   adminPassword?: string;
   notificationsInAppEnabled?: boolean;
   notificationsEmailEnabled?: boolean;

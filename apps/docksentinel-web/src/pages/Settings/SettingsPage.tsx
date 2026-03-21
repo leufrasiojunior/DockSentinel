@@ -1,4 +1,5 @@
 import { LockKeyhole, Mail, ShieldAlert } from "lucide-react";
+import { useTranslation } from "react-i18next";
 
 import { EmptyState } from "../../components/product/empty-state";
 import { PageHeader } from "../../components/product/page-header";
@@ -7,9 +8,11 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "../../components/ui/ta
 import { AuthSettings } from "../../features/settings/components/AuthSettings";
 import { NotificationSettings } from "../../features/settings/components/NotificationSettings";
 import { useSettings } from "../../features/settings/hooks/useSettings";
+import { getAuthModeLabel } from "../../i18n/helpers";
 import { useConfirm } from "../../shared/components/ui/ConfirmProvider";
 
 export function SettingsPage() {
+  const { t } = useTranslation();
   const confirm = useConfirm();
   const {
     activeTab,
@@ -26,6 +29,8 @@ export function SettingsPage() {
     setNewPassword,
     newPassword2,
     setNewPassword2,
+    defaultLocale,
+    setDefaultLocale,
     notificationsInAppEnabled,
     setNotificationsInAppEnabled,
     notificationsEmailEnabled,
@@ -56,27 +61,27 @@ export function SettingsPage() {
 
   function buildChangeConfirmText() {
     if (currentMode === "none") {
-      return "Você está sem login ativo. Essa alteração pode exigir login novamente.";
+      return t("settings.authChangeText.none");
     }
     if (currentMode === "password") {
-      return "Seu login atual é por senha. Ao salvar, você pode ser deslogado e precisará entrar novamente.";
+      return t("settings.authChangeText.password");
     }
     if (currentMode === "totp") {
-      return "Seu login atual é por TOTP. Ao salvar, você pode ser deslogado e precisará entrar novamente com TOTP.";
+      return t("settings.authChangeText.totp");
     }
-    return "Seu login atual é senha + TOTP. Ao salvar, você pode ser deslogado e precisará entrar novamente.";
+    return t("settings.authChangeText.both");
   }
 
   async function handleSaveAuth(options?: { totpConfirmedOverride?: boolean }) {
     const isModeChange = desiredMode !== currentMode;
     if (isModeChange) {
       const ok = await confirm.confirm({
-        title: "Confirmar alteração do modo de login?",
+        title: t("settings.confirmAuthChangeTitle"),
         description:
           buildChangeConfirmText() +
-          "\n\nDica: se você perdeu o TOTP ou quer trocar a senha, pode manter o mesmo modo e apenas reconfigurar.",
-        confirmText: "Continuar",
-        cancelText: "Cancelar",
+          `\n\n${t("settings.confirmAuthChangeHint")}`,
+        confirmText: t("common.actions.continue"),
+        cancelText: t("common.actions.cancel"),
       });
       if (!ok) return;
     }
@@ -90,29 +95,34 @@ export function SettingsPage() {
   return (
     <div className="space-y-6">
       <PageHeader
-        eyebrow="Control"
-        title="Workspace Settings"
-        description="Autenticação, SMTP e retenção de notificações, organizados em uma linguagem única de configuração."
+        eyebrow={t("settings.eyebrow")}
+        title={t("settings.title")}
+        description={t("settings.description")}
         meta={
           <>
-            <Badge variant="outline">modo atual: {currentMode}</Badge>
-            <Badge variant="outline">auth + notifications</Badge>
+            <Badge variant="outline">
+              {t("common.labels.currentMode")}: {getAuthModeLabel(t, currentMode)}
+            </Badge>
+            <Badge variant="outline">
+              {t("common.labels.defaultLocale")}: {defaultLocale}
+            </Badge>
+            <Badge variant="outline">{t("settings.authAndNotificationsMeta")}</Badge>
           </>
         }
       />
 
       {loading ? (
         <EmptyState
-          title="Carregando configurações"
-          description="Buscando status de autenticação e parâmetros seguros do backend."
+          title={t("settings.loadingTitle")}
+          description={t("settings.loadingDescription")}
           icon={ShieldAlert}
         />
       ) : null}
 
       {hasError ? (
         <EmptyState
-          title="Erro ao carregar configurações"
-          description="Não foi possível sincronizar as preferências do ambiente."
+          title={t("settings.errorTitle")}
+          description={t("settings.errorDescription")}
           icon={ShieldAlert}
         />
       ) : null}
@@ -122,11 +132,11 @@ export function SettingsPage() {
           <TabsList>
             <TabsTrigger value="auth">
               <LockKeyhole className="size-4" />
-              Autenticação
+              {t("settings.tabs.auth")}
             </TabsTrigger>
             <TabsTrigger value="notifications">
               <Mail className="size-4" />
-              Notificações
+              {t("settings.tabs.notifications")}
             </TabsTrigger>
           </TabsList>
 
@@ -174,6 +184,8 @@ export function SettingsPage() {
               setSmtpFromName={setSmtpFromName}
               smtpFromEmail={smtpFromEmail}
               setSmtpFromEmail={setSmtpFromEmail}
+              defaultLocale={defaultLocale}
+              setDefaultLocale={setDefaultLocale}
               onSave={() => saveMutation.mutate(undefined)}
               isSaving={saveMutation.isPending}
               onTestSmtp={() => smtpTestMutation.mutate(undefined)}

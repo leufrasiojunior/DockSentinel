@@ -1,3 +1,6 @@
+import i18n from "../../../i18n";
+import { getCurrentLocale } from "../../../i18n/format";
+
 export type ScheduleEditorMode = "guided" | "advanced";
 export type GuidedScheduleKind = "interval" | "daily" | "weekly" | "monthly";
 export type GuidedIntervalUnit = "minutes" | "hours";
@@ -25,65 +28,16 @@ export type SchedulePreset = {
   schedule: GuidedSchedule;
 };
 
-export const WEEKDAY_OPTIONS = [
-  { value: 0, shortLabel: "Dom", label: "Domingo" },
-  { value: 1, shortLabel: "Seg", label: "Segunda" },
-  { value: 2, shortLabel: "Ter", label: "Terça" },
-  { value: 3, shortLabel: "Qua", label: "Quarta" },
-  { value: 4, shortLabel: "Qui", label: "Quinta" },
-  { value: 5, shortLabel: "Sex", label: "Sexta" },
-  { value: 6, shortLabel: "Sáb", label: "Sábado" },
-] as const;
-
-export const SCHEDULE_PRESETS: SchedulePreset[] = [
-  {
-    id: "every-5m",
-    label: "A cada 5 min",
-    description: "Monitoramento contínuo com alta frequência.",
-    schedule: { kind: "interval", every: 5, unit: "minutes" },
-  },
-  {
-    id: "every-15m",
-    label: "A cada 15 min",
-    description: "Equilíbrio entre agilidade e carga.",
-    schedule: { kind: "interval", every: 15, unit: "minutes" },
-  },
-  {
-    id: "every-30m",
-    label: "A cada 30 min",
-    description: "Boa opção para ambientes mais estáveis.",
-    schedule: { kind: "interval", every: 30, unit: "minutes" },
-  },
-  {
-    id: "every-1h",
-    label: "A cada 1 hora",
-    description: "Rotina leve com checkpoints regulares.",
-    schedule: { kind: "interval", every: 1, unit: "hours" },
-  },
-  {
-    id: "daily-03",
-    label: "Todo dia às 03:00",
-    description: "Janela noturna para execução diária.",
-    schedule: { kind: "daily", time: "03:00" },
-  },
-  {
-    id: "weekdays-09",
-    label: "Dias úteis às 09:00",
-    description: "Rotina comercial em dias úteis.",
-    schedule: { kind: "weekly", time: "09:00", days: [1, 2, 3, 4, 5] },
-  },
-  {
-    id: "weekly",
-    label: "Semanal",
-    description: "Ponto de partida para recorrência semanal.",
-    schedule: { kind: "weekly", time: "09:00", days: [1] },
-  },
-  {
-    id: "monthly",
-    label: "Mensal",
-    description: "Execução mensal com dia configurável.",
-    schedule: { kind: "monthly", time: "09:00", day: 1 },
-  },
+const WEEKDAY_VALUES = [0, 1, 2, 3, 4, 5, 6] as const;
+const PRESET_SCHEDULES: Array<{ id: SchedulePresetId; schedule: GuidedSchedule }> = [
+  { id: "every-5m", schedule: { kind: "interval", every: 5, unit: "minutes" } },
+  { id: "every-15m", schedule: { kind: "interval", every: 15, unit: "minutes" } },
+  { id: "every-30m", schedule: { kind: "interval", every: 30, unit: "minutes" } },
+  { id: "every-1h", schedule: { kind: "interval", every: 1, unit: "hours" } },
+  { id: "daily-03", schedule: { kind: "daily", time: "03:00" } },
+  { id: "weekdays-09", schedule: { kind: "weekly", time: "09:00", days: [1, 2, 3, 4, 5] } },
+  { id: "weekly", schedule: { kind: "weekly", time: "09:00", days: [1] } },
+  { id: "monthly", schedule: { kind: "monthly", time: "09:00", day: 1 } },
 ];
 
 type TimeParts = {
@@ -92,8 +46,28 @@ type TimeParts = {
   valid: boolean;
 };
 
-const WEEKDAY_SET = new Set<number>(WEEKDAY_OPTIONS.map((option) => option.value));
+const WEEKDAY_SET = new Set<number>(WEEKDAY_VALUES);
 const WORKWEEK = [1, 2, 3, 4, 5];
+
+function translate(key: string, options?: Record<string, unknown>) {
+  return i18n.t(key as never, options as never) as unknown as string;
+}
+
+export function getWeekdayOptions() {
+  return WEEKDAY_VALUES.map((value) => ({
+    value,
+    shortLabel: translate(`scheduler.cron.weekdays.${value}.short`),
+    label: translate(`scheduler.cron.weekdays.${value}.long`),
+  }));
+}
+
+export function getSchedulePresets(): SchedulePreset[] {
+  return PRESET_SCHEDULES.map((preset) => ({
+    ...preset,
+    label: translate(`scheduler.cron.presets.${preset.id}.label`),
+    description: translate(`scheduler.cron.presets.${preset.id}.description`),
+  }));
+}
 
 export function clampInt(value: number, min: number, max: number) {
   if (!Number.isFinite(value)) return min;
@@ -126,7 +100,7 @@ export function defaultGuidedSchedule(kind: GuidedScheduleKind = "interval"): Gu
 }
 
 export function buildPresetSchedule(id: SchedulePresetId): GuidedSchedule {
-  const preset = SCHEDULE_PRESETS.find((item) => item.id === id);
+  const preset = PRESET_SCHEDULES.find((item) => item.id === id);
   return normalizeGuidedSchedule(preset?.schedule ?? defaultGuidedSchedule());
 }
 
@@ -176,7 +150,7 @@ export function guidedScheduleToCron(schedule: GuidedSchedule) {
   if (normalized.kind === "daily") {
     const time = parseTimeValue(normalized.time);
     if (!time.valid) {
-      return { cron: "", errors: ["Horário inválido."] };
+      return { cron: "", errors: [translate("scheduler.errors.invalidSchedule")] };
     }
 
     return { cron: `${time.minutes} ${time.hours} * * *`, errors };
@@ -185,10 +159,10 @@ export function guidedScheduleToCron(schedule: GuidedSchedule) {
   if (normalized.kind === "weekly") {
     const time = parseTimeValue(normalized.time);
     if (!time.valid) {
-      errors.push("Horário inválido.");
+      errors.push(translate("scheduler.errors.invalidSchedule"));
     }
     if (normalized.days.length === 0) {
-      errors.push("Selecione ao menos um dia da semana.");
+      errors.push(translate("scheduler.cron.weekdayError"));
     }
 
     if (errors.length > 0) {
@@ -203,7 +177,7 @@ export function guidedScheduleToCron(schedule: GuidedSchedule) {
 
   const time = parseTimeValue(normalized.time);
   if (!time.valid) {
-    return { cron: "", errors: ["Horário inválido."] };
+    return { cron: "", errors: [translate("scheduler.errors.invalidSchedule")] };
   }
 
   return {
@@ -275,35 +249,45 @@ export function formatGuidedSchedule(schedule: GuidedSchedule) {
 
   if (normalized.kind === "interval") {
     if (normalized.unit === "minutes") {
-      return normalized.every === 1 ? "A cada minuto" : `A cada ${normalized.every} minutos`;
+      return normalized.every === 1
+        ? translate("scheduler.cron.summaries.everyMinute")
+        : translate("scheduler.cron.summaries.everyMinutes", { count: normalized.every });
     }
 
-    return normalized.every === 1 ? "A cada hora" : `A cada ${normalized.every} horas`;
+    return normalized.every === 1
+      ? translate("scheduler.cron.summaries.everyHour")
+      : translate("scheduler.cron.summaries.everyHours", { count: normalized.every });
   }
 
   if (normalized.kind === "daily") {
-    return `Todo dia às ${normalized.time}`;
+    return translate("scheduler.cron.summaries.everyDayAt", { time: normalized.time });
   }
 
   if (normalized.kind === "weekly") {
     if (normalized.days.length === 0) {
-      return "Selecione um ou mais dias da semana";
+      return translate("scheduler.cron.summaries.chooseWeekday");
     }
 
     if (isWorkweek(normalized.days)) {
-      return `Dias úteis às ${normalized.time}`;
+      return translate("scheduler.cron.summaries.weekdaysAt", { time: normalized.time });
     }
 
     const labels = normalized.days.reduce<string[]>((acc, day) => {
-      const label = WEEKDAY_OPTIONS.find((option) => option.value === day)?.label;
+      const label = getWeekdayOptions().find((option) => option.value === day)?.label;
       if (label) acc.push(label);
       return acc;
     }, []);
 
-    return `${joinHumanList(labels)} às ${normalized.time}`;
+    return translate("scheduler.cron.summaries.weeklyAt", {
+      days: joinHumanList(labels),
+      time: normalized.time,
+    });
   }
 
-  return `Todo mês no dia ${normalized.day} às ${normalized.time}`;
+  return translate("scheduler.cron.summaries.monthlyAt", {
+    day: normalized.day,
+    time: normalized.time,
+  });
 }
 
 export function describeCronExpression(expr: string) {
@@ -311,7 +295,7 @@ export function describeCronExpression(expr: string) {
   if (!normalized) {
     return {
       guidedSchedule: null,
-      summary: "Use uma expressão cron com 5 campos",
+      summary: translate("scheduler.cron.summaries.useFiveFields"),
       isCustom: true,
       isValid: false,
     };
@@ -329,7 +313,7 @@ export function describeCronExpression(expr: string) {
 
   return {
     guidedSchedule: null,
-    summary: "Agendamento customizado",
+    summary: translate("scheduler.cron.summaries.custom"),
     isCustom: true,
     isValid: true,
   };
@@ -413,7 +397,8 @@ function isWorkweek(days: number[]) {
 
 function joinHumanList(values: string[]) {
   if (values.length === 0) return "";
-  if (values.length === 1) return values[0];
-  if (values.length === 2) return `${values[0]} e ${values[1]}`;
-  return `${values.slice(0, -1).join(", ")} e ${values[values.length - 1]}`;
+  return new Intl.ListFormat(getCurrentLocale(), {
+    style: "long",
+    type: "conjunction",
+  }).format(values);
 }

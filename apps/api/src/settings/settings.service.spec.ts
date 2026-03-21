@@ -37,6 +37,7 @@ describe("SettingsService (unit)", () => {
           id: 1,
           authMode: patch.authMode ?? db.value?.authMode ?? "none",
           logLevel: patch.logLevel ?? db.value?.logLevel ?? "info",
+          defaultLocale: patch.defaultLocale ?? db.value?.defaultLocale ?? "pt-BR",
           adminPasswordHash: patch.adminPasswordHash ?? db.value?.adminPasswordHash ?? null,
           totpSecretEnc: patch.totpSecretEnc ?? db.value?.totpSecretEnc ?? null,
           createdAt: db.value?.createdAt ?? now,
@@ -68,6 +69,7 @@ describe("SettingsService (unit)", () => {
     expect(repo.upsert).toHaveBeenCalled()
     expect(result.authMode).toBe("both")
     expect(result.logLevel).toBe("debug")
+    expect(result.defaultLocale).toBe("pt-BR")
     expect(result.hasPassword).toBe(true)
     expect(result.hasTotp).toBe(true)
     expect(result.notificationsInAppEnabled).toBe(true)

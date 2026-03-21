@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { BellRing, MailCheck, MailOpen } from "lucide-react";
+import { useTranslation } from "react-i18next";
 
 import { FormField } from "../../../components/product/form-field";
 import { SectionCard } from "../../../components/product/section-card";
@@ -17,6 +18,8 @@ import {
 import { Input } from "../../../components/ui/input";
 import { Select } from "../../../components/ui/select";
 import { Switch } from "../../../components/ui/switch";
+import { type Locale, SUPPORTED_LOCALES } from "../../../i18n/locale";
+import { getLocaleLabel, getNotificationLevelLabel } from "../../../i18n/helpers";
 import { type SafeSettings, type NotificationLevel, type SmtpSecureMode } from "../api/settings";
 
 type ProviderPreset = {
@@ -37,6 +40,8 @@ const PROVIDERS: ProviderPreset[] = [
 
 interface NotificationSettingsProps {
   safe: SafeSettings;
+  defaultLocale: Locale;
+  setDefaultLocale: (v: Locale) => void;
   notificationsInAppEnabled: boolean;
   setNotificationsInAppEnabled: (v: boolean) => void;
   notificationsEmailEnabled: boolean;
@@ -69,6 +74,8 @@ interface NotificationSettingsProps {
 
 export function NotificationSettings({
   safe,
+  defaultLocale,
+  setDefaultLocale,
   notificationsInAppEnabled,
   setNotificationsInAppEnabled,
   notificationsEmailEnabled,
@@ -98,6 +105,7 @@ export function NotificationSettings({
   onTestSmtp,
   isTestingSmtp,
 }: NotificationSettingsProps) {
+  const { t } = useTranslation();
   const [presetModalOpen, setPresetModalOpen] = useState(false);
   const [presetSelected, setPresetSelected] = useState<ProviderPreset | null>(null);
   const [presetHost, setPresetHost] = useState("");
@@ -119,18 +127,23 @@ export function NotificationSettings({
     setPresetModalOpen(false);
   }
 
+  function getProviderLabel(preset: ProviderPreset | null) {
+    if (!preset) return "";
+    return preset.id === "custom" ? t("common.states.custom") : preset.label;
+  }
+
   return (
     <>
       <SectionCard
-        title="Notifications delivery"
-        description="Canal visual na aplicação e envio por SMTP com presets rápidos."
+        title={t("settings.notifications.sectionTitle")}
+        description={t("settings.notifications.sectionDescription")}
         actions={
           <div className="flex flex-wrap gap-2">
             <Button type="button" variant="outline" onClick={onTestSmtp} disabled={isTestingSmtp}>
-              {isTestingSmtp ? "Testando..." : "Testar SMTP"}
+              {isTestingSmtp ? t("settings.notifications.testing") : t("common.actions.testSmtp")}
             </Button>
             <Button type="button" variant="primary" onClick={onSave} disabled={isSaving}>
-              {isSaving ? "Salvando..." : "Salvar notificações"}
+              {isSaving ? t("common.actions.saving") : t("settings.notifications.save")}
             </Button>
           </div>
         }
@@ -141,10 +154,10 @@ export function NotificationSettings({
               <div>
                 <div className="flex items-center gap-3">
                   <BellRing className="size-4.5 text-foreground" />
-                  <div className="text-sm font-semibold text-foreground">Notificações na tela</div>
+                  <div className="text-sm font-semibold text-foreground">{t("settings.notifications.inAppTitle")}</div>
                 </div>
                 <div className="mt-2 text-sm text-muted-foreground">
-                  Toasts e centro de notificações dentro do painel.
+                  {t("settings.notifications.inAppDescription")}
                 </div>
               </div>
               <Switch checked={notificationsInAppEnabled} onCheckedChange={setNotificationsInAppEnabled} />
@@ -156,30 +169,43 @@ export function NotificationSettings({
               <div>
                 <div className="flex items-center gap-3">
                   <MailCheck className="size-4.5 text-foreground" />
-                  <div className="text-sm font-semibold text-foreground">Notificações por e-mail</div>
+                  <div className="text-sm font-semibold text-foreground">{t("settings.notifications.emailTitle")}</div>
                 </div>
                 <div className="mt-2 text-sm text-muted-foreground">
-                  Usa a configuração SMTP definida abaixo para alertas automatizados.
+                  {t("settings.notifications.emailDescription")}
                 </div>
               </div>
               <Switch checked={notificationsEmailEnabled} onCheckedChange={setNotificationsEmailEnabled} />
             </div>
           </Card>
 
-          <FormField label="Nível de notificação" description="Escolhe entre fluxo completo ou apenas erros.">
+          <FormField label={t("common.labels.defaultLocale")} description={t("settings.notifications.defaultLocaleDescription")}>
+            <Select
+              value={defaultLocale}
+              onChange={(e: React.ChangeEvent<HTMLSelectElement>) => setDefaultLocale(e.target.value as Locale)}
+            >
+              {SUPPORTED_LOCALES.map((locale) => (
+                <option key={locale} value={locale}>
+                  {getLocaleLabel(t, locale)}
+                </option>
+              ))}
+            </Select>
+          </FormField>
+
+          <FormField label={t("settings.notifications.notificationLevel")} description={t("settings.notifications.notificationLevelDescription")}>
             <Select
               value={notificationLevel}
               onChange={(e: React.ChangeEvent<HTMLSelectElement>) =>
                 setNotificationLevel(e.target.value as NotificationLevel)
               }
             >
-              <option value="all">Todas</option>
-              <option value="errors_only">Somente erros</option>
+              <option value="all">{getNotificationLevelLabel(t, "all")}</option>
+              <option value="errors_only">{getNotificationLevelLabel(t, "errors_only")}</option>
             </Select>
           </FormField>
 
           <div className="grid gap-4 sm:grid-cols-2">
-            <FormField label="Retenção lidas (dias)">
+            <FormField label={t("settings.notifications.readRetention")}>
               <Input
                 type="number"
                 min={1}
@@ -188,7 +214,7 @@ export function NotificationSettings({
                 onChange={(e: React.ChangeEvent<HTMLInputElement>) => setNotificationReadRetentionDays(e.target.value)}
               />
             </FormField>
-            <FormField label="Retenção não lidas (dias)">
+            <FormField label={t("settings.notifications.unreadRetention")}>
               <Input
                 type="number"
                 min={1}
@@ -201,20 +227,20 @@ export function NotificationSettings({
 
           <div className="md:col-span-2">
             <FormField
-              label="Presets SMTP"
-              description="Aplica rapidamente host, porta e segurança do provedor."
+              label={t("settings.notifications.smtpPresets")}
+              description={t("settings.notifications.smtpPresetsDescription")}
             >
               <div className="flex flex-wrap gap-2">
                 {PROVIDERS.map((preset) => (
                   <Button key={preset.id} type="button" size="sm" variant="outline" onClick={() => openProviderModal(preset)}>
-                    {preset.label}
+                    {getProviderLabel(preset)}
                   </Button>
                 ))}
               </div>
             </FormField>
           </div>
 
-          <FormField label="SMTP host" description="Endpoint do provedor de e-mail.">
+          <FormField label={t("settings.notifications.smtpHost")} description={t("settings.notifications.smtpHostDescription")}>
             <Input
               value={smtpHost}
               onChange={(e: React.ChangeEvent<HTMLInputElement>) => setSmtpHost(e.target.value)}
@@ -222,7 +248,7 @@ export function NotificationSettings({
             />
           </FormField>
 
-          <FormField label="SMTP port">
+          <FormField label={t("settings.notifications.smtpPort")}>
             <Input
               type="number"
               min={1}
@@ -232,7 +258,7 @@ export function NotificationSettings({
             />
           </FormField>
 
-          <FormField label="Segurança">
+          <FormField label={t("settings.notifications.security")}>
             <Select
               value={smtpSecureMode}
               onChange={(e: React.ChangeEvent<HTMLSelectElement>) => setSmtpSecureMode(e.target.value as SmtpSecureMode)}
@@ -243,30 +269,42 @@ export function NotificationSettings({
           </FormField>
 
           <FormField
-            label="SMTP usuário"
-            description={safe?.hasSmtpPassword ? "Senha já cadastrada no backend." : "Credencial do provedor SMTP."}
+            label={t("settings.notifications.smtpUsername")}
+            description={
+              safe?.hasSmtpPassword
+                ? t("settings.notifications.smtpUsernameSavedDescription")
+                : t("settings.notifications.smtpUsernameDescription")
+            }
           >
             <Input
               value={smtpUsername}
               onChange={(e: React.ChangeEvent<HTMLInputElement>) => setSmtpUsername(e.target.value)}
-              placeholder="usuario"
+              placeholder={t("settings.notifications.placeholders.username")}
             />
           </FormField>
 
           <FormField
             className="md:col-span-2"
-            label="SMTP senha"
-            description={safe?.hasSmtpPassword ? "Deixe em branco para manter a senha atual." : "Opcional para testes imediatos."}
+            label={t("settings.notifications.smtpPassword")}
+            description={
+              safe?.hasSmtpPassword
+                ? t("settings.notifications.smtpPasswordSavedDescription")
+                : t("settings.notifications.smtpPasswordDescription")
+            }
           >
             <Input
               type="password"
               value={smtpPassword}
               onChange={(e: React.ChangeEvent<HTMLInputElement>) => setSmtpPassword(e.target.value)}
-              placeholder={safe?.hasSmtpPassword ? "Senha atual protegida" : "Senha"}
+              placeholder={
+                safe?.hasSmtpPassword
+                  ? t("settings.notifications.placeholders.currentPasswordProtected")
+                  : t("settings.notifications.placeholders.password")
+              }
             />
           </FormField>
 
-          <FormField label="From name">
+          <FormField label={t("settings.notifications.fromName")}>
             <Input
               value={smtpFromName}
               onChange={(e: React.ChangeEvent<HTMLInputElement>) => setSmtpFromName(e.target.value)}
@@ -275,23 +313,25 @@ export function NotificationSettings({
           </FormField>
 
           <FormField
-            label="From email"
-            description="O destinatário de auto-notificação será este mesmo e-mail."
+            label={t("settings.notifications.fromEmail")}
+            description={t("settings.notifications.fromEmailDescription")}
           >
             <Input
               type="email"
               value={smtpFromEmail}
               onChange={(e: React.ChangeEvent<HTMLInputElement>) => setSmtpFromEmail(e.target.value)}
-              placeholder="seuemail@provedor.com"
+              placeholder={t("settings.notifications.placeholders.fromEmail")}
             />
           </FormField>
         </div>
 
         <div className="flex items-center gap-2 text-xs uppercase tracking-[0.16em] text-muted-foreground">
           <MailOpen className="size-3.5" />
-          <span>SMTP password stored: {safe.hasSmtpPassword ? "yes" : "no"}</span>
+          <span>
+            {t("settings.notifications.passwordStoredLabel")}: {safe.hasSmtpPassword ? t("common.states.yes") : t("common.states.no")}
+          </span>
           <Badge variant={safe.hasSmtpPassword ? "success" : "outline"}>
-            {safe.hasSmtpPassword ? "Ready" : "Pending"}
+            {safe.hasSmtpPassword ? t("settings.notifications.ready") : t("settings.notifications.pending")}
           </Badge>
         </div>
       </SectionCard>
@@ -299,18 +339,20 @@ export function NotificationSettings({
       <Dialog open={presetModalOpen} onOpenChange={setPresetModalOpen}>
         <DialogContent className="max-w-lg">
           <DialogHeader>
-            <DialogTitle>Preset SMTP: {presetSelected?.label ?? ""}</DialogTitle>
+            <DialogTitle>
+              {t("settings.notifications.presetDialogTitle", { name: getProviderLabel(presetSelected) })}
+            </DialogTitle>
             <DialogDescription>
-              Ajuste host, porta e modo de segurança antes de aplicar o preset ao formulário principal.
+              {t("settings.notifications.presetDialogDescription")}
             </DialogDescription>
           </DialogHeader>
 
           <div className="grid gap-4 md:grid-cols-2">
-            <FormField className="md:col-span-2" label="Host">
+            <FormField className="md:col-span-2" label={t("settings.notifications.smtpHost")}>
               <Input value={presetHost} onChange={(e: React.ChangeEvent<HTMLInputElement>) => setPresetHost(e.target.value)} />
             </FormField>
 
-            <FormField label="Porta">
+            <FormField label={t("settings.notifications.smtpPort")}>
               <Input
                 type="number"
                 value={presetPort}
@@ -318,7 +360,7 @@ export function NotificationSettings({
               />
             </FormField>
 
-            <FormField label="Segurança">
+            <FormField label={t("settings.notifications.security")}>
               <Select
                 value={presetMode}
                 onChange={(e: React.ChangeEvent<HTMLSelectElement>) => setPresetMode(e.target.value as SmtpSecureMode)}
@@ -331,10 +373,10 @@ export function NotificationSettings({
 
           <DialogFooter>
             <Button type="button" variant="outline" onClick={() => setPresetModalOpen(false)}>
-              Cancelar
+              {t("common.actions.cancel")}
             </Button>
             <Button type="button" variant="primary" onClick={applyProviderPreset}>
-              Aplicar preset
+              {t("settings.notifications.applyPreset")}
             </Button>
           </DialogFooter>
         </DialogContent>

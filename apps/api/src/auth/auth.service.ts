@@ -4,6 +4,7 @@ import { authenticator } from "@otplib/preset-default"
 import { SettingsRepository } from "../settings/settings.repository"
 import { CryptoService } from "../crypto/crypto.service"
 import { SettingsService } from "../settings/settings.service"
+import { t } from "../i18n/translate"
 
 @Injectable()
 export class AuthService {
@@ -33,16 +34,16 @@ async validateLogin(input: { password?: string; totp?: string }): Promise<void> 
     `[validateLogin] dbRow=${!!row} hasHash=${!!row?.adminPasswordHash} hasTotpEnc=${!!row?.totpSecretEnc}`
   )
 
-  if (!row) throw new UnauthorizedException("Invalid credentials")
+  if (!row) throw new UnauthorizedException(t("auth.invalidCredentials"))
 
   // PASSWORD
   if (mode === "password" || mode === "both") {
-    if (!input.password) throw new UnauthorizedException("Invalid credentials")
-    if (!row.adminPasswordHash) throw new UnauthorizedException("Invalid credentials")
+    if (!input.password) throw new UnauthorizedException(t("auth.invalidCredentials"))
+    if (!row.adminPasswordHash) throw new UnauthorizedException(t("auth.invalidCredentials"))
 
     const ok = await argon2.verify(row.adminPasswordHash, input.password)
     this.logger.debug(`[validateLogin] password_verify=${ok}`)
-    if (!ok) throw new UnauthorizedException("Invalid credentials")
+    if (!ok) throw new UnauthorizedException(t("auth.invalidCredentials"))
   }
 
   // TOTP
@@ -50,8 +51,8 @@ async validateLogin(input: { password?: string; totp?: string }): Promise<void> 
     const token = (input.totp ?? "").trim()
     this.logger.debug(`[validateLogin] tokenFormatOk=${/^\d{6}$/.test(token)}`)
 
-    if (!/^\d{6}$/.test(token)) throw new UnauthorizedException("Invalid credentials")
-    if (!row.totpSecretEnc) throw new UnauthorizedException("Invalid credentials")
+    if (!/^\d{6}$/.test(token)) throw new UnauthorizedException(t("auth.invalidCredentials"))
+    if (!row.totpSecretEnc) throw new UnauthorizedException(t("auth.invalidCredentials"))
 
     let secret: string
     try {
@@ -60,12 +61,12 @@ async validateLogin(input: { password?: string; totp?: string }): Promise<void> 
     } catch (e: unknown) {
       const msg = e instanceof Error ? e.message : String(e)
       this.logger.error(`[validateLogin] decrypt_ok=false err=${msg}`)
-      throw new UnauthorizedException("Invalid credentials")
+      throw new UnauthorizedException(t("auth.invalidCredentials"))
     }
 
     const ok = authenticator.verify({ token, secret })
     this.logger.debug(`[validateLogin] totp_verify=${ok}`)
-    if (!ok) throw new UnauthorizedException("Invalid credentials")
+    if (!ok) throw new UnauthorizedException(t("auth.invalidCredentials"))
   }
 }
 

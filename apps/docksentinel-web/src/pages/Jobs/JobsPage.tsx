@@ -1,4 +1,5 @@
 import { CircleCheckBig, Clock3, ListOrdered, OctagonX, RefreshCcw, Workflow } from "lucide-react";
+import { useTranslation } from "react-i18next";
 
 import { FilterBar } from "../../components/product/filter-bar";
 import { PageHeader } from "../../components/product/page-header";
@@ -8,8 +9,10 @@ import { Badge } from "../../components/ui/badge";
 import { Button } from "../../components/ui/button";
 import { JobTable } from "../../features/jobs/components/JobTable";
 import { useJobs } from "../../features/jobs/hooks/useJobs";
+import { getJobFilterLabel } from "../../i18n/helpers";
 
 export function JobsPage() {
+  const { t } = useTranslation();
   const {
     filtered,
     counters,
@@ -24,43 +27,45 @@ export function JobsPage() {
   return (
     <div className="space-y-6">
       <PageHeader
-        eyebrow="Queue"
-        title="Execution Stream"
-        description="Fila e histórico das ações disparadas pelo updater, com auto-refresh pausando quando a aba fica oculta."
+        eyebrow={t("jobs.eyebrow")}
+        title={t("jobs.title")}
+        description={t("jobs.description")}
         meta={
           <>
-            <Badge variant="outline">{visible ? "Auto-refresh ON" : "Auto-refresh OFF"}</Badge>
-            <Badge variant="outline">{filtered.length} itens filtrados</Badge>
+            <Badge variant="outline">
+              {visible ? t("common.states.autoRefreshOn") : t("common.states.autoRefreshOff")}
+            </Badge>
+            <Badge variant="outline">{t("jobs.filteredItems", { count: filtered.length })}</Badge>
           </>
         }
         actions={
           <Button onClick={() => refetch()} disabled={isFetching} type="button" variant="outline">
             <RefreshCcw className="size-4" />
-            Recarregar
+            {t("common.actions.reload")}
           </Button>
         }
       />
 
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-5">
-        <StatCard label="Total" value={counters.total} helper="Todos os jobs retornados pela API." icon={ListOrdered} />
-        <StatCard label="Queued" value={counters.queued} helper="Aguardando execução." icon={Clock3} tone="warning" />
-        <StatCard label="Running" value={counters.running} helper="Execuções em andamento." icon={Workflow} tone="info" />
-        <StatCard label="Done" value={counters.done} helper="Execuções concluídas." icon={CircleCheckBig} tone="success" />
-        <StatCard label="Failed" value={counters.failed} helper="Execuções com erro." icon={OctagonX} tone="destructive" />
+        <StatCard label={t("common.labels.total")} value={counters.total} helper={t("jobs.stats.totalHelper")} icon={ListOrdered} />
+        <StatCard label={t("jobs.filters.queued")} value={counters.queued} helper={t("jobs.stats.queuedHelper")} icon={Clock3} tone="warning" />
+        <StatCard label={t("jobs.filters.running")} value={counters.running} helper={t("jobs.stats.runningHelper")} icon={Workflow} tone="info" />
+        <StatCard label={t("jobs.filters.done")} value={counters.done} helper={t("jobs.stats.doneHelper")} icon={CircleCheckBig} tone="success" />
+        <StatCard label={t("jobs.filters.failed")} value={counters.failed} helper={t("jobs.stats.failedHelper")} icon={OctagonX} tone="destructive" />
       </div>
 
       <SectionCard
-        title={`Lista (${filtered.length})`}
-        description="Fluxo somente-leitura por enquanto, voltado a acompanhamento operacional."
+        title={t("jobs.sectionTitle", { count: filtered.length })}
+        description={t("jobs.sectionDescription")}
       >
-        <FilterBar helper={`${counters.total} jobs totais`}>
+        <FilterBar helper={t("jobs.helper", { count: counters.total })}>
           <Button
             type="button"
             size="sm"
             variant={filter === "all" ? "primary" : "ghost"}
             onClick={() => setFilter("all")}
           >
-            All
+            {getJobFilterLabel(t, "all")}
           </Button>
           <Button
             type="button"
@@ -68,7 +73,7 @@ export function JobsPage() {
             variant={filter === "queued" ? "primary" : "ghost"}
             onClick={() => setFilter("queued")}
           >
-            Queued
+            {getJobFilterLabel(t, "queued")}
           </Button>
           <Button
             type="button"
@@ -76,7 +81,7 @@ export function JobsPage() {
             variant={filter === "running" ? "primary" : "ghost"}
             onClick={() => setFilter("running")}
           >
-            Running
+            {getJobFilterLabel(t, "running")}
           </Button>
           <Button
             type="button"
@@ -84,7 +89,7 @@ export function JobsPage() {
             variant={filter === "done" ? "primary" : "ghost"}
             onClick={() => setFilter("done")}
           >
-            Done
+            {getJobFilterLabel(t, "done")}
           </Button>
           <Button
             type="button"
@@ -92,7 +97,7 @@ export function JobsPage() {
             variant={filter === "failed" ? "primary" : "ghost"}
             onClick={() => setFilter("failed")}
           >
-            Failed
+            {getJobFilterLabel(t, "failed")}
           </Button>
         </FilterBar>
 

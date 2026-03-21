@@ -16,6 +16,13 @@ export class SafeSettingsDto {
   logLevel!: 'error' | 'warn' | 'info' | 'debug';
 
   @ApiProperty({
+    description: 'Idioma padrão da aplicação para processos sem contexto do navegador',
+    enum: ['pt-BR', 'en-US'],
+    example: 'pt-BR',
+  })
+  defaultLocale!: 'pt-BR' | 'en-US';
+
+  @ApiProperty({
     description: 'Indica se há senha cadastrada',
     example: true,
   })

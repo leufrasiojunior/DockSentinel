@@ -40,6 +40,7 @@ import {
   UpdateContainerResultDto,
 } from './dto/update-result.dto';
 import { NotificationsService } from '../notifications/notifications.service';
+import { t } from '../i18n/translate';
 
 @ApiTags('Docker')
 @ApiExtraModels(
@@ -132,7 +133,7 @@ export class DockerController {
     }
 
     if (!targetImage) {
-      throw new BadRequestException('Unable to determine target image.');
+      throw new BadRequestException(t('docker.targetImageRequired'));
     }
 
     // 2) Regra simples do MVP:
@@ -143,7 +144,10 @@ export class DockerController {
     const isChangingImage = targetFromBody && targetFromBody !== check.imageRef;
     if (isChangingImage && !force) {
       throw new BadRequestException(
-        `Changing container image requires force=true (current=${check.imageRef}, requested=${targetFromBody}).`,
+        t('docker.forceRequiredForImageChange', {
+          current: check.imageRef,
+          requested: targetFromBody,
+        }),
       );
     }
 
@@ -203,10 +207,16 @@ export class DockerController {
       const remoteDigest = await this.digests.getRemoteDigest(imageRef);
 
       if (!remoteDigest) {
-        await this.notifications.emitScanError(
-          `Checagem manual sem digest remoto para ${name} (${imageRef}).`,
-          { container: name, imageRef, reason: 'remote_digest_not_found' },
-        );
+        await this.notifications.emitScanError({
+          mode: 'manual_check',
+          scanned: 1,
+          errors: 1,
+          container: name,
+          imageRef,
+          reason: 'remote_digest_not_found',
+          scannedImages: [`${name} => ${imageRef}`],
+          updateCandidates: [],
+        });
         return {
           container: name,
           imageRef,
@@ -225,15 +235,12 @@ export class DockerController {
 
       const hasUpdate = this.updater.hasUpdate(repoDigests, remoteDigest);
 
-      await this.notifications.emitScanInfo(
-        `Checagem manual concluída: ${name}. hasUpdate=${hasUpdate}. image=${imageRef}.`,
-        {
-          mode: 'manual_check',
-          scanned: 1,
-          scannedImages: [`${name} => ${imageRef}`],
-          updateCandidates: hasUpdate ? [`${name} => ${imageRef}`] : [],
-        },
-      );
+      await this.notifications.emitScanInfo({
+        mode: 'manual_check',
+        scanned: 1,
+        scannedImages: [`${name} => ${imageRef}`],
+        updateCandidates: hasUpdate ? [`${name} => ${imageRef}`] : [],
+      });
 
       return {
         container: name,
@@ -314,9 +321,7 @@ export class DockerController {
     //    Atualiza usando a MESMA tag do container (imageRef atual)
     const targetImage = check.imageRef;
     if (!targetImage) {
-      throw new BadRequestException(
-        'Unable to determine container imageRef for update.',
-      );
+      throw new BadRequestException(t('docker.imageRefRequired'));
     }
 
     const result = await this.updater.recreateContainerWithImage(

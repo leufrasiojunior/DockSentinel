@@ -1,7 +1,9 @@
 import { useEffect, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useNavigate } from "react-router-dom";
+import { useTranslation } from "react-i18next";
 import { useToast } from "../../../shared/components/ui/ToastProvider";
+import { DEFAULT_LOCALE, type Locale } from "../../../i18n/locale";
 import { getAuthStatus, logout, type AuthMode } from "../../auth/api/auth";
 import {
   getSettings,
@@ -26,6 +28,7 @@ function errorMessage(error: unknown, fallback: string) {
 }
 
 export function useSettings() {
+  const { t } = useTranslation();
   const toast = useToast();
   const nav = useNavigate();
   const qc = useQueryClient();
@@ -51,6 +54,7 @@ export function useSettings() {
   // Auth fields
   const [newPassword, setNewPassword] = useState("");
   const [newPassword2, setNewPassword2] = useState("");
+  const [defaultLocale, setDefaultLocale] = useState<Locale>(DEFAULT_LOCALE);
 
   // Notifications fields
   const [notificationsInAppEnabled, setNotificationsInAppEnabled] = useState(true);
@@ -74,6 +78,7 @@ export function useSettings() {
   useEffect(() => {
     if (!safe) return;
     setLogLevel((safe.logLevel as LogLevel) ?? "info");
+    setDefaultLocale((safe.defaultLocale as Locale) ?? DEFAULT_LOCALE);
     setNotificationsInAppEnabled(safe.notificationsInAppEnabled ?? true);
     setNotificationsEmailEnabled(safe.notificationsEmailEnabled ?? false);
     setNotificationLevel((safe.notificationLevel as NotificationLevel) ?? "all");
@@ -92,6 +97,7 @@ export function useSettings() {
       const body: UpdateSettingsBody = options?.customBody ?? { authMode: desiredMode, logLevel };
       
       if (!options?.customBody) {
+        body.defaultLocale = defaultLocale;
         body.notificationsInAppEnabled = notificationsInAppEnabled;
         body.notificationsEmailEnabled = notificationsEmailEnabled;
         body.notificationLevel = notificationLevel;
@@ -112,11 +118,11 @@ export function useSettings() {
 
         if (wantPassword) {
           if (isChangingPassword) {
-            if (newPassword !== newPassword2) throw new Error("As senhas não conferem.");
-            if (newPassword.length < 8) throw new Error("Senha precisa ter pelo menos 8 caracteres.");
+            if (newPassword !== newPassword2) throw new Error(t("settings.validation.passwordsDoNotMatch"));
+            if (newPassword.length < 8) throw new Error(t("settings.validation.passwordTooShort"));
             body.adminPassword = newPassword;
           } else if (!hasPassword) {
-            throw new Error("Defina uma senha (mínimo 8 caracteres) para este modo.");
+            throw new Error(t("settings.validation.passwordRequired"));
           }
         }
       }
@@ -124,7 +130,7 @@ export function useSettings() {
       return updateSettings(body);
     },
     onSuccess: async () => {
-      toast.success("Configurações salvas.", "Settings");
+      toast.success(t("settings.saveSuccess"), "Settings");
       setSmtpPassword("");
       setNewPassword("");
       setNewPassword2("");
@@ -137,7 +143,7 @@ export function useSettings() {
          nav("/login", { replace: true });
       }
     },
-    onError: (error: unknown) => toast.error(errorMessage(error, "Erro ao salvar"), "Settings"),
+    onError: (error: unknown) => toast.error(errorMessage(error, t("settings.saveError")), "Settings"),
   });
 
   const smtpTestMutation = useMutation({
@@ -151,8 +157,8 @@ export function useSettings() {
         smtpFromName: smtpFromName.trim() || "DockSentinel",
         smtpFromEmail: smtpFromEmail.trim(),
       }),
-    onSuccess: () => toast.success("SMTP validado com sucesso.", "SMTP"),
-    onError: (error: unknown) => toast.error(errorMessage(error, "Falha no teste SMTP"), "SMTP"),
+    onSuccess: () => toast.success(t("settings.notifications.smtpSuccess"), "SMTP"),
+    onError: (error: unknown) => toast.error(errorMessage(error, t("settings.notifications.smtpError")), "SMTP"),
   });
 
   return {
@@ -170,6 +176,8 @@ export function useSettings() {
     setNewPassword,
     newPassword2,
     setNewPassword2,
+    defaultLocale,
+    setDefaultLocale,
     notificationsInAppEnabled,
     setNotificationsInAppEnabled,
     notificationsEmailEnabled,

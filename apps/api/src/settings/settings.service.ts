@@ -7,10 +7,14 @@ import { ConfigService } from "@nestjs/config"
 import { Env } from "../config/env.schema"
 import { MailService } from "../mail/mail.service"
 import type { SmtpTestDto } from "./dto/smtp-test.dto"
+import { DEFAULT_LOCALE, type AppLocale, normalizeLocale } from "../i18n/locale"
+import { t } from "../i18n/translate"
 
 type AuthMode = Env["AUTH_MODE"]
 const isAuthMode = (value: unknown): value is AuthMode =>
   value === "none" || value === "password" || value === "totp" || value === "both"
+const isAppLocale = (value: unknown): value is AppLocale =>
+  value === "pt-BR" || value === "en-US"
 
 /**
  * SettingsService:
@@ -20,6 +24,7 @@ const isAuthMode = (value: unknown): value is AuthMode =>
 @Injectable()
 export class SettingsService {
   private readonly logger = new Logger(SettingsService.name)
+  private defaultLocaleCache: AppLocale = DEFAULT_LOCALE
 
   constructor(
     private readonly repo: SettingsRepository,
@@ -34,9 +39,13 @@ export class SettingsService {
    */
   async getSafeSettings() {
     const row = await this.repo.get()
+    const defaultLocale = isAppLocale(row?.defaultLocale) ? row.defaultLocale : DEFAULT_LOCALE
+    this.defaultLocaleCache = defaultLocale
+
     return {
       authMode: isAuthMode(row?.authMode) ? row.authMode : "none",
       logLevel: row?.logLevel ?? "info",
+      defaultLocale,
       // flags úteis para UI
       hasPassword: Boolean(row?.adminPasswordHash),
       hasTotp: Boolean(row?.totpSecretEnc),
@@ -62,6 +71,17 @@ export class SettingsService {
     return this.repo.get()
   }
 
+  async getDefaultLocale(): Promise<AppLocale> {
+    try {
+      const row = await this.repo.get()
+      const defaultLocale = isAppLocale(row?.defaultLocale) ? row.defaultLocale : this.defaultLocaleCache
+      this.defaultLocaleCache = defaultLocale
+      return defaultLocale
+    } catch {
+      return this.defaultLocaleCache
+    }
+  }
+
   /**
    * Atualiza settings globais no DB (singleton).
    * - Se adminPassword vier, gera hash e salva.
@@ -76,16 +96,17 @@ export class SettingsService {
     const willHaveTotp = Boolean(dto.totpSecret) || Boolean(row?.totpSecretEnc)
 
     if ((nextAuthMode === "password" || nextAuthMode === "both") && !willHavePassword) {
-      throw new BadRequestException("adminPassword is required for password/both modes")
+      throw new BadRequestException(t("settings.passwordRequired"))
     }
 
     if ((nextAuthMode === "totp" || nextAuthMode === "both") && !willHaveTotp) {
-      throw new BadRequestException("totpSecret is required for totp/both modes")
+      throw new BadRequestException(t("settings.totpRequired"))
     }
 
     const patch: {
       authMode?: string
       logLevel?: string
+      defaultLocale?: AppLocale
       adminPasswordHash?: string | null
       totpSecretEnc?: string | null
       notificationsInAppEnabled?: boolean
@@ -105,6 +126,7 @@ export class SettingsService {
 
     if (dto.authMode) patch.authMode = dto.authMode
     if (dto.logLevel) patch.logLevel = dto.logLevel
+    if (dto.defaultLocale) patch.defaultLocale = this.validateLocale(dto.defaultLocale)
 
     if (dto.adminPassword) {
       patch.adminPasswordHash = await argon2.hash(dto.adminPassword)
@@ -169,22 +191,21 @@ export class SettingsService {
 
     if (nextEmailEnabled) {
       if (!nextRecipient) {
-        throw new BadRequestException("smtpFromEmail is required (recipient uses the same email)")
+        throw new BadRequestException(t("settings.smtpFromRequired"))
       }
       if (!nextHost || !nextPort || !nextFrom) {
-        throw new BadRequestException(
-          "smtpHost, smtpPort and smtpFromEmail are required when email notification is enabled",
-        )
+        throw new BadRequestException(t("settings.smtpRequiredWhenEmailEnabled"))
       }
       // Para o MVP: exigimos username + password para evitar configurações ambíguas.
       if (!nextUser || !nextPwd) {
-        throw new BadRequestException(
-          "smtpUsername and smtpPassword are required when email notification is enabled",
-        )
+        throw new BadRequestException(t("settings.smtpCredentialsRequired"))
       }
     }
 
     await this.repo.upsert(patch)
+    if (patch.defaultLocale) {
+      this.defaultLocaleCache = patch.defaultLocale
+    }
 
     // devolve o “safe settings” atualizado
     return this.getSafeSettings()
@@ -228,10 +249,10 @@ export class SettingsService {
     }
 
     if (!recipient || !host || !port || !fromEmail || !username || !password) {
-      throw new BadRequestException(
-        "SMTP incomplete: host, port, username, password and fromEmail are required",
-      )
+      throw new BadRequestException(t("settings.smtpIncomplete"))
     }
+
+    const locale = await this.getDefaultLocale()
 
     await this.mail.send(
       {
@@ -245,8 +266,8 @@ export class SettingsService {
       },
       {
         to: recipient,
-        subject: "Teste SMTP DockSentinel",
-        html: "<html><body><h2>Teste SMTP DockSentinel</h2><p>Envio realizado com sucesso.</p></body></html>",
+        subject: t("settings.smtpTestSubject", undefined, locale),
+        html: `<html><body><h2>${t("settings.smtpTestHeading", undefined, locale)}</h2><p>${t("settings.smtpTestSuccess", undefined, locale)}</p></body></html>`,
       },
     )
     return { ok: true as const }
@@ -254,12 +275,17 @@ export class SettingsService {
 
   private validateRetentionDays(field: string, value: unknown) {
     if (typeof value !== "number" || !Number.isFinite(value)) {
-      throw new BadRequestException(`${field} must be a finite number`)
+      throw new BadRequestException(t("settings.retentionFinite", { field }))
     }
     const days = Math.floor(value)
     if (days < 1 || days > 3650) {
-      throw new BadRequestException(`${field} must be between 1 and 3650`)
+      throw new BadRequestException(t("settings.retentionRange", { field }))
     }
     return days
+  }
+
+  private validateLocale(value: unknown): AppLocale {
+    const locale = normalizeLocale(value)
+    return locale ?? DEFAULT_LOCALE
   }
 }

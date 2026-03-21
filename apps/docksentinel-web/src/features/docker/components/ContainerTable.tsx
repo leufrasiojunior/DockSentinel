@@ -1,3 +1,4 @@
+import { useTranslation } from "react-i18next";
 import { Badge } from "../../../shared/components/ui/Badge";
 import { Button } from "../../../shared/components/ui/Button";
 import { Card, CardContent, CardHeader } from "../../../shared/components/ui/Card";
@@ -43,34 +44,36 @@ export function ContainerTable({
   checks,
   busy,
 }: ContainerTableProps) {
+  const { t } = useTranslation();
+
   function renderUpdateBadge(name: string, labels: Record<string, string>) {
     const allow = getAllowAutoUpdateFromLabels(labels);
     const st = checks[name];
 
-    if (!allow) return <Badge tone="gray">Auto update OFF</Badge>;
+    if (!allow) return <Badge tone="gray">{t("common.states.autoUpdateOff")}</Badge>;
     if (!st || st.status === "idle")
-      return <Badge tone="gray">Não checado</Badge>;
-    if (st.status === "checking") return <Badge tone="blue">Checando...</Badge>;
-    if (st.status === "error") return <Badge tone="red">Erro</Badge>;
+      return <Badge tone="gray">{t("common.states.notChecked")}</Badge>;
+    if (st.status === "checking") return <Badge tone="blue">{t("common.states.checking")}</Badge>;
+    if (st.status === "error") return <Badge tone="red">{t("toast.error")}</Badge>;
 
     if (st.result.hasUpdate === true)
-      return <Badge tone="yellow">Update disponível</Badge>;
+      return <Badge tone="yellow">{t("common.states.updateAvailable")}</Badge>;
     if (st.result.hasUpdate === false)
-      return <Badge tone="green">Atualizado</Badge>;
-    return <Badge tone="gray">Checado</Badge>;
+      return <Badge tone="green">{t("common.states.upToDate")}</Badge>;
+    return <Badge tone="gray">{t("common.states.checked")}</Badge>;
   }
 
   return (
     <Card className="overflow-hidden">
       <CardHeader
-        title={`Containers monitorados (${containers.length})`}
+        title={t("containers.tableTitle", { count: containers.length })}
         subtitle={
           <>
-            Atualização automática é bloqueada quando a label{" "}
+            {t("containers.tableSubtitle").split("docksentinel.update=false")[0]}
             <span className="font-mono">docksentinel.update=false</span>.
           </>
         }
-        right={<Badge tone="blue">Live polling</Badge>}
+        right={<Badge tone="blue">{t("common.states.livePolling")}</Badge>}
       />
 
       <CardContent className="p-0">
@@ -86,11 +89,11 @@ export function ContainerTable({
                 />
               </div>
             </TableHead>
-            <TableHead className="text-left">Container</TableHead>
-            <TableHead className="text-left">Imagem</TableHead>
-            <TableHead className="text-left">Estado</TableHead>
-            <TableHead className="text-left">Update</TableHead>
-            <TableHead className="text-left">Ações</TableHead>
+            <TableHead className="text-left">{t("containers.columns.container")}</TableHead>
+            <TableHead className="text-left">{t("containers.columns.image")}</TableHead>
+            <TableHead className="text-left">{t("containers.columns.state")}</TableHead>
+            <TableHead className="text-left">{t("containers.columns.update")}</TableHead>
+            <TableHead className="text-left">{t("containers.columns.actions")}</TableHead>
           </TableRow>
         </TableHeader>
 
@@ -98,7 +101,7 @@ export function ContainerTable({
           {loading && (
             <TableRow>
               <TableCell colSpan={6} className="h-24 text-center text-muted-foreground">
-                Carregando...
+                {t("containers.loading")}
               </TableCell>
             </TableRow>
           )}
@@ -106,7 +109,7 @@ export function ContainerTable({
           {!loading && containers.length === 0 && (
             <TableRow>
               <TableCell colSpan={6} className="h-24 text-center text-muted-foreground">
-                Nenhum container encontrado.
+                {t("containers.empty")}
               </TableCell>
             </TableRow>
           )}
@@ -147,8 +150,8 @@ export function ContainerTable({
                     {img.repo}
                   </div>
                   <div className="mt-1 flex items-center gap-2">
-                    <Badge tone="gray">{img.tag || "no-tag"}</Badge>
-                    {!allowAutoUpdate && <Badge tone="red">blocked</Badge>}
+                    <Badge tone="gray">{img.tag || t("common.states.noTag")}</Badge>
+                    {!allowAutoUpdate && <Badge tone="red">{t("containers.blocked")}</Badge>}
                   </div>
                 </TableCell>
 
@@ -177,7 +180,7 @@ export function ContainerTable({
                       disabled={busy}
                       type="button"
                     >
-                      Detalhes
+                      {t("common.actions.details")}
                     </Button>
 
                     <Button
@@ -187,7 +190,7 @@ export function ContainerTable({
                       disabled={busy}
                       type="button"
                     >
-                      Checar
+                      {t("common.actions.check")}
                     </Button>
 
                     <Button
@@ -197,13 +200,13 @@ export function ContainerTable({
                       disabled={busy || !allowAutoUpdate}
                       type="button"
                     >
-                      Atualizar
+                      {t("common.actions.update")}
                     </Button>
                   </div>
 
                   {!allowAutoUpdate && (
                     <div className="mt-1 text-[11px] text-muted-foreground">
-                      bloqueado por label
+                      {t("common.states.blockedByLabel")}
                     </div>
                   )}
                 </TableCell>

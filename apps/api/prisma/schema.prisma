@@ -32,6 +32,7 @@ model GlobalSettings {
    * Nível de log global do backend.
    */
   logLevel String @default("info")
+  defaultLocale String @default("pt-BR")
 
   notificationsInAppEnabled Boolean @default(true)
   notificationsEmailEnabled Boolean @default(false)

@@ -1,5 +1,6 @@
 import { useMemo, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useTranslation } from "react-i18next";
 import {
   getAllowAutoUpdateFromLabels,
   listContainers,
@@ -12,8 +13,10 @@ import { scanAndEnqueue } from "../../updates/api/updates";
 import { useToast } from "../../../shared/components/ui/ToastProvider";
 import { useConfirm } from "../../../shared/components/ui/ConfirmProvider";
 import { type CheckState, type ContainerDetails, type BusyState } from "../types";
+import { formatList } from "../../../i18n/format";
 
 export function useContainers() {
+  const { t } = useTranslation();
   const qc = useQueryClient();
   const toast = useToast();
   const confirm = useConfirm();
@@ -82,12 +85,12 @@ export function useContainers() {
         [name]: { status: "done", result, checkedAt: new Date().toISOString() },
       }));
     } catch (e: any) {
-      const msg = e?.message ?? "Erro ao checar updates";
+      const msg = e?.message ?? t("containers.updateCheckError");
       setChecks((prev) => ({
         ...prev,
         [name]: { status: "error", error: msg },
       }));
-      toast.error(msg, "Update check");
+      toast.error(msg, t("containers.updateCheckTitle"));
     }
   }
 
@@ -95,7 +98,7 @@ export function useContainers() {
     if (busy) return;
     if (!Array.isArray(containers) || containers.length === 0) return;
 
-    setBusy({ kind: "checkAll", progressText: "Checando containers..." });
+    setBusy({ kind: "checkAll", progressText: t("dashboard.busy.checkingAll") });
 
     setChecks((prev) => {
       const next = { ...prev };
@@ -122,7 +125,7 @@ export function useContainers() {
         } else {
           next[name] = {
             status: "error",
-            error: (r.reason as any)?.message ?? "Erro ao checar",
+            error: (r.reason as any)?.message ?? t("containers.updateCheckError"),
           };
         }
       });
@@ -144,46 +147,54 @@ export function useContainers() {
 
     if (blocked.length > 0) {
       toast.info(
-        `Ignorando ${blocked.length} bloqueado(s): ${blocked.map((c) => c.name).join(", ")}`,
-        "Auto-update OFF",
+        t("containers.selectAutoUpdateIgnored", {
+          count: blocked.length,
+          names: formatList(blocked.map((container) => container.name)),
+        }),
+        t("common.states.autoUpdateOff"),
       );
     }
 
     if (allowed.length === 0) {
-      toast.info("Nenhum selecionado permitido para update.", "Nada a fazer");
+      toast.info(t("containers.selectNothingAllowed"), t("containers.nothingToDo"));
       return;
     }
 
     const ok = await confirm.confirm({
-      title: "Atualizar selecionados?",
-      description:
-        `Você vai iniciar update em ${allowed.length} container(s).\n\n` +
-        `Selecionados: ${allowed.map((c) => c.name).join(", ")}`,
-      confirmText: "Atualizar agora",
-      cancelText: "Cancelar",
+      title: t("containers.confirmUpdateSelectedTitle"),
+      description: t("containers.confirmUpdateSelectedDescription", {
+        count: allowed.length,
+        names: formatList(allowed.map((container) => container.name)),
+      }),
+      confirmText: t("containers.confirmUpdateSelectedAction"),
+      cancelText: t("common.actions.cancel"),
     });
 
     if (!ok) return;
 
     setBusy({
       kind: "updateSelected",
-      progressText: "Atualizando selecionados...",
+      progressText: t("dashboard.busy.updatingSelected"),
     });
 
     for (let i = 0; i < allowed.length; i++) {
       const c = allowed[i];
       setBusy({
         kind: "updateSelected",
-        progressText: `Atualizando ${c.name} (${i + 1}/${allowed.length})...`,
+        progressText: t("dashboard.busy.updatingContainer", {
+          name: c.name,
+          current: i + 1,
+          total: allowed.length,
+        }),
       });
 
       try {
         await updateContainer(c.name, { pull: true, force: false });
-        toast.success(`Update disparado: ${c.name}`, "Update");
+        toast.success(t("containers.updateTriggered", { name: c.name }), t("containers.updateTitle"));
         await runUpdateCheckOne(c.name);
       } catch (e: any) {
-        const msg = e?.message ?? `Erro ao atualizar ${c.name}`;
-        toast.error(msg, "Update");
+        const msg = e?.message ?? t("containers.updateError", { name: c.name });
+        toast.error(msg, t("containers.updateTitle"));
         setChecks((prev) => ({
           ...prev,
           [c.name]: { status: "error", error: msg },
@@ -198,22 +209,25 @@ export function useContainers() {
   async function handleScanOnly() {
     if (busy) return;
 
-    setBusy({ kind: "scanOnly", progressText: "Executando scan (scan_only)..." });
+    setBusy({ kind: "scanOnly", progressText: t("dashboard.busy.scanOnly") });
     try {
       const result = await scanAndEnqueue("scan_only");
-      toast.success("Scan concluído.", "Scan");
+      toast.success(t("containers.scanDone"), t("containers.scanTitle"));
 
       if (result && typeof result === "object") {
         const keys = Object.keys(result);
         if (keys.length > 0) {
-          toast.info(`Retorno: ${keys.slice(0, 6).join(", ")}...`, "Scan");
+          toast.info(
+            t("containers.scanResponse", { keys: keys.slice(0, 6).join(", ") }),
+            t("containers.scanTitle"),
+          );
         }
       }
 
       await qc.invalidateQueries({ queryKey: ["docker", "containers"] });
     } catch (e: any) {
-      const msg = e?.message ?? "Erro ao executar scan";
-      toast.error(msg, "Scan");
+      const msg = e?.message ?? t("containers.scanError");
+      toast.error(msg, t("containers.scanTitle"));
     } finally {
       setBusy(null);
     }
@@ -223,28 +237,26 @@ export function useContainers() {
     if (busy) return;
 
     const ok = await confirm.confirm({
-      title: "Scan + enfileirar updates?",
-      description:
-        "Isso vai rodar o scan e enfileirar jobs para atualizar os containers elegíveis.\n\n" +
-        "Containers com label docksentinel.update=false serão ignorados.",
-      confirmText: "Executar",
-      cancelText: "Cancelar",
+      title: t("containers.scanAndQueueConfirmTitle"),
+      description: t("containers.scanAndQueueConfirmDescription"),
+      confirmText: t("common.actions.execute"),
+      cancelText: t("common.actions.cancel"),
     });
 
     if (!ok) return;
 
     setBusy({
       kind: "scanAndUpdate",
-      progressText: "Executando scan e enfileirando jobs (scan_and_update)...",
+      progressText: t("dashboard.busy.scanAndUpdate"),
     });
 
     try {
       await scanAndEnqueue("scan_and_update");
-      toast.success("Jobs enfileirados com sucesso.", "Scheduler/Queue");
+      toast.success(t("containers.queueSuccess"), t("containers.queueTitle"));
       await qc.invalidateQueries({ queryKey: ["docker", "containers"] });
     } catch (e: any) {
-      const msg = e?.message ?? "Erro ao executar scan_and_update";
-      toast.error(msg, "Scheduler/Queue");
+      const msg = e?.message ?? t("containers.scanAndUpdateError");
+      toast.error(msg, t("containers.queueTitle"));
     } finally {
       setBusy(null);
     }
@@ -265,10 +277,10 @@ export function useContainers() {
     if (busy) return;
     try {
       await updateContainer(name, { pull: true, force: false });
-      toast.success(`Update disparado: ${name}`, "Update");
+      toast.success(t("containers.updateTriggered", { name }), t("containers.updateTitle"));
       await runUpdateCheckOne(name);
     } catch (e: any) {
-      toast.error(e?.message ?? `Erro ao atualizar ${name}`, "Update");
+      toast.error(e?.message ?? t("containers.updateError", { name }), t("containers.updateTitle"));
     }
   }
 

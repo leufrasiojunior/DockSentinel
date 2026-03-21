@@ -17,6 +17,7 @@ describe("NotificationsService", () => {
         notificationsEmailEnabled: false,
         notificationLevel: "all",
       }),
+      getDefaultLocale: jest.fn().mockResolvedValue("pt-BR"),
       getRawSettings: jest.fn(),
     } as unknown as SettingsService
 
@@ -57,6 +58,7 @@ describe("NotificationsService", () => {
         smtpFromName: "DockSentinel",
         smtpFromEmail: "no-reply@example.com",
       }),
+      getDefaultLocale: jest.fn().mockResolvedValue("pt-BR"),
       getRawSettings: jest.fn().mockResolvedValue({ smtpPasswordEnc: "enc" }),
     } as unknown as SettingsService
 
@@ -92,6 +94,7 @@ describe("NotificationsService", () => {
         notificationsEmailEnabled: true,
         notificationLevel: "errors_only",
       }),
+      getDefaultLocale: jest.fn().mockResolvedValue("pt-BR"),
       getRawSettings: jest.fn(),
     } as unknown as SettingsService
 
@@ -103,7 +106,12 @@ describe("NotificationsService", () => {
       mail,
     )
 
-    await svc.emitScanInfo("scan ok")
+    await svc.emitScanInfo({
+      mode: "scan_only",
+      scanned: 2,
+      queued: 0,
+      updateCandidates: [],
+    })
 
     expect((repo as any).createInApp).not.toHaveBeenCalled()
     expect((mail as any).send).not.toHaveBeenCalled()

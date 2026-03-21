@@ -1,5 +1,7 @@
 import { Injectable, Logger } from "@nestjs/common"
 import { CryptoService } from "../crypto/crypto.service"
+import { getCurrentLocale, type AppLocale } from "../i18n/locale"
+import { t } from "../i18n/translate"
 import { MailSecureMode, MailService } from "../mail/mail.service"
 import { SettingsService } from "../settings/settings.service"
 import { NotificationsRepository } from "./notifications.repository"
@@ -57,55 +59,96 @@ export class NotificationsService {
     return this.repo.cleanupExpired(readDays, unreadDays)
   }
 
-  async emitJobSuccess(payload: JobNotificationPayload) {
+  async emitJobSuccess(payload: JobNotificationPayload, locale?: AppLocale) {
+    const resolvedLocale = await this.resolveLocale(locale)
+
     await this.emit({
       type: "job_success",
       level: "info",
-      title: `Atualização concluída: ${payload.container}`,
-      message: `Container ${payload.container} atualizado com sucesso.`,
+      title: t("notifications.jobSuccessTitle", { container: payload.container }, resolvedLocale),
+      message: t("notifications.jobSuccessMessage", { container: payload.container }, resolvedLocale),
       payload,
+      locale: resolvedLocale,
     })
   }
 
-  async emitJobFailed(payload: JobNotificationPayload) {
+  async emitJobFailed(payload: JobNotificationPayload, locale?: AppLocale) {
+    const resolvedLocale = await this.resolveLocale(locale)
+
     await this.emit({
       type: "job_failed",
       level: "error",
-      title: `Falha na atualização: ${payload.container}`,
-      message: `Falha ao atualizar ${payload.container}: ${payload.error ?? "erro desconhecido"}`,
+      title: t("notifications.jobFailedTitle", { container: payload.container }, resolvedLocale),
+      message: t(
+        "notifications.jobFailedMessage",
+        {
+          container: payload.container,
+          error: payload.error ?? t("notifications.unknownError", undefined, resolvedLocale),
+        },
+        resolvedLocale,
+      ),
       payload,
+      locale: resolvedLocale,
     })
   }
 
-  async emitScanInfo(message: string, payload?: GenericNotificationPayload) {
-    const mode = typeof payload?.mode === "string" ? payload.mode : "scan_only"
+  async emitScanInfo(payload?: GenericNotificationPayload, locale?: AppLocale) {
+    const resolvedLocale = await this.resolveLocale(locale)
+    const scanMeta = this.extractScanMeta(payload)
+
     await this.emit({
       type: "scan_info",
       level: "info",
-      title: `Scan de containers (${mode})`,
-      message,
+      title: t("notifications.scanInfoTitle", { mode: scanMeta.mode }, resolvedLocale),
+      message: t(
+        "notifications.scanInfoMessage",
+        {
+          mode: scanMeta.mode,
+          scanned: scanMeta.scanned,
+          queued: scanMeta.queued,
+          updates: scanMeta.updates,
+        },
+        resolvedLocale,
+      ),
       payload,
+      locale: resolvedLocale,
     })
   }
 
-  async emitScanError(message: string, payload?: GenericNotificationPayload) {
-    const mode = typeof payload?.mode === "string" ? payload.mode : "scan_only"
+  async emitScanError(payload?: GenericNotificationPayload, locale?: AppLocale) {
+    const resolvedLocale = await this.resolveLocale(locale)
+    const scanMeta = this.extractScanMeta(payload)
+
     await this.emit({
       type: "scan_error",
       level: "error",
-      title: `Erro no scan de containers (${mode})`,
-      message,
+      title: t("notifications.scanErrorTitle", { mode: scanMeta.mode }, resolvedLocale),
+      message: t(
+        "notifications.scanErrorMessage",
+        {
+          mode: scanMeta.mode,
+          scanned: scanMeta.scanned,
+          queued: scanMeta.queued,
+          errors: scanMeta.errors,
+          updates: scanMeta.updates,
+        },
+        resolvedLocale,
+      ),
       payload,
+      locale: resolvedLocale,
     })
   }
 
-  async emitSystemError(message: string, payload?: GenericNotificationPayload) {
+  async emitSystemError(message: string, payload?: GenericNotificationPayload, locale?: AppLocale) {
+    const resolvedLocale = await this.resolveLocale(locale)
+
     await this.emit({
       type: "system_error",
       level: "error",
-      title: "Erro do sistema",
-      message,
+      title: t("notifications.systemErrorTitle", undefined, resolvedLocale),
+      message: t("notifications.systemErrorMessage", { message }, resolvedLocale),
       payload,
+      locale: resolvedLocale,
     })
   }
 
@@ -115,6 +158,7 @@ export class NotificationsService {
     title: string
     message: string
     payload?: GenericNotificationPayload
+    locale: AppLocale
   }) {
     const safe = await this.settings.getSafeSettings()
     if (!this.shouldDeliverByLevel(safe.notificationLevel, input.level)) return
@@ -137,6 +181,7 @@ export class NotificationsService {
         message: input.message,
         payload: input.payload,
         safe,
+        locale: input.locale,
       })
     }
   }
@@ -153,6 +198,7 @@ export class NotificationsService {
     message: string
     payload?: GenericNotificationPayload
     safe: Awaited<ReturnType<SettingsService["getSafeSettings"]>>
+    locale: AppLocale
   }) {
     try {
       if (!input.safe.smtpHost || !input.safe.smtpPort || !input.safe.smtpFromEmail) return
@@ -163,13 +209,14 @@ export class NotificationsService {
       const password = full.smtpPasswordEnc ? this.crypto.decrypt(full.smtpPasswordEnc) : null
       if (!input.safe.smtpUsername || !password) return
 
-      const subject = this.buildEmailSubject(input.level)
+      const subject = this.buildEmailSubject(input.level, input.locale)
       const html = this.renderTemplate({
         level: input.level,
         title: input.title,
         message: input.message,
         type: input.type,
         payload: input.payload,
+        locale: input.locale,
       })
 
       const recipient = input.safe.smtpFromEmail
@@ -196,14 +243,19 @@ export class NotificationsService {
     }
   }
 
-  private buildEmailSubject(level: NotificationLevel) {
+  private buildEmailSubject(level: NotificationLevel, locale: AppLocale) {
     const now = new Date()
     const dd = String(now.getDate()).padStart(2, "0")
     const mm = String(now.getMonth() + 1).padStart(2, "0")
-    const weekdayRaw = new Intl.DateTimeFormat("pt-BR", { weekday: "short" }).format(now)
+    const weekdayRaw = new Intl.DateTimeFormat(locale, { weekday: "short" }).format(now)
     const weekday = weekdayRaw.replace(".", "").trim()
-    const levelLabel = level === "error" ? "ERRO" : "INFO"
-    return `DockSentinel - (${dd}/${mm} - ${weekday}) - (${levelLabel})`
+    const levelLabel = t(`notifications.emailLevel.${level}`, undefined, locale)
+
+    return t(
+      "notifications.emailSubject",
+      { date: `${dd}/${mm}`, weekday, level: levelLabel },
+      locale,
+    )
   }
 
   private normalizeRetentionDays(value: unknown, fallback: number) {
@@ -230,6 +282,7 @@ export class NotificationsService {
     title: string
     message: string
     payload?: GenericNotificationPayload
+    locale: AppLocale
   }) {
     const scannedImages = Array.isArray(input.payload?.scannedImages)
       ? input.payload?.scannedImages.filter((v) => typeof v === "string")
@@ -240,7 +293,7 @@ export class NotificationsService {
 
     const scannedHtml =
       scannedImages.length > 0
-        ? `<div style=\"margin-top:12px\"><div style=\"font-weight:600\">Imagens escaneadas (${scannedImages.length})</div><ul style=\"margin:6px 0 0 20px\">${scannedImages
+        ? `<div style=\"margin-top:12px\"><div style=\"font-weight:600\">${t("notifications.emailScannedImages", { count: scannedImages.length }, input.locale)}</div><ul style=\"margin:6px 0 0 20px\">${scannedImages
             .slice(0, 20)
             .map((item) => `<li>${item}</li>`)
             .join("")}</ul></div>`
@@ -248,18 +301,18 @@ export class NotificationsService {
 
     const updatesHtml =
       updateCandidates.length > 0
-        ? `<div style=\"margin-top:12px\"><div style=\"font-weight:600\">Com atualização disponível (${updateCandidates.length})</div><ul style=\"margin:6px 0 0 20px\">${updateCandidates
+        ? `<div style=\"margin-top:12px\"><div style=\"font-weight:600\">${t("notifications.emailUpdateCandidates", { count: updateCandidates.length }, input.locale)}</div><ul style=\"margin:6px 0 0 20px\">${updateCandidates
             .slice(0, 20)
             .map((item) => `<li>${item}</li>`)
             .join("")}</ul></div>`
-        : `<div style=\"margin-top:12px\"><div style=\"font-weight:600\">Com atualização disponível</div><div>nenhuma</div></div>`
+        : `<div style=\"margin-top:12px\"><div style=\"font-weight:600\">${t("notifications.emailUpdateCandidates", { count: 0 }, input.locale)}</div><div>${t("notifications.none", undefined, input.locale)}</div></div>`
 
     const detailsHtml = input.payload
-      ? `<div style=\"margin-top:12px\"><div style=\"font-weight:600\">Detalhes técnicos</div><pre style=\"background:#f8fafc;border:1px solid #e2e8f0;padding:10px;border-radius:8px;overflow:auto\">${JSON.stringify(input.payload, null, 2)}</pre></div>`
+      ? `<div style=\"margin-top:12px\"><div style=\"font-weight:600\">${t("notifications.emailTechnicalDetails", undefined, input.locale)}</div><pre style=\"background:#f8fafc;border:1px solid #e2e8f0;padding:10px;border-radius:8px;overflow:auto\">${JSON.stringify(input.payload, null, 2)}</pre></div>`
       : ""
 
     const levelTone = input.level === "error" ? "#dc2626" : "#0284c7"
-    const levelLabel = input.level === "error" ? "ERRO" : "INFO"
+    const levelLabel = t(`notifications.emailLevel.${input.level}`, undefined, input.locale)
 
     return [
       '<html><body style="font-family:Arial,sans-serif;line-height:1.5;color:#0f172a;background:#f1f5f9;padding:16px">',
@@ -269,8 +322,8 @@ export class NotificationsService {
       `<div style="font-size:18px;font-weight:700">${input.title}</div>`,
       `<div style="margin-top:8px">${input.message}</div>`,
       '<div style="margin-top:12px;display:grid;grid-template-columns:1fr 1fr;gap:8px">',
-      `<div><strong>Tipo:</strong> ${input.type}</div>`,
-      `<div><strong>Nível:</strong> ${levelLabel}</div>`,
+      `<div><strong>${t("notifications.emailTypeLabel", undefined, input.locale)}:</strong> ${input.type}</div>`,
+      `<div><strong>${t("notifications.emailLevelLabel", undefined, input.locale)}:</strong> ${levelLabel}</div>`,
       "</div>",
       scannedHtml,
       updatesHtml,
@@ -279,5 +332,24 @@ export class NotificationsService {
       "</div>",
       "</body></html>",
     ].join("")
+  }
+
+  private extractScanMeta(payload?: GenericNotificationPayload) {
+    return {
+      mode: typeof payload?.mode === "string" ? payload.mode : "scan_only",
+      scanned: typeof payload?.scanned === "number" ? payload.scanned : 0,
+      queued: typeof payload?.queued === "number" ? payload.queued : 0,
+      errors: typeof payload?.errors === "number" ? payload.errors : 1,
+      updates: Array.isArray(payload?.updateCandidates) ? payload.updateCandidates.length : 0,
+    }
+  }
+
+  private async resolveLocale(locale?: AppLocale) {
+    if (locale) return locale
+
+    const currentLocale = getCurrentLocale()
+    if (currentLocale) return currentLocale
+
+    return this.settings.getDefaultLocale()
   }
 }

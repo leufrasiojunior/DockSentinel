@@ -1,6 +1,7 @@
 import * as React from "react";
 import * as ReactDOM from "react-dom";
 import { X } from "lucide-react";
+import { useTranslation } from "react-i18next";
 
 import { cn } from "@/lib/utils";
 
@@ -85,6 +86,7 @@ interface DialogContentProps extends React.HTMLAttributes<HTMLDivElement> {
 
 const DialogContent = React.forwardRef<HTMLDivElement, DialogContentProps>(
   ({ className, children, hideClose = false, ...props }, ref) => {
+    const { t } = useTranslation();
     const { open, setOpen } = useDialogContext();
     if (!open) return null;
 
@@ -107,7 +109,7 @@ const DialogContent = React.forwardRef<HTMLDivElement, DialogContentProps>(
                 type="button"
                 className="absolute right-5 top-5 inline-flex size-9 items-center justify-center rounded-full text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
                 onClick={() => setOpen(false)}
-                aria-label="Fechar"
+                aria-label={t("common.actions.close")}
               >
                 <X className="size-4" />
               </button>

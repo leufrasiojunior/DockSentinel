@@ -1,9 +1,11 @@
 import { useEffect, useMemo, useState } from "react";
 import { useMutation } from "@tanstack/react-query";
+import { useTranslation } from "react-i18next";
 import { useToast } from "../../../shared/components/ui/ToastProvider";
 import { totpInit, totpConfirm, type TotpInitResponse } from "../api/totp";
 
 export function useTotp() {
+  const { t } = useTranslation();
   const toast = useToast();
   const [totp, setTotp] = useState<TotpInitResponse | null>(null);
   const [totpToken, setTotpToken] = useState("");
@@ -28,25 +30,25 @@ export function useTotp() {
       setTotp(resp);
       setTotpToken("");
       setTotpConfirmed(false);
-      toast.info("TOTP iniciado. Escaneie e confirme.", "TOTP");
+      toast.info(t("settings.auth.initSuccess"), "TOTP");
     },
-    onError: (error: any) => toast.error(error?.message ?? "Falha ao iniciar TOTP", "TOTP"),
+    onError: (error: any) => toast.error(error?.message ?? t("settings.auth.initError"), "TOTP"),
   });
 
   const confirmMutation = useMutation({
     mutationFn: async () => {
-      if (!totp) throw new Error("Inicie o TOTP primeiro.");
+      if (!totp) throw new Error(t("settings.auth.initRequired"));
       return totpConfirm({ challengeId: totp.challengeId, token: totpToken });
     },
     onSuccess: (resp) => {
       if (resp.ok) {
         setTotpConfirmed(true);
-        toast.success(`TOTP confirmado (authMode final: ${resp.authMode}).`, "TOTP");
+        toast.success(t("settings.auth.confirmSuccess", { authMode: resp.authMode }), "TOTP");
       } else {
-        toast.error("Resposta inesperada do confirm.", "TOTP");
+        toast.error(t("settings.auth.confirmUnexpected"), "TOTP");
       }
     },
-    onError: (error: any) => toast.error(error?.message ?? "Falha ao confirmar TOTP", "TOTP"),
+    onError: (error: any) => toast.error(error?.message ?? t("settings.auth.confirmError"), "TOTP"),
   });
 
   return {

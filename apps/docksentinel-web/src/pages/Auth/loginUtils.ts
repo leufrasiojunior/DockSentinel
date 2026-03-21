@@ -1,3 +1,4 @@
+import i18n from "../../i18n";
 import type { AuthMode } from "../../features/auth/api/auth";
 
 export type LoginPayload = {
@@ -14,10 +15,10 @@ export function needsTotp(mode: AuthMode) {
 }
 
 export function loginHint(mode: AuthMode) {
-  if (mode === "none") return "Sem login: clique em Entrar.";
-  if (mode === "password") return "Informe a senha.";
-  if (mode === "totp") return "Informe o código TOTP (6 dígitos).";
-  return "Informe senha + TOTP.";
+  if (mode === "none") return i18n.t("login.hints.none");
+  if (mode === "password") return i18n.t("login.hints.password");
+  if (mode === "totp") return i18n.t("login.hints.totp");
+  return i18n.t("login.hints.both");
 }
 
 export function buildLoginBody(mode: AuthMode, password: string, totp: string): LoginPayload {

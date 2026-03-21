@@ -17,6 +17,7 @@ import {
   type ScanAndEnqueueResult,
 } from './updates.orchestrator.service';
 import { NotificationsService } from '../notifications/notifications.service';
+import { t } from '../i18n/translate';
 
 const JOB_NAME = 'updates_scan_job';
 
@@ -249,13 +250,13 @@ export class UpdatesSchedulerService implements OnModuleInit {
 
   private assertCronValid(expr: string) {
     const s = String(expr ?? '').trim();
-    if (!s) throw new BadRequestException('cronExpr is required');
+    if (!s) throw new BadRequestException(t('scheduler.cronExprRequired'));
 
     try {
       // ✅ isso valida mesmo (diferente do split em 5 campos)
       new CronTime(s, this.timeZone);
     } catch {
-      throw new BadRequestException(`Invalid cronExpr: ${s}`);
+      throw new BadRequestException(t('scheduler.invalidCronExpr', { value: s }));
     }
   }
   private safeNextScan(job: CronJob): Date | null {

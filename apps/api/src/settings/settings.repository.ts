@@ -10,6 +10,7 @@ export type SettingsPatch = {
   adminPasswordHash?: string | null;
   totpSecretEnc?: string | null;
   logLevel?: string;
+  defaultLocale?: "pt-BR" | "en-US";
   notificationsInAppEnabled?: boolean;
   notificationsEmailEnabled?: boolean;
   notificationLevel?: "all" | "errors_only";

@@ -1,5 +1,6 @@
 /* eslint-disable react-refresh/only-export-components */
 import React, { createContext, useContext, useMemo, useState } from "react";
+import { useTranslation } from "react-i18next";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -31,6 +32,7 @@ type Pending = {
 };
 
 export function ConfirmProvider({ children }: { children: React.ReactNode }) {
+  const { t } = useTranslation();
   const [pending, setPending] = useState<Pending | null>(null);
 
   function confirm(opts: ConfirmOptions) {
@@ -64,14 +66,14 @@ export function ConfirmProvider({ children }: { children: React.ReactNode }) {
             </AlertDialogHeader>
             <AlertDialogFooter>
               <AlertDialogCancel type="button" onClick={() => close(false)}>
-                {pending.opts.cancelText ?? "Cancelar"}
+                {pending.opts.cancelText ?? t("common.actions.cancel")}
               </AlertDialogCancel>
               <AlertDialogAction
                 type="button"
                 variant={pending.opts.danger ? "danger" : "primary"}
                 onClick={() => close(true)}
               >
-                {pending.opts.confirmText ?? "Confirmar"}
+                {pending.opts.confirmText ?? t("common.actions.confirm")}
               </AlertDialogAction>
             </AlertDialogFooter>
           </AlertDialogContent>

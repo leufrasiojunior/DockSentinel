@@ -1,4 +1,5 @@
 import { useMemo, useState } from "react";
+import { useTranslation } from "react-i18next";
 import { getRegistryDomain, getAppCandidates } from "../utils/image";
 
 interface ContainerIconProps {
@@ -7,6 +8,7 @@ interface ContainerIconProps {
 }
 
 export function ContainerIcon({ imageRepo, containerName }: ContainerIconProps) {
+  const { t } = useTranslation();
   const domain = getRegistryDomain(imageRepo);
 
   const [idx, setIdx] = useState(0);
@@ -24,8 +26,8 @@ export function ContainerIcon({ imageRepo, containerName }: ContainerIconProps) 
     return (
       <div
         className="h-8 w-8 rounded-lg bg-slate-100 flex items-center justify-center"
-        title="Docker"
-        aria-label="docker placeholder"
+        title={t("containers.iconFallbackTitle")}
+        aria-label={t("containers.iconFallbackAriaLabel")}
       >
         <span className="text-sm">🐳</span>
       </div>
@@ -41,7 +43,7 @@ export function ContainerIcon({ imageRepo, containerName }: ContainerIconProps) 
       <div className="h-8 w-8 rounded-lg bg-slate-100 flex items-center justify-center overflow-hidden">
         <img
           src={src}
-          alt={`${containerName} registry`}
+          alt={t("containers.registryAlt", { container: containerName })}
           className="h-6 w-6"
           title={domain}
           onError={() => setFailedAll(true)}
@@ -56,7 +58,7 @@ export function ContainerIcon({ imageRepo, containerName }: ContainerIconProps) 
     <div className="h-8 w-8 rounded-lg bg-slate-100 flex items-center justify-center overflow-hidden">
       <img
         src={siSrc}
-        alt={`${containerName} icon`}
+        alt={t("containers.iconAlt", { container: containerName })}
         className="h-6 w-6"
         title={`simpleicons: ${current}`}
         onError={() => {
