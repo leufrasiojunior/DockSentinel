@@ -1,5 +1,38 @@
 # Changelog
 
+## [1.5.0](https://github.com/leufrasiojunior/DockSentinel/compare/v1.4.1...v1.5.0) (2026-03-21)
+
+
+### Features
+
+* add Button and Table components with utility functions ([2f111ce](https://github.com/leufrasiojunior/DockSentinel/commit/2f111ced745dd6ee1ce61b1fc20ea3ce649b2380))
+* add container management features ([2d42cf7](https://github.com/leufrasiojunior/DockSentinel/commit/2d42cf77cc8ede72833f0565912ea929dea629b5))
+* add job and notification management features ([2bd713d](https://github.com/leufrasiojunior/DockSentinel/commit/2bd713de0efa8e98b56292f40b6c1ed3799e3fa8))
+* add LanguageSelector and LocaleProvider components for improved localization support ([a7a4587](https://github.com/leufrasiojunior/DockSentinel/commit/a7a45872de9729d8b05697df30a1bef2254d6fa4))
+* add TOTP authentication and notification settings ([e32e087](https://github.com/leufrasiojunior/DockSentinel/commit/e32e08741cd3b40cb906e16c995bb1a213ee6a66))
+* adicionar documentação para scripts e melhorar Dockerfile com suporte a dependências nativas ([fdda6bd](https://github.com/leufrasiojunior/DockSentinel/commit/fdda6bd3c2537ece924a4b000e95aed3dc0df797))
+* adicionar funcionalidade de colapsar o sidebar e ícones nos links ([f949f37](https://github.com/leufrasiojunior/DockSentinel/commit/f949f3715428233a0ca060974e5a63fdb17585ea))
+* adicionar manuais de uso para scripts e workflows ([b95815c](https://github.com/leufrasiojunior/DockSentinel/commit/b95815c85efdfca3ad4c03cc3cf4b90fe6e0de52))
+* adicionar mensagem sobre o projeto e link para o repositório no GitHub ([a5ee4c5](https://github.com/leufrasiojunior/DockSentinel/commit/a5ee4c551da9c3ae9e0281e5ff75a7c1f5911d77))
+* adicionar suporte a --keep-tag para reutilizar a mesma versão/tag em publicações ([45fb317](https://github.com/leufrasiojunior/DockSentinel/commit/45fb317bf4aea49676c8024530a0c682d2ac2bcd))
+* adicionar suporte a tsconfig-paths no Docker e scripts de inicialização ([3ade230](https://github.com/leufrasiojunior/DockSentinel/commit/3ade2301c3e84972fcaeb2b23b1704dc512602b3))
+* atualizar versão do projeto para 2.0 ([eb46b8f](https://github.com/leufrasiojunior/DockSentinel/commit/eb46b8faf5d1c396f26b38e4ec8278cd9fd2a587))
+* enhance NotificationCenter with improved styling and functionality ([a5505dd](https://github.com/leufrasiojunior/DockSentinel/commit/a5505ddf4db6a47f0b562d246a5cd4bf18423bea))
+* implement guided scheduling in useScheduler hook ([71ec514](https://github.com/leufrasiojunior/DockSentinel/commit/71ec514358965ea7c182b374329b776d2178b4f2))
+* implement in-app notifications system with retention and email … ([ee0e801](https://github.com/leufrasiojunior/DockSentinel/commit/ee0e8018a0a33d697a419394e6cc239befdbd7dc))
+* implement in-app notifications system with retention and email support ([c681ac9](https://github.com/leufrasiojunior/DockSentinel/commit/c681ac970fd581359280eb0ab7825961ceee5088))
+* implement ThemeToggle component for dark/light mode switching ([a5505dd](https://github.com/leufrasiojunior/DockSentinel/commit/a5505ddf4db6a47f0b562d246a5cd4bf18423bea))
+* implementar gerenciamento de tema com ThemeProvider e ThemeToggle ([e955e98](https://github.com/leufrasiojunior/DockSentinel/commit/e955e98e7310730ffab25cec309ffbf1e5e612b1))
+* refactor release script for improved interactivity and usability ([6a2a11e](https://github.com/leufrasiojunior/DockSentinel/commit/6a2a11e82850fffcf4d3899bafefc22bc5f01e56))
+* reorganizar componentes de tabela e adicionar novo DataTable ([f759042](https://github.com/leufrasiojunior/DockSentinel/commit/f75904231f2d5359fce1ae458235c7c90060e402))
+
+
+### Bug Fixes
+
+* adicionar borda ao sidebar para melhor visualização ([f3c1102](https://github.com/leufrasiojunior/DockSentinel/commit/f3c1102a00dde7ae64499d39e5d7f70ab43a37f4))
+* adjust SchedulerPage layout and functionality ([71ec514](https://github.com/leufrasiojunior/DockSentinel/commit/71ec514358965ea7c182b374329b776d2178b4f2))
+* remocao de arquivos temporarios ([b540da1](https://github.com/leufrasiojunior/DockSentinel/commit/b540da1570a3f8208b111a42a00566060fd482db))
+
 ## [1.4.1](https://github.com/leufrasiojunior/DockSentinel/compare/v1.4.0...v1.4.1) (2026-02-22)
 
 
