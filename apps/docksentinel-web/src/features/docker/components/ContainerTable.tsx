@@ -1,3 +1,4 @@
+import { LoaderCircle } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { Badge } from "../../../shared/components/ui/Badge";
 import { Button } from "../../../shared/components/ui/Button";
@@ -27,6 +28,7 @@ interface ContainerTableProps {
   onDetails: (id: string) => void;
   onCheck: (name: string) => void;
   onUpdate: (name: string) => void;
+  updatingNames: Record<string, boolean>;
   checks: Record<string, CheckState>;
   busy: boolean;
 }
@@ -41,6 +43,7 @@ export function ContainerTable({
   onDetails,
   onCheck,
   onUpdate,
+  updatingNames,
   checks,
   busy,
 }: ContainerTableProps) {
@@ -118,6 +121,7 @@ export function ContainerTable({
             const allowAutoUpdate = getAllowAutoUpdateFromLabels(c.labels);
             const img = splitImageRef(c.image);
             const checkState = checks[c.name];
+            const isUpdating = !!updatingNames[c.name];
 
             return (
               <TableRow key={c.id}>
@@ -197,10 +201,18 @@ export function ContainerTable({
                       size="sm"
                       variant="primary"
                       onClick={() => onUpdate(c.name)}
-                      disabled={busy || !allowAutoUpdate}
+                      disabled={busy || !allowAutoUpdate || isUpdating}
                       type="button"
+                      aria-busy={isUpdating}
                     >
-                      {t("common.actions.update")}
+                      {isUpdating ? (
+                        <>
+                          <LoaderCircle className="size-3.5 animate-spin" />
+                          {t("common.actions.updating")}
+                        </>
+                      ) : (
+                        t("common.actions.update")
+                      )}
                     </Button>
                   </div>
 

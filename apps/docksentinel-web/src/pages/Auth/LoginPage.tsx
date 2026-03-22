@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { useLocation, useNavigate } from "react-router-dom";
 import { useTranslation } from "react-i18next";
@@ -39,6 +39,11 @@ export function LoginPage() {
   const authMode = statusQuery.data?.authMode ?? "password";
   const from = ((location.state as { from?: string } | null)?.from) ?? "/dashboard";
   const hints = loginHint(authMode);
+  const pageTitle = t("login.title");
+
+  useEffect(() => {
+    document.title = `DockSentinel | ${pageTitle}`;
+  }, [pageTitle]);
 
   const loginMutation = useMutation({
     mutationFn: async () => {

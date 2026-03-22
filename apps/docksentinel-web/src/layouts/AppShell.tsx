@@ -1,4 +1,11 @@
-import { useMemo, useState } from "react";
+import {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type PointerEvent as ReactPointerEvent,
+} from "react";
 import { NavLink, Outlet, useLocation, useNavigate } from "react-router-dom";
 import { useQueryClient } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
@@ -32,6 +39,16 @@ import { cn } from "../shared/lib/utils/cn";
 import { LanguageSelector } from "../shared/components/ui/LanguageSelector";
 
 import logo from "../assets/logo2.png";
+
+const SIDEBAR_COLLAPSED_WIDTH = 96;
+const SIDEBAR_DEFAULT_WIDTH = 320;
+const SIDEBAR_MIN_WIDTH = 256;
+const SIDEBAR_MAX_WIDTH = 420;
+const SIDEBAR_WIDTH_STORAGE_KEY = "docksentinel.sidebar.width";
+
+function clampSidebarWidth(value: number) {
+  return Math.min(SIDEBAR_MAX_WIDTH, Math.max(SIDEBAR_MIN_WIDTH, Math.round(value)));
+}
 
 interface SidebarLinkProps {
   to: string;
@@ -193,6 +210,9 @@ export function AppShell() {
   const qc = useQueryClient();
   const [isCollapsed, setIsCollapsed] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
+  const [sidebarWidth, setSidebarWidth] = useState(SIDEBAR_DEFAULT_WIDTH);
+  const [isResizing, setIsResizing] = useState(false);
+  const resizeStateRef = useRef<{ startX: number; startWidth: number } | null>(null);
 
   const currentNav = useMemo(() => {
     return (
@@ -200,6 +220,83 @@ export function AppShell() {
       navItems[0]
     );
   }, [location.pathname]);
+  const currentTitle = t(currentNav.labelKey);
+
+  useEffect(() => {
+    document.title = `DockSentinel | ${currentTitle}`;
+  }, [currentTitle]);
+
+  useEffect(() => {
+    try {
+      const raw = window.localStorage.getItem(SIDEBAR_WIDTH_STORAGE_KEY);
+      if (!raw) return;
+
+      const parsed = Number(raw);
+      if (Number.isFinite(parsed)) {
+        setSidebarWidth(clampSidebarWidth(parsed));
+      }
+    } catch {
+      // ignore storage failures and keep default width
+    }
+  }, []);
+
+  useEffect(() => {
+    try {
+      window.localStorage.setItem(SIDEBAR_WIDTH_STORAGE_KEY, String(sidebarWidth));
+    } catch {
+      // ignore storage failures and keep current session width only
+    }
+  }, [sidebarWidth]);
+
+  useEffect(() => {
+    if (!isResizing) return;
+
+    const handlePointerMove = (event: PointerEvent) => {
+      const state = resizeStateRef.current;
+      if (!state) return;
+
+      const delta = event.clientX - state.startX;
+      setSidebarWidth(clampSidebarWidth(state.startWidth + delta));
+    };
+
+    const stopResizing = () => {
+      resizeStateRef.current = null;
+      setIsResizing(false);
+    };
+
+    const previousCursor = document.body.style.cursor;
+    const previousUserSelect = document.body.style.userSelect;
+    document.body.style.cursor = "col-resize";
+    document.body.style.userSelect = "none";
+
+    window.addEventListener("pointermove", handlePointerMove);
+    window.addEventListener("pointerup", stopResizing);
+    window.addEventListener("pointercancel", stopResizing);
+
+    return () => {
+      document.body.style.cursor = previousCursor;
+      document.body.style.userSelect = previousUserSelect;
+      window.removeEventListener("pointermove", handlePointerMove);
+      window.removeEventListener("pointerup", stopResizing);
+      window.removeEventListener("pointercancel", stopResizing);
+    };
+  }, [isResizing]);
+
+  const handleResizeStart = useCallback(
+    (event: ReactPointerEvent<HTMLDivElement>) => {
+      if (isCollapsed) return;
+
+      event.preventDefault();
+      resizeStateRef.current = {
+        startX: event.clientX,
+        startWidth: sidebarWidth,
+      };
+      setIsResizing(true);
+    },
+    [isCollapsed, sidebarWidth],
+  );
+
+  const desktopSidebarWidth = isCollapsed ? SIDEBAR_COLLAPSED_WIDTH : sidebarWidth;
 
   async function handleLogout() {
     try {
@@ -216,15 +313,33 @@ export function AppShell() {
       <div className="flex min-h-screen">
         <aside
           className={cn(
-            "sticky top-0 z-20 hidden h-screen shrink-0 flex-col border-r-2 border-sidebar-border/80 bg-sidebar text-sidebar-foreground transition-all duration-300 ease-in-out lg:flex",
-            isCollapsed ? "w-24" : "w-80",
+            "sticky top-0 z-20 hidden h-screen shrink-0 flex-col border-r-2 border-sidebar-border/80 bg-sidebar text-sidebar-foreground lg:flex",
+            isResizing ? "transition-none" : "transition-[width] duration-300 ease-in-out",
           )}
+          style={{ width: desktopSidebarWidth, minWidth: desktopSidebarWidth }}
         >
           <SidebarContent
             isCollapsed={isCollapsed}
             onToggleCollapse={() => setIsCollapsed((current) => !current)}
             onLogout={handleLogout}
           />
+
+          {!isCollapsed ? (
+            <div
+              role="separator"
+              aria-orientation="vertical"
+              aria-label={t("navigation.resizeSidebar")}
+              className="absolute inset-y-0 -right-2 hidden w-4 cursor-col-resize lg:block"
+              onPointerDown={handleResizeStart}
+            >
+              <div
+                className={cn(
+                  "absolute inset-y-8 left-1/2 w-1 -translate-x-1/2 rounded-full transition-colors",
+                  isResizing ? "bg-sidebar-ring" : "bg-sidebar-border/85 hover:bg-sidebar-ring/80",
+                )}
+              />
+            </div>
+          ) : null}
         </aside>
 
         <div className="flex min-w-0 flex-1 flex-col">
@@ -259,12 +374,12 @@ export function AppShell() {
               <div className="min-w-0 flex-1">
                 <div className="flex flex-wrap items-center gap-2">
                   <span className="text-[0.7rem] font-semibold uppercase tracking-[0.18em] text-muted-foreground">
-                    {t(currentNav.labelKey)}
+                    {currentTitle}
                   </span>
                 </div>
                 <div className="mt-2 flex flex-col gap-1 lg:flex-row lg:items-baseline lg:gap-4">
                   <div className="text-lg font-semibold tracking-tight text-foreground">
-                    {t(currentNav.labelKey)}
+                    {currentTitle}
                   </div>
                 </div>
               </div>

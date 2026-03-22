@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
 import {
@@ -34,6 +34,8 @@ export function useContainers() {
   const [selected, setSelected] = useState<Record<string, boolean>>({});
   const [checks, setChecks] = useState<Record<string, CheckState>>({});
   const [busy, setBusy] = useState<BusyState>(null);
+  const [updatingNames, setUpdatingNames] = useState<Record<string, boolean>>({});
+  const updatingNamesRef = useRef(new Set<string>());
 
   // Modal: container selecionado para detalhes
   const [detailsId, setDetailsId] = useState<string | null>(null);
@@ -274,13 +276,24 @@ export function useContainers() {
   }
 
   async function handleUpdateOne(name: string) {
-    if (busy) return;
+    if (busy || updatingNamesRef.current.has(name)) return;
+
+    updatingNamesRef.current.add(name);
+    setUpdatingNames((prev) => ({ ...prev, [name]: true }));
+
     try {
       await updateContainer(name, { pull: true, force: false });
       toast.success(t("containers.updateTriggered", { name }), t("containers.updateTitle"));
       await runUpdateCheckOne(name);
     } catch (e: any) {
       toast.error(e?.message ?? t("containers.updateError", { name }), t("containers.updateTitle"));
+    } finally {
+      updatingNamesRef.current.delete(name);
+      setUpdatingNames((prev) => {
+        const next = { ...prev };
+        delete next[name];
+        return next;
+      });
     }
   }
 
@@ -295,6 +308,7 @@ export function useContainers() {
     anySelected,
     selectedBlocked,
     busy,
+    updatingNames,
     checks,
     detailsId,
     setDetailsId,
