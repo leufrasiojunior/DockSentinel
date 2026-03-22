@@ -1,13 +1,2 @@
-Front
-Incluir i18n
-melhorar o layout
-melhorar o sistema de notificacoes
-
-
-
-
-
-
-
 Back
 Verificar rotas duplicadas
