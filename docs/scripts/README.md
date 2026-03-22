@@ -1,14 +1,7 @@
 # Documentacao dos scripts
 
-Cada arquivo abaixo documenta detalhadamente um script da pasta `scripts/`.
+Esta pasta concentra a documentacao operacional dos scripts usados no dia a dia do projeto.
 
-- `scripts/dev-all.sh` -> `docs/scripts/dev-all.sh.md`
-- `scripts/version.mjs` -> `docs/scripts/version.mjs.md`
-- `scripts/tag-latest.mjs` -> `docs/scripts/tag-latest.mjs.md`
-- `scripts/publish.mjs` -> `docs/scripts/publish.mjs.md`
-- `scripts/release.mjs` -> `docs/scripts/release.mjs.md`
-- `scripts/lib/cli.mjs` -> `docs/scripts/lib-cli.mjs.md`
-- `scripts/lib/release-utils.mjs` -> `docs/scripts/lib-release-utils.mjs.md`
-- `scripts/tests/publish-release.integration.sh` -> `docs/scripts/tests-publish-release.integration.sh.md`
-- `scripts/tests/release-utils.test.mjs` -> `docs/scripts/tests-release-utils.test.mjs.md`
+O guia principal esta em [`COMO-USAR.md`](./COMO-USAR.md), com os comandos disponiveis, o fluxo de desenvolvimento local, o fluxo de release/publicacao e um resumo de troubleshooting.
 
+Use este arquivo apenas como ponto de entrada.
