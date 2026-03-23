@@ -141,7 +141,7 @@ const translationPtBr = {
     resizeSidebar: "Redimensionar sidebar",
     primaryNavigation: "Navegação principal do painel operacional.",
     language: "Idioma",
-    projectBlurb: "v2.0 - DockSentinel é um projeto de código aberto. Confira o repositório no",
+    projectBlurb: "v{{version}} - DockSentinel é um projeto de código aberto. Confira o repositório no",
   },
   theme: {
     toggleToDark: "Mudar para modo escuro",
@@ -786,7 +786,7 @@ const translationEnUs = {
     resizeSidebar: "Resize sidebar",
     primaryNavigation: "Primary navigation for the operations dashboard.",
     language: "Language",
-    projectBlurb: "v2.0 - DockSentinel is an open source project. Check the repository on",
+    projectBlurb: "v{{version}} - DockSentinel is an open source project. Check the repository on",
   },
   theme: {
     toggleToDark: "Switch to dark mode",
