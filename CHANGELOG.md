@@ -1,5 +1,12 @@
 # Changelog
 
+## [2.4.1](https://github.com/leufrasiojunior/DockSentinel/compare/v2.4.0...v2.4.1) (2026-03-24)
+
+
+### Bug Fixes
+
+* dockerfile change do publish production ([5ce1807](https://github.com/leufrasiojunior/DockSentinel/commit/5ce18078360699b0055b9314dfd0cd6b90f36c87))
+
 ## [2.4.0](https://github.com/leufrasiojunior/DockSentinel/compare/v2.3.0...v2.4.0) (2026-03-24)
 
 
