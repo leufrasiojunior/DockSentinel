@@ -1,4 +1,5 @@
-import { LoaderCircle } from "lucide-react";
+import { useState } from "react";
+import { LoaderCircle, RefreshCcw } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { Badge } from "../../../shared/components/ui/Badge";
 import { Button } from "../../../shared/components/ui/Button";
@@ -8,7 +9,7 @@ import { StatusBadge } from "../../../components/product/status-badge";
 import { ContainerIcon } from "./ContainerIcon";
 import { splitImageRef } from "../utils/image";
 import { getAllowAutoUpdateFromLabels, type DockerContainer } from "../api/docker";
-import { type CheckState } from "../types";
+import { type BusyState, type CheckState } from "../types";
 import {
   Table,
   TableBody,
@@ -17,6 +18,7 @@ import {
   TableHeader,
   TableRow,
 } from "../../../components/ui/table";
+import { ActionBar } from "@/components/product/action-bar";
 
 interface ContainerTableProps {
   containers: DockerContainer[];
@@ -28,9 +30,18 @@ interface ContainerTableProps {
   onDetails: (id: string) => void;
   onCheck: (name: string) => void;
   onUpdate: (name: string) => void;
+  onRefetch: () => Promise<unknown>;
+  onCheckAll: () => void | Promise<void>;
+  onUpdateSelected: () => void | Promise<void>;
+  onScanOnly: () => void | Promise<void>;
+  onScanAndUpdate: () => void | Promise<void>;
+  activeDetailsId: string | null;
+  isDetailsLoading: boolean;
   updatingNames: Record<string, boolean>;
   checks: Record<string, CheckState>;
-  busy: boolean;
+  busy: BusyState;
+  anySelected: boolean;
+  selectedBlockedCount: number;
 }
 
 export function ContainerTable({
@@ -43,11 +54,37 @@ export function ContainerTable({
   onDetails,
   onCheck,
   onUpdate,
+  onRefetch,
+  onCheckAll,
+  onUpdateSelected,
+  onScanOnly,
+  onScanAndUpdate,
+  activeDetailsId,
+  isDetailsLoading,
   updatingNames,
   checks,
   busy,
+  anySelected,
+  selectedBlockedCount,
 }: ContainerTableProps) {
   const { t } = useTranslation();
+  const [isRefreshing, setIsRefreshing] = useState(false);
+
+  const isBusy = !!busy;
+  const isCheckAllBusy = busy?.kind === "checkAll";
+  const isUpdateSelectedBusy = busy?.kind === "updateSelected";
+  const isScanOnlyBusy = busy?.kind === "scanOnly";
+  const isScanAndUpdateBusy = busy?.kind === "scanAndUpdate";
+
+  async function handleReload() {
+    if (loading || isBusy || isRefreshing) return;
+    setIsRefreshing(true);
+    try {
+      await onRefetch();
+    } finally {
+      setIsRefreshing(false);
+    }
+  }
 
   function renderUpdateBadge(name: string, labels: Record<string, string>) {
     const allow = getAllowAutoUpdateFromLabels(labels);
@@ -68,16 +105,74 @@ export function ContainerTable({
 
   return (
     <Card className="overflow-hidden">
-      <CardHeader
-        title={t("containers.tableTitle", { count: containers.length })}
-        subtitle={
-          <>
-            {t("containers.tableSubtitle").split("docksentinel.update=false")[0]}
-            <span className="font-mono">docksentinel.update=false</span>.
-          </>
-        }
-        right={<Badge tone="blue">{t("common.states.livePolling")}</Badge>}
-      />
+      <CardHeader className="gap-4">
+        <div className="flex w-full flex-col gap-4">
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+            <div className="min-w-0">
+              <div className="text-sm font-semibold tracking-[0.02em] text-foreground">
+                {t("containers.tableTitle", { count: containers.length })}
+              </div>
+              <div className="mt-1 text-sm leading-relaxed text-muted-foreground">
+                {t("containers.tableSubtitle").split("docksentinel.update=false")[0]}
+                <span className="font-mono">docksentinel.update=false</span>.
+              </div>
+            </div>
+            <ActionBar className="justify-end">
+              <Button onClick={handleReload} disabled={loading || isBusy || isRefreshing} type="button" variant="outline">
+                {isRefreshing ? <LoaderCircle className="size-4 animate-spin" /> : <RefreshCcw className="size-4" />}
+                {t("common.actions.reload")}
+              </Button>
+
+              <Button
+                onClick={onScanOnly}
+                disabled={loading || isBusy}
+                type="button"
+                variant="secondary"
+                aria-busy={isScanOnlyBusy}
+                title={t("dashboard.manualScanTitle")}
+              >
+                {isScanOnlyBusy ? <LoaderCircle className="size-4 animate-spin" /> : null}
+                {t("dashboard.scan")}
+              </Button>
+
+              <Button
+                variant="primary"
+                onClick={onScanAndUpdate}
+                disabled={loading || isBusy}
+                type="button"
+                aria-busy={isScanAndUpdateBusy}
+                title={t("dashboard.scanAndEnqueueTitle")}
+              >
+                {isScanAndUpdateBusy ? <LoaderCircle className="size-4 animate-spin" /> : null}
+                {t("dashboard.scanAndEnqueue")}
+              </Button>
+
+              <Button
+                onClick={onCheckAll}
+                disabled={loading || isBusy || containers.length === 0}
+                type="button"
+                variant="secondary"
+                aria-busy={isCheckAllBusy}
+              >
+                {isCheckAllBusy ? <LoaderCircle className="size-4 animate-spin" /> : null}
+                {t("dashboard.checkAll")}
+              </Button>
+
+              <Button
+                variant="primary"
+                onClick={onUpdateSelected}
+                disabled={loading || isBusy || !anySelected}
+                type="button"
+                aria-busy={isUpdateSelectedBusy}
+                title={selectedBlockedCount > 0 ? t("dashboard.selectedBlockedTitle") : undefined}
+              >
+                {isUpdateSelectedBusy ? <LoaderCircle className="size-4 animate-spin" /> : null}
+                {t("dashboard.updateSelected")}
+              </Button>
+            </ActionBar>
+          </div>
+        </div>
+      </CardHeader>
 
       <CardContent className="p-0">
         <Table>
@@ -122,6 +217,8 @@ export function ContainerTable({
             const img = splitImageRef(c.image);
             const checkState = checks[c.name];
             const isUpdating = !!updatingNames[c.name];
+            const isChecking = checkState?.status === "checking";
+            const isOpeningDetails = activeDetailsId === c.id && isDetailsLoading;
 
             return (
               <TableRow key={c.id}>
@@ -142,7 +239,7 @@ export function ContainerTable({
 
                     <div>
                       <div className="font-medium text-foreground">{c.name}</div>
-                      <div className="text-xs text-muted-foreground font-mono truncate max-w-[200px]">
+                      <div className="text-xs text-muted-foreground font-mono truncate max-w-50">
                         {c.id.slice(0, 12)}
                       </div>
                     </div>
@@ -150,7 +247,7 @@ export function ContainerTable({
                 </TableCell>
 
                 <TableCell className="text-left">
-                  <div className="font-mono text-xs text-foreground truncate max-w-[400px]">
+                  <div className="font-mono text-xs text-foreground truncate max-w-400px">
                     {img.repo}
                   </div>
                   <div className="mt-1 flex items-center gap-2">
@@ -181,9 +278,11 @@ export function ContainerTable({
                       size="sm"
                       variant="outline"
                       onClick={() => onDetails(c.id)}
-                      disabled={busy}
+                      disabled={isBusy || isOpeningDetails}
                       type="button"
+                      aria-busy={isOpeningDetails}
                     >
+                      {isOpeningDetails ? <LoaderCircle className="size-3.5 animate-spin" /> : null}
                       {t("common.actions.details")}
                     </Button>
 
@@ -191,9 +290,11 @@ export function ContainerTable({
                       size="sm"
                       variant="secondary"
                       onClick={() => onCheck(c.name)}
-                      disabled={busy}
+                      disabled={isBusy || isChecking}
                       type="button"
+                      aria-busy={isChecking}
                     >
+                      {isChecking ? <LoaderCircle className="size-3.5 animate-spin" /> : null}
                       {t("common.actions.check")}
                     </Button>
 
@@ -201,7 +302,7 @@ export function ContainerTable({
                       size="sm"
                       variant="primary"
                       onClick={() => onUpdate(c.name)}
-                      disabled={busy || !allowAutoUpdate || isUpdating}
+                      disabled={isBusy || !allowAutoUpdate || isUpdating}
                       type="button"
                       aria-busy={isUpdating}
                     >
