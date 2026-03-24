@@ -205,7 +205,7 @@ function SidebarContent({
 }
 
 export function AppShell() {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const navigate = useNavigate();
   const location = useLocation();
   const qc = useQueryClient();
@@ -221,7 +221,7 @@ export function AppShell() {
       navItems[0]
     );
   }, [location.pathname]);
-  const currentTitle = t(currentNav.labelKey);
+  const currentTitle = useMemo(() => t(currentNav.labelKey), [currentNav.labelKey, i18n.resolvedLanguage, t]);
 
   useEffect(() => {
     document.title = `DockSentinel | ${currentTitle}`;
