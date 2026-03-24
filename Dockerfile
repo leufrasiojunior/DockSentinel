@@ -51,11 +51,6 @@ COPY apps/api/prisma/schema.prisma apps/api/prisma/schema.prisma
 
 # Install only production deps needed by the API workspace
 RUN npm ci --omit=dev --workspace apps/api \
-  && PRISMA_VERSION=$(node -p 'require("./apps/api/package.json").devDependencies.prisma') \
-  && npm install --no-save --omit=dev --workspace apps/api "prisma@${PRISMA_VERSION}" \
-  && npm install --no-save --workspace apps/api tsconfig-paths \
-  && cd /app/apps/api \
-  && ../../node_modules/.bin/prisma generate --config=prisma.config.ts \
   && npm cache clean --force
 
 FROM node:20-alpine AS runtime
@@ -80,6 +75,8 @@ ENV NODE_ENV=production \
   TZ=UTC
 
 COPY --from=prod-deps /app/node_modules /app/node_modules
+COPY --from=build /app/node_modules/.prisma /app/node_modules/.prisma
+COPY --from=build /app/node_modules/@prisma/client /app/node_modules/@prisma/client
 COPY --from=build /app/apps/api/prisma.config.ts /app/apps/api/prisma.config.ts
 COPY --from=build /app/apps/api/dist /app/apps/api/dist
 COPY --from=build /app/apps/api/prisma/schema.prisma /app/apps/api/prisma/schema.prisma
