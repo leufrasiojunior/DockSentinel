@@ -92,12 +92,16 @@ const DialogContent = React.forwardRef<HTMLDivElement, DialogContentProps>(
 
     return (
       <DialogPortal>
-        <DialogOverlay onClick={() => setOpen(false)} />
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+        <DialogOverlay />
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center p-4"
+          onClick={() => setOpen(false)}
+        >
           <div
             ref={ref}
             role="dialog"
             aria-modal="true"
+            onClick={(event) => event.stopPropagation()}
             className={cn(
               "relative w-full max-w-2xl rounded-[2rem] border border-border/60 bg-card/95 text-card-foreground shadow-[0_40px_120px_-50px_rgba(8,13,24,0.7)] backdrop-blur-xl",
               className,
