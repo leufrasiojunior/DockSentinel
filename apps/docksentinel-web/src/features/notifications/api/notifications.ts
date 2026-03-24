@@ -35,8 +35,27 @@ export async function markNotificationRead(id: string): Promise<{ ok: boolean }>
   });
 }
 
+export async function markNotificationUnread(id: string): Promise<{ ok: boolean }> {
+  return http<{ ok: boolean }>(`/api/notifications/${encodeURIComponent(id)}/unread`, {
+    method: "POST",
+  });
+}
+
 export async function markAllNotificationsRead(): Promise<{ ok: boolean; affected: number }> {
   return http<{ ok: boolean; affected: number }>("/api/notifications/read-all", {
     method: "POST",
+  });
+}
+
+export async function deleteNotification(id: string): Promise<{ ok: boolean }> {
+  return http<{ ok: boolean }>(`/api/notifications/${encodeURIComponent(id)}`, {
+    method: "DELETE",
+  });
+}
+
+export async function deleteNotifications(ids: string[]): Promise<{ ok: boolean; affected: number }> {
+  return http<{ ok: boolean; affected: number }>("/api/notifications/delete-many", {
+    method: "POST",
+    body: { ids },
   });
 }

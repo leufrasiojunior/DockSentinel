@@ -48,8 +48,20 @@ export class NotificationsService {
     return this.repo.markRead(id)
   }
 
+  async markUnread(id: string) {
+    return this.repo.markUnread(id)
+  }
+
   async markAllRead() {
     return this.repo.markAllRead()
+  }
+
+  async deleteOne(id: string) {
+    return this.repo.deleteOne(id)
+  }
+
+  async deleteMany(ids: string[]) {
+    return this.repo.deleteMany(ids)
   }
 
   async cleanupExpiredBySettings() {

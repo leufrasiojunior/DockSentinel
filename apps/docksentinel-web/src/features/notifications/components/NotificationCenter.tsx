@@ -14,6 +14,12 @@ import {
   markAllNotificationsRead,
   markNotificationRead,
 } from "../api/notifications";
+import {
+  markAllNotificationsReadInCache,
+  markNotificationReadInCache,
+  restoreNotificationsCache,
+  snapshotNotificationsCache,
+} from "../utils/cache";
 import { sortNewestFirst } from "../utils/date";
 import { formatDateTime } from "../../../i18n/format";
 
@@ -39,15 +45,27 @@ export function NotificationCenter() {
 
   const markReadMutation = useMutation({
     mutationFn: async (id: string) => markNotificationRead(id),
-    onSuccess: async () => {
-      await qc.invalidateQueries({ queryKey: ["notifications"] });
+    onMutate: async (id: string) => {
+      await qc.cancelQueries({ queryKey: ["notifications"] });
+      const snapshot = snapshotNotificationsCache(qc);
+      markNotificationReadInCache(qc, id);
+      return { snapshot };
+    },
+    onError: (_error, _id, context) => {
+      restoreNotificationsCache(qc, context?.snapshot);
     },
   });
 
   const markAllReadMutation = useMutation({
     mutationFn: async () => markAllNotificationsRead(),
-    onSuccess: async () => {
-      await qc.invalidateQueries({ queryKey: ["notifications"] });
+    onMutate: async () => {
+      await qc.cancelQueries({ queryKey: ["notifications"] });
+      const snapshot = snapshotNotificationsCache(qc);
+      markAllNotificationsReadInCache(qc);
+      return { snapshot };
+    },
+    onError: (_error, _vars, context) => {
+      restoreNotificationsCache(qc, context?.snapshot);
     },
   });
 
@@ -80,7 +98,10 @@ export function NotificationCenter() {
       >
         <Bell className="size-4.5" />
         {unreadCount > 0 ? (
-          <span className="absolute -right-1 -top-1 flex h-4 min-w-4 items-center justify-center rounded-full bg-primary px-1 text-[10px] font-bold text-primary-foreground ring-2 ring-background">
+          <span
+            key={unreadCount}
+            className="absolute -right-1 -top-1 flex h-4 min-w-4 items-center justify-center rounded-full bg-primary px-1 text-[10px] font-bold text-primary-foreground ring-2 ring-background transition-transform duration-300 motion-safe:animate-in motion-safe:fade-in-0 motion-safe:zoom-in-75 motion-safe:duration-300"
+          >
             {unreadCount}
           </span>
         ) : null}
