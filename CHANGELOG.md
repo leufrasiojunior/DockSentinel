@@ -1,5 +1,17 @@
 # Changelog
 
+## [2.3.0](https://github.com/leufrasiojunior/DockSentinel/compare/v2.2.0...v2.3.0) (2026-03-24)
+
+
+### Features
+
+* adicionar suporte à versão da aplicação nas traduções e no AppShell ([38e032c](https://github.com/leufrasiojunior/DockSentinel/commit/38e032c7ee4138a7f49661a4e2f64e1f8df89970))
+* atualizar componentes para melhorar a interface e a usabilidade ([d8bff83](https://github.com/leufrasiojunior/DockSentinel/commit/d8bff837144f235f028ec488033ceb88b0318246))
+* **web:** add Spanish locale support ([0471315](https://github.com/leufrasiojunior/DockSentinel/commit/0471315868efb8863d1edc2fd4ec9a5373e9d449))
+* **web:** add Spanish locale support ([50dd326](https://github.com/leufrasiojunior/DockSentinel/commit/50dd326b13e1b4b692115535969a5855fd032b46))
+* **web:** improve page actions and row updates` ([f6889fc](https://github.com/leufrasiojunior/DockSentinel/commit/f6889fccb9f03f4beb60c7d65bf5b2693ac52b43))
+* **web:** refine container details modal UX ([2cd0086](https://github.com/leufrasiojunior/DockSentinel/commit/2cd00863b1548ffef8ef56b2af853b1296fe6d97))
+
 ## [2.2.0](https://github.com/leufrasiojunior/DockSentinel/compare/v2.1.0...v2.2.0) (2026-03-22)
 
 
