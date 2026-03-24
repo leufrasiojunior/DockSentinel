@@ -19,6 +19,8 @@ export const translationPtBr = {
       login: "Entrar",
       markAllAsRead: "Marcar todas como lidas",
       markAsRead: "Marcar como lida",
+      markAsUnread: "Marcar como não lida",
+      delete: "Apagar",
       retry: "Tentar novamente",
     },
     labels: {
@@ -340,6 +342,16 @@ export const translationPtBr = {
       loading: "Carregando...",
       empty: "Nenhuma notificação encontrada.",
       markRead: "Marcar lida",
+      openActions: "Abrir ações",
+      selectAll: "Selecionar todas as notificações",
+      selectRow: "Selecionar notificação",
+      deleteSelected: "Apagar selecionadas ({{count}})",
+    },
+    confirm: {
+      deleteOneTitle: "Apagar notificação?",
+      deleteOneDescription: "Essa ação remove permanentemente a notificação selecionada.",
+      deleteManyTitle: "Apagar {{count}} notificações?",
+      deleteManyDescription: "Essa ação remove permanentemente as notificações selecionadas.",
     },
   },
   settings: {

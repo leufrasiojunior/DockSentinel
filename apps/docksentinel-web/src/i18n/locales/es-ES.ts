@@ -23,6 +23,8 @@ export const translationEsEs = {
       login: "Iniciar sesión",
       markAllAsRead: "Marcar todas como leídas",
       markAsRead: "Marcar como leída",
+      markAsUnread: "Marcar como no leída",
+      delete: "Eliminar",
       retry: "Reintentar",
     },
     labels: {
@@ -340,6 +342,16 @@ export const translationEsEs = {
       loading: "Cargando...",
       empty: "No se encontraron notificaciones.",
       markRead: "Marcar leída",
+      openActions: "Abrir acciones",
+      selectAll: "Seleccionar todas las notificaciones",
+      selectRow: "Seleccionar notificación",
+      deleteSelected: "Eliminar seleccionadas ({{count}})",
+    },
+    confirm: {
+      deleteOneTitle: "¿Eliminar notificación?",
+      deleteOneDescription: "Esta acción elimina permanentemente la notificación seleccionada.",
+      deleteManyTitle: "¿Eliminar {{count}} notificaciones?",
+      deleteManyDescription: "Esta acción elimina permanentemente las notificaciones seleccionadas.",
     },
   },
   settings: {

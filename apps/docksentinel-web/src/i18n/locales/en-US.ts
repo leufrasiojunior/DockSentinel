@@ -19,6 +19,8 @@ export const translationEnUs = {
       login: "Sign in",
       markAllAsRead: "Mark all as read",
       markAsRead: "Mark as read",
+      markAsUnread: "Mark as unread",
+      delete: "Delete",
       retry: "Try again",
     },
     labels: {
@@ -336,6 +338,16 @@ export const translationEnUs = {
       loading: "Loading...",
       empty: "No notifications found.",
       markRead: "Mark read",
+      openActions: "Open actions",
+      selectAll: "Select all notifications",
+      selectRow: "Select notification",
+      deleteSelected: "Delete selected ({{count}})",
+    },
+    confirm: {
+      deleteOneTitle: "Delete notification?",
+      deleteOneDescription: "This action permanently removes the selected notification.",
+      deleteManyTitle: "Delete {{count}} notifications?",
+      deleteManyDescription: "This action permanently removes the selected notifications.",
     },
   },
   settings: {
