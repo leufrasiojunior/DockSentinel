@@ -2,13 +2,10 @@ import { LockKeyhole, Mail, ShieldAlert } from "lucide-react";
 import { useTranslation } from "react-i18next";
 
 import { EmptyState } from "../../components/product/empty-state";
-import { PageHeader } from "../../components/product/page-header";
-import { Badge } from "../../components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "../../components/ui/tabs";
 import { AuthSettings } from "../../features/settings/components/AuthSettings";
 import { NotificationSettings } from "../../features/settings/components/NotificationSettings";
 import { useSettings } from "../../features/settings/hooks/useSettings";
-import { getAuthModeLabel } from "../../i18n/helpers";
 import { useConfirm } from "../../shared/components/ui/ConfirmProvider";
 
 export function SettingsPage() {
@@ -94,23 +91,6 @@ export function SettingsPage() {
 
   return (
     <div className="space-y-6">
-      <PageHeader
-        eyebrow={t("settings.eyebrow")}
-        title={t("settings.title")}
-        description={t("settings.description")}
-        meta={
-          <>
-            <Badge variant="outline">
-              {t("common.labels.currentMode")}: {getAuthModeLabel(t, currentMode)}
-            </Badge>
-            <Badge variant="outline">
-              {t("common.labels.defaultLocale")}: {defaultLocale}
-            </Badge>
-            <Badge variant="outline">{t("settings.authAndNotificationsMeta")}</Badge>
-          </>
-        }
-      />
-
       {loading ? (
         <EmptyState
           title={t("settings.loadingTitle")}

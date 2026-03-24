@@ -1,13 +1,10 @@
 import { Bot, Clock3, RefreshCcw, ScanSearch, ShieldCheck } from "lucide-react";
 import { useTranslation } from "react-i18next";
 
-import { ActionBar } from "../../components/product/action-bar";
 import { FormField } from "../../components/product/form-field";
-import { PageHeader } from "../../components/product/page-header";
 import { SectionCard } from "../../components/product/section-card";
 import { StatCard } from "../../components/product/stat-card";
 import { StatusBadge } from "../../components/product/status-badge";
-import { Badge } from "../../components/ui/badge";
 import { Button } from "../../components/ui/button";
 import { Card } from "../../components/ui/card";
 import { Input } from "../../components/ui/input";
@@ -30,7 +27,6 @@ export function SchedulerPage() {
   const {
     cfg,
     rt,
-    loading,
     isFetching,
     refetch,
     enabled,
@@ -53,49 +49,11 @@ export function SchedulerPage() {
     schedulePreview,
     dirty,
     saving,
-    scanning,
     handleSave,
-    handleScanAndEnqueue,
-    visible,
   } = useScheduler();
 
   return (
     <div className="space-y-6">
-      <PageHeader
-        eyebrow={t("scheduler.eyebrow")}
-        title={t("scheduler.title")}
-        description={t("scheduler.description")}
-        meta={
-          <>
-            <Badge variant="outline">
-              {visible ? t("common.states.autoRefreshOn") : t("common.states.autoRefreshOff")}
-            </Badge>
-            <Badge variant={schedulePreview.isCustom ? "warning" : "info"}>
-              {schedulePreview.isCustom ? t("common.states.customCron") : t("common.states.guided")}
-            </Badge>
-            <Badge variant="outline">{rt?.timeZone ?? "UTC"}</Badge>
-          </>
-        }
-        actions={
-          <ActionBar className="justify-end">
-            <Button onClick={() => refetch()} disabled={isFetching} type="button" variant="outline">
-              <RefreshCcw className="size-4" />
-              {t("common.actions.reload")}
-            </Button>
-
-            <Button
-              variant="primary"
-              onClick={handleScanAndEnqueue}
-              disabled={loading || scanning}
-              type="button"
-            >
-              <ScanSearch className="size-4" />
-              {scanning ? t("scheduler.running") : t("scheduler.scanAndEnqueue")}
-            </Button>
-          </ActionBar>
-        }
-      />
-
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
         <StatCard
           label={t("common.labels.status")}
@@ -119,9 +77,15 @@ export function SchedulerPage() {
         title={t("scheduler.whenSectionTitle")}
         description={t("scheduler.whenSectionDescription")}
         actions={
-          <Button variant="primary" onClick={handleSave} disabled={!cfg || !dirty || saving} type="button">
-            {saving ? t("common.actions.saving") : dirty ? t("scheduler.saveChanges") : t("scheduler.noChanges")}
-          </Button>
+          <>
+            <Button variant="outline" onClick={() => refetch()} disabled={isFetching} type="button">
+              <RefreshCcw className="size-4" />
+              {t("common.actions.reload")}
+            </Button>
+            <Button variant="primary" onClick={handleSave} disabled={!cfg || !dirty || saving} type="button">
+              {saving ? t("common.actions.saving") : dirty ? t("scheduler.saveChanges") : t("scheduler.noChanges")}
+            </Button>
+          </>
         }
       >
         <CronBuilder

@@ -25,6 +25,7 @@ interface JobTableProps {
 export function JobTable({ jobs, loading }: JobTableProps) {
   const { t } = useTranslation();
 
+
   return (
     <Table>
       <TableHeader>
@@ -35,6 +36,7 @@ export function JobTable({ jobs, loading }: JobTableProps) {
           <TableHead className="text-left">{t("common.labels.timestamps")}</TableHead>
           <TableHead className="text-left">{t("common.labels.lock")}</TableHead>
         </TableRow>
+
       </TableHeader>
 
       <TableBody>
@@ -80,7 +82,7 @@ export function JobTable({ jobs, loading }: JobTableProps) {
             </TableCell>
 
             <TableCell className="text-left">
-              <div className="font-mono text-xs text-foreground max-w-[400px] truncate">
+              <div className="font-mono text-xs text-foreground max-w-400px truncate">
                 {j.image ?? "—"}
               </div>
             </TableCell>
@@ -96,7 +98,7 @@ export function JobTable({ jobs, loading }: JobTableProps) {
             <TableCell className="text-left">
               <div className="text-xs text-muted-foreground space-y-1">
                 <div>{t("jobs.table.lockedAt")}: {fmt(j.lockedAt ?? null)}</div>
-                <div className="font-mono truncate max-w-[200px]">
+                <div className="font-mono truncate max-w-200px">
                   {t("jobs.table.lockedBy")}: {j.lockedBy ?? "—"}
                 </div>
               </div>
