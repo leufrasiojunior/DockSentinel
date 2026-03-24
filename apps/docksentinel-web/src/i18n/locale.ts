@@ -1,4 +1,4 @@
-export const SUPPORTED_LOCALES = ["pt-BR", "en-US"] as const;
+export const SUPPORTED_LOCALES = ["pt-BR", "en-US", "es-ES"] as const;
 
 export type Locale = (typeof SUPPORTED_LOCALES)[number];
 
@@ -11,6 +11,7 @@ export function normalizeLocale(value: unknown): Locale {
   const normalized = value.trim().toLowerCase();
   if (normalized.startsWith("pt")) return "pt-BR";
   if (normalized.startsWith("en")) return "en-US";
+  if (normalized.startsWith("es")) return "es-ES";
   return DEFAULT_LOCALE;
 }
 

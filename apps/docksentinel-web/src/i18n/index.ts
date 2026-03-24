@@ -10,7 +10,7 @@ void i18n
   .init({
     lng: getInitialLocale(),
     fallbackLng: DEFAULT_LOCALE,
-    supportedLngs: ["pt-BR", "pt", "en-US", "en"],
+    supportedLngs: ["pt-BR", "pt", "en-US", "en", "es-ES", "es"],
     nonExplicitSupportedLngs: true,
     load: "currentOnly",
     resources,

@@ -6,6 +6,16 @@ import { t } from "../i18n/translate"
 export class NotificationsRepository {
   constructor(private readonly prisma: PrismaService) {}
 
+  private async ensureExists(id: string) {
+    const existing = await this.prisma.client.notificationEvent.findUnique({
+      where: { id },
+      select: { id: true, readAt: true },
+    })
+
+    if (!existing) throw new NotFoundException(t("notifications.notFound", { id }))
+    return existing
+  }
+
   async createInApp(input: {
     type: string
     level: "info" | "error"
@@ -65,16 +75,23 @@ export class NotificationsRepository {
   }
 
   async markRead(id: string) {
-    const existing = await this.prisma.client.notificationEvent.findUnique({
-      where: { id },
-      select: { id: true, readAt: true },
-    })
-    if (!existing) throw new NotFoundException(t("notifications.notFound", { id }))
+    const existing = await this.ensureExists(id)
     if (existing.readAt) return { ok: true as const }
 
     await this.prisma.client.notificationEvent.update({
       where: { id },
       data: { readAt: new Date() },
+    })
+    return { ok: true as const }
+  }
+
+  async markUnread(id: string) {
+    const existing = await this.ensureExists(id)
+    if (!existing.readAt) return { ok: true as const }
+
+    await this.prisma.client.notificationEvent.update({
+      where: { id },
+      data: { readAt: null },
     })
     return { ok: true as const }
   }
@@ -85,6 +102,32 @@ export class NotificationsRepository {
       where: { readAt: null },
       data: { readAt: now },
     })
+    return { ok: true as const, affected: result.count }
+  }
+
+  async deleteOne(id: string) {
+    await this.ensureExists(id)
+
+    await this.prisma.client.notificationEvent.delete({
+      where: { id },
+    })
+
+    return { ok: true as const }
+  }
+
+  async deleteMany(ids: string[]) {
+    const uniqueIds = Array.from(new Set(ids.map((value) => value.trim()).filter(Boolean)))
+
+    if (uniqueIds.length === 0) return { ok: true as const, affected: 0 }
+
+    const result = await this.prisma.client.notificationEvent.deleteMany({
+      where: {
+        id: {
+          in: uniqueIds,
+        },
+      },
+    })
+
     return { ok: true as const, affected: result.count }
   }
 

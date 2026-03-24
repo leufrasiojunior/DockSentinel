@@ -9,7 +9,10 @@ import {
 } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
 
-interface SectionCardProps extends Omit<React.HTMLAttributes<HTMLDivElement>, "title"> {
+interface SectionCardProps extends Omit<
+  React.HTMLAttributes<HTMLDivElement>,
+  "title"
+> {
   title: React.ReactNode;
   description?: React.ReactNode;
   actions?: React.ReactNode;
@@ -28,15 +31,23 @@ function SectionCard({
   return (
     <Card className={cn("overflow-hidden", className)} {...props}>
       <CardHeader className="border-b border-border/60">
-        <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-          <div className="space-y-1">
+        <div className="flex w-full flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+          <div className="min-w-0 space-y-1">
             <CardTitle>{title}</CardTitle>
-            {description ? <CardDescription>{description}</CardDescription> : null}
+            {description ? (
+              <CardDescription>{description}</CardDescription>
+            ) : null}
           </div>
-          {actions ? <div className="shrink-0">{actions}</div> : null}
+          {actions ? (
+            <div className="flex w-full flex-wrap items-center gap-2 sm:w-auto sm:justify-end">
+              {actions}
+            </div>
+          ) : null}
         </div>
       </CardHeader>
-      <CardContent className={cn("space-y-4", contentClassName)}>{children}</CardContent>
+      <CardContent className={cn("space-y-4", contentClassName)}>
+        {children}
+      </CardContent>
     </Card>
   );
 }

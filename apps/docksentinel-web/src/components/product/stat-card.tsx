@@ -1,7 +1,6 @@
 import * as React from "react";
-import type { LucideIcon } from "lucide-react";
+import {  type LucideIcon } from "lucide-react";
 
-import { Badge } from "@/components/ui/badge";
 import { Card } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
 
@@ -23,21 +22,18 @@ function StatCard({
   ...props
 }: StatCardProps) {
   return (
-    <Card className={cn("p-5", className)} {...props}>
-      <div className="flex items-start justify-between gap-4">
-        <div className="space-y-3">
+    
+    <Card className={cn("relative p-1", className)} {...props}>
+      {Icon ? (
+        <div className="absolute left-5 top-5">
+          <Icon className="size-5 text-foreground bg-" />
+        </div>
+      ) : null}
+      <div className="flex min-h-20 items-center justify-center">
+        <div className="min-w-0 space-y-3 text-center">
           <div className="text-xs font-semibold uppercase tracking-[0.16em] text-muted-foreground">{label}</div>
           <div className="text-3xl font-semibold tracking-tight text-foreground">{value}</div>
-          {helper ? <div className="text-sm leading-relaxed text-muted-foreground">{helper}</div> : null}
         </div>
-        {Icon ? (
-          <div className="rounded-2xl border border-border/60 bg-muted/45 p-3">
-            <Icon className="size-5 text-foreground" />
-          </div>
-        ) : null}
-      </div>
-      <div className="mt-4">
-        <Badge variant={tone}>Live</Badge>
       </div>
     </Card>
   );

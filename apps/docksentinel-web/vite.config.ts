@@ -1,13 +1,20 @@
+import fs from "node:fs";
 import tailwindcss from "@tailwindcss/vite";
 import { defineConfig } from "vite";
 import react from "@vitejs/plugin-react";
 import * as path from "path";
 
 const API_TARGET = "http://localhost:3000";
+const rootPackageJsonPath = path.resolve(__dirname, "../../package.json");
+const rootPackageJson = JSON.parse(fs.readFileSync(rootPackageJsonPath, "utf-8")) as { version?: string };
+const appVersion = rootPackageJson.version ?? "0.0.0";
 
 export default defineConfig({
+  define: {
+    __APP_VERSION__: JSON.stringify(appVersion),
+  },
   plugins: [react(), tailwindcss()],
-    resolve: {
+  resolve: {
     alias: [
       {
         find: "@",

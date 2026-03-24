@@ -45,6 +45,7 @@ const SIDEBAR_DEFAULT_WIDTH = 320;
 const SIDEBAR_MIN_WIDTH = 256;
 const SIDEBAR_MAX_WIDTH = 420;
 const SIDEBAR_WIDTH_STORAGE_KEY = "docksentinel.sidebar.width";
+const APP_VERSION = __APP_VERSION__;
 
 function clampSidebarWidth(value: number) {
   return Math.min(SIDEBAR_MAX_WIDTH, Math.max(SIDEBAR_MIN_WIDTH, Math.round(value)));
@@ -172,7 +173,7 @@ function SidebarContent({
         {!isCollapsed ? (
           <div className="mb-4 border-white/8 p-4 text-sm text-sidebar-foreground/72">
             <p className="mt-2 text-xs leading-relaxed text-sidebar-foreground/55">
-              {t("navigation.projectBlurb")}{" "}
+              {t("navigation.projectBlurb", { version: APP_VERSION })}{" "}
               <a
                 href="https://github.com/leufrasiojunior/DockSentinel"
                 target="_blank"
@@ -204,7 +205,7 @@ function SidebarContent({
 }
 
 export function AppShell() {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const navigate = useNavigate();
   const location = useLocation();
   const qc = useQueryClient();
@@ -220,7 +221,7 @@ export function AppShell() {
       navItems[0]
     );
   }, [location.pathname]);
-  const currentTitle = t(currentNav.labelKey);
+  const currentTitle = useMemo(() => t(currentNav.labelKey), [currentNav.labelKey, i18n.resolvedLanguage, t]);
 
   useEffect(() => {
     document.title = `DockSentinel | ${currentTitle}`;
@@ -344,7 +345,7 @@ export function AppShell() {
 
         <div className="flex min-w-0 flex-1 flex-col">
           <header className="sticky top-0 z-10 border-b border-border/60 bg-background/80 backdrop-blur-xl">
-            <div className="mx-auto flex w-full max-w-[1600px] items-center gap-4 px-4 py-4 sm:px-6 lg:px-8">
+            <div className="mx-auto flex w-full max-w-400 items-center gap-4 px-4 py-4 sm:px-6 lg:px-8">
               <div className="lg:hidden">
                   <Sheet open={mobileOpen} onOpenChange={setMobileOpen}>
                   <SheetTrigger asChild>
@@ -393,7 +394,7 @@ export function AppShell() {
           </header>
 
           <main className="flex-1">
-            <div className="mx-auto w-full max-w-[1600px] px-4 py-5 sm:px-6 lg:px-8">
+            <div className="mx-auto w-full max-w-400 px-4 py-5 sm:px-6 lg:px-8">
               <Outlet />
             </div>
           </main>

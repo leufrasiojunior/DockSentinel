@@ -23,7 +23,7 @@ function PageHeader({
   return (
     <div
       className={cn(
-        "flex flex-col gap-5 rounded-[2rem] border border-border/60 bg-card/70 p-6 shadow-[0_18px_60px_-40px_rgba(8,13,24,0.55)] backdrop-blur-sm lg:flex-row lg:items-end lg:justify-between",
+        "lg:items-center flex flex-col gap-5 rounded-[2rem] border border-border/60 bg-card/70 p-6 shadow-[0_18px_60px_-40px_rgba(8,13,24,0.55)] backdrop-blur-sm lg:flex-row lg:justify-between ",
         className,
       )}
       {...props}
