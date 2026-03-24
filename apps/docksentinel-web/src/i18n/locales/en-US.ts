@@ -90,6 +90,7 @@ export const translationEnUs = {
     locales: {
       "pt-BR": "Portuguese (Brazil)",
       "en-US": "English (US)",
+      "es-ES": "Spanish (Spain)",
     },
     authModes: {
       none: "No password",
@@ -635,4 +636,3 @@ export const translationEnUs = {
     },
   },
 } as const;
-

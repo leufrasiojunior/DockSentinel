@@ -42,9 +42,21 @@ function FlagUsa(props: SVGProps<SVGSVGElement>) {
   );
 }
 
+function FlagSpain(props: SVGProps<SVGSVGElement>) {
+  return (
+    <svg viewBox="0 0 64 64" aria-hidden="true" {...props}>
+      <rect width="64" height="64" rx="32" fill="#C60B1E" />
+      <rect y="16" width="64" height="32" fill="#FFC400" />
+      <rect x="14" y="22" width="10" height="20" rx="2" fill="#AA151B" />
+      <rect x="16.5" y="26" width="5" height="10" rx="1" fill="#F1BF00" />
+    </svg>
+  );
+}
+
 const LOCALE_FLAGS: Record<Locale, ComponentType<SVGProps<SVGSVGElement>>> = {
   "pt-BR": FlagBrazil,
   "en-US": FlagUsa,
+  "es-ES": FlagSpain,
 };
 
 export function LocaleFlag({
@@ -57,4 +69,3 @@ export function LocaleFlag({
   const Flag = LOCALE_FLAGS[locale];
   return <Flag className={className} />;
 }
-

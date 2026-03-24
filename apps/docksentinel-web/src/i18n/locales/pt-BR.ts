@@ -90,6 +90,7 @@ export const translationPtBr = {
     locales: {
       "pt-BR": "Português (Brasil)",
       "en-US": "English (US)",
+      "es-ES": "Español",
     },
     authModes: {
       none: "Sem senha",
