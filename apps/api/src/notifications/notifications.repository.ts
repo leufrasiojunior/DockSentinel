@@ -17,6 +17,8 @@ export class NotificationsRepository {
   }
 
   async createInApp(input: {
+    environmentId: string
+    environmentName: string
     type: string
     level: "info" | "error"
     title: string
@@ -25,6 +27,8 @@ export class NotificationsRepository {
   }) {
     return this.prisma.client.notificationEvent.create({
       data: {
+        environmentId: input.environmentId,
+        environmentName: input.environmentName,
         channel: "in_app",
         type: input.type,
         level: input.level,
@@ -35,11 +39,12 @@ export class NotificationsRepository {
     })
   }
 
-  async listForClient(params: { afterId?: string; take: number }) {
+  async listForClient(params: { afterId?: string; take: number; environmentId: string }) {
     const take = Math.max(1, Math.min(params.take, 100))
 
     if (!params.afterId) {
       return this.prisma.client.notificationEvent.findMany({
+        where: { environmentId: params.environmentId },
         orderBy: [{ createdAt: "desc" }, { id: "desc" }],
         take,
       })
@@ -60,6 +65,7 @@ export class NotificationsRepository {
 
     return this.prisma.client.notificationEvent.findMany({
       where: {
+        environmentId: params.environmentId,
         OR: [
           { createdAt: { gt: after.createdAt } },
           {
@@ -96,10 +102,10 @@ export class NotificationsRepository {
     return { ok: true as const }
   }
 
-  async markAllRead() {
+  async markAllRead(environmentId?: string) {
     const now = new Date()
     const result = await this.prisma.client.notificationEvent.updateMany({
-      where: { readAt: null },
+      where: { readAt: null, ...(environmentId ? { environmentId } : {}) },
       data: { readAt: now },
     })
     return { ok: true as const, affected: result.count }

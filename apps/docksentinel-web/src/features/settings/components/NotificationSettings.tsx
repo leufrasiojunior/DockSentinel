@@ -52,6 +52,8 @@ interface NotificationSettingsProps {
   setNotificationReadRetentionDays: (v: string) => void;
   notificationUnreadRetentionDays: string;
   setNotificationUnreadRetentionDays: (v: string) => void;
+  environmentHealthcheckIntervalMin: string;
+  setEnvironmentHealthcheckIntervalMin: (v: string) => void;
   smtpHost: string;
   setSmtpHost: (v: string) => void;
   smtpPort: string;
@@ -86,6 +88,8 @@ export function NotificationSettings({
   setNotificationReadRetentionDays,
   notificationUnreadRetentionDays,
   setNotificationUnreadRetentionDays,
+  environmentHealthcheckIntervalMin,
+  setEnvironmentHealthcheckIntervalMin,
   smtpHost,
   setSmtpHost,
   smtpPort,
@@ -224,6 +228,21 @@ export function NotificationSettings({
               />
             </FormField>
           </div>
+
+          <FormField
+            label={t("settings.notifications.environmentHealthcheckInterval")}
+            description={t("settings.notifications.environmentHealthcheckIntervalDescription")}
+          >
+            <Input
+              type="number"
+              min={1}
+              max={1440}
+              value={environmentHealthcheckIntervalMin}
+              onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
+                setEnvironmentHealthcheckIntervalMin(e.target.value)
+              }
+            />
+          </FormField>
 
           <div className="md:col-span-2">
             <FormField

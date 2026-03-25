@@ -22,17 +22,19 @@ import {
 } from "../utils/cache";
 import { sortNewestFirst } from "../utils/date";
 import { formatDateTime } from "../../../i18n/format";
+import { useEnvironmentRoute } from "../../environments/hooks/useEnvironmentRoute";
 
 export function NotificationCenter() {
   const { t } = useTranslation();
   const qc = useQueryClient();
   const visible = usePageVisibility();
+  const { environmentId } = useEnvironmentRoute();
   const [open, setOpen] = useState(false);
   const panelRef = useRef<HTMLDivElement | null>(null);
 
   const notificationsQuery = useQuery({
-    queryKey: ["notifications", "panel"],
-    queryFn: () => listNotifications({ take: 5 }),
+    queryKey: ["notifications", environmentId, "panel"],
+    queryFn: () => listNotifications({ environmentId, take: 5 }),
     refetchInterval: visible ? 5_000 : false,
     retry: false,
   });
@@ -44,7 +46,7 @@ export function NotificationCenter() {
   const unreadCount = notifications.filter((n) => !n.readAt).length;
 
   const markReadMutation = useMutation({
-    mutationFn: async (id: string) => markNotificationRead(id),
+    mutationFn: async (id: string) => markNotificationRead(environmentId, id),
     onMutate: async (id: string) => {
       await qc.cancelQueries({ queryKey: ["notifications"] });
       const snapshot = snapshotNotificationsCache(qc);
@@ -57,7 +59,7 @@ export function NotificationCenter() {
   });
 
   const markAllReadMutation = useMutation({
-    mutationFn: async () => markAllNotificationsRead(),
+    mutationFn: async () => markAllNotificationsRead(environmentId),
     onMutate: async () => {
       await qc.cancelQueries({ queryKey: ["notifications"] });
       const snapshot = snapshotNotificationsCache(qc);
@@ -115,7 +117,7 @@ export function NotificationCenter() {
               {unreadCount > 0 ? <Badge variant="info">{t("notifications.center.badgeNew", { count: unreadCount })}</Badge> : null}
             </div>
             <Link
-              to="/notifications"
+              to={`/environments/${encodeURIComponent(environmentId)}/notifications`}
               className="inline-flex items-center gap-1 text-xs text-primary transition-colors hover:text-primary/80"
               onClick={() => setOpen(false)}
             >

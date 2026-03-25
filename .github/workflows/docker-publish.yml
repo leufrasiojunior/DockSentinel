@@ -29,9 +29,15 @@ jobs:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
 
+      - name: Resolve version
+        id: version
+        shell: bash
+        run: |
+          echo "value=${GITHUB_REF_NAME#v}" >> $GITHUB_OUTPUT
+
       # Gera tags Docker a partir da tag Git (SemVer)
-      - name: Docker meta
-        id: meta
+      - name: Docker meta (server)
+        id: meta_server
         uses: docker/metadata-action@v5
         with:
           images: ${{ secrets.DOCKERHUB_USERNAME }}/docksentinel
@@ -45,38 +51,76 @@ jobs:
             # Tag por SHA (debug)
             type=sha,format=short,prefix=sha-
 
+      - name: Docker meta (agent)
+        id: meta_agent
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ secrets.DOCKERHUB_USERNAME }}/docksentinel-agent
+          tags: |
+            type=semver,pattern={{version}}
+            type=semver,pattern={{major}}.{{minor}}
+            type=semver,pattern={{major}}
+            type=sha,format=short,prefix=sha-
+
       - name: Add channel tags (latest/alpha/beta)
         id: channel
         shell: bash
         run: |
           REF="${GITHUB_REF_NAME}"
-          EXTRA=""
+          SERVER_EXTRA=""
+          AGENT_EXTRA=""
           # stable: v1.2.3 -> latest
           if [[ "$REF" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
-            EXTRA="${{ secrets.DOCKERHUB_USERNAME }}/docksentinel:latest"
+            SERVER_EXTRA="${{ secrets.DOCKERHUB_USERNAME }}/docksentinel:latest"
+            AGENT_EXTRA="${{ secrets.DOCKERHUB_USERNAME }}/docksentinel-agent:latest"
           fi
           # alpha tag: v1.2.3-alpha.1 -> alpha
           if [[ "$REF" == *"-alpha."* ]]; then
-            EXTRA="${{ secrets.DOCKERHUB_USERNAME }}/docksentinel:alpha"
+            SERVER_EXTRA="${{ secrets.DOCKERHUB_USERNAME }}/docksentinel:alpha"
+            AGENT_EXTRA="${{ secrets.DOCKERHUB_USERNAME }}/docksentinel-agent:alpha"
           fi
           # beta tag: v1.2.3-beta.1 -> beta
           if [[ "$REF" == *"-beta."* ]]; then
-            EXTRA="${{ secrets.DOCKERHUB_USERNAME }}/docksentinel:beta"
+            SERVER_EXTRA="${{ secrets.DOCKERHUB_USERNAME }}/docksentinel:beta"
+            AGENT_EXTRA="${{ secrets.DOCKERHUB_USERNAME }}/docksentinel-agent:beta"
           fi
 
-          echo "extra_tags<<EOF" >> $GITHUB_OUTPUT
-          echo "$EXTRA" >> $GITHUB_OUTPUT
+          echo "server_extra_tags<<EOF" >> $GITHUB_OUTPUT
+          echo "$SERVER_EXTRA" >> $GITHUB_OUTPUT
           echo "EOF" >> $GITHUB_OUTPUT
 
-      - name: Build and push (multi-arch)
+          echo "agent_extra_tags<<EOF" >> $GITHUB_OUTPUT
+          echo "$AGENT_EXTRA" >> $GITHUB_OUTPUT
+          echo "EOF" >> $GITHUB_OUTPUT
+
+      - name: Build and push server (multi-arch)
         uses: docker/build-push-action@v6
         with:
           context: .
+          file: ./Dockerfile
           push: true
           platforms: linux/amd64,linux/arm64
+          build-args: |
+            APP_VERSION=${{ steps.version.outputs.value }}
           tags: |
-            ${{ steps.meta.outputs.tags }}
-            ${{ steps.channel.outputs.extra_tags }}
-          labels: ${{ steps.meta.outputs.labels }}
+            ${{ steps.meta_server.outputs.tags }}
+            ${{ steps.channel.outputs.server_extra_tags }}
+          labels: ${{ steps.meta_server.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Build and push agent (multi-arch)
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: ./Dockerfile.agent
+          push: true
+          platforms: linux/amd64,linux/arm64
+          build-args: |
+            APP_VERSION=${{ steps.version.outputs.value }}
+          tags: |
+            ${{ steps.meta_agent.outputs.tags }}
+            ${{ steps.channel.outputs.agent_extra_tags }}
+          labels: ${{ steps.meta_agent.outputs.labels }}
           cache-from: type=gha
           cache-to: type=gha,mode=max

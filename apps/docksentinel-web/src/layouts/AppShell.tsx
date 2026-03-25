@@ -37,6 +37,14 @@ import { NotificationsBridge } from "./NotificationsBridge";
 import { ThemeToggle } from "../shared/components/ui/ThemeToggle";
 import { cn } from "../shared/lib/utils/cn";
 import { LanguageSelector } from "../shared/components/ui/LanguageSelector";
+import {
+  buildEnvironmentPath,
+} from "../features/environments/api/environments";
+import {
+  getEnvironmentIdFromPathname,
+  readStoredEnvironmentId,
+  writeStoredEnvironmentId,
+} from "../features/environments/hooks/useEnvironmentRoute";
 
 import logo from "../assets/logo2.png";
 
@@ -59,33 +67,16 @@ interface SidebarLinkProps {
   onNavigate?: () => void;
 }
 
-const navItems = [
-  {
-    to: "/dashboard",
-    labelKey: "navigation.dashboard",
-    icon: LayoutDashboard,
-  },
-  {
-    to: "/jobs",
-    labelKey: "navigation.jobs",
-    icon: TerminalSquare,
-  },
-  {
-    to: "/scheduler",
-    labelKey: "navigation.scheduler",
-    icon: Clock3,
-  },
-  {
-    to: "/notifications",
-    labelKey: "navigation.notifications",
-    icon: Bell,
-  },
-  {
-    to: "/settings",
-    labelKey: "navigation.settings",
-    icon: Settings2,
-  },
-] as const;
+type NavItem = {
+  to: string;
+  labelKey:
+    | "navigation.dashboard"
+    | "navigation.jobs"
+    | "navigation.scheduler"
+    | "navigation.notifications"
+    | "navigation.settings";
+  icon: LucideIcon;
+};
 
 function SidebarLink({ to, label, icon: Icon, isCollapsed, onNavigate }: SidebarLinkProps) {
   return (
@@ -121,11 +112,13 @@ function SidebarContent({
   onToggleCollapse,
   onLogout,
   onNavigate,
+  navItems,
 }: {
   isCollapsed: boolean;
   onToggleCollapse: () => void;
   onLogout: () => void;
   onNavigate?: () => void;
+  navItems: NavItem[];
 }) {
   const { t } = useTranslation();
 
@@ -214,18 +207,60 @@ export function AppShell() {
   const [sidebarWidth, setSidebarWidth] = useState(SIDEBAR_DEFAULT_WIDTH);
   const [isResizing, setIsResizing] = useState(false);
   const resizeStateRef = useRef<{ startX: number; startWidth: number } | null>(null);
+  const activeEnvironmentId = useMemo(
+    () => getEnvironmentIdFromPathname(location.pathname) ?? readStoredEnvironmentId() ?? "local",
+    [location.pathname],
+  );
+
+  const navItems = useMemo<NavItem[]>(() => {
+    const dashboardPath = buildEnvironmentPath(activeEnvironmentId, "dashboard");
+    return [
+      {
+        to: dashboardPath,
+        labelKey: "navigation.dashboard",
+        icon: LayoutDashboard,
+      },
+      {
+        to: buildEnvironmentPath(activeEnvironmentId, "jobs"),
+        labelKey: "navigation.jobs",
+        icon: TerminalSquare,
+      },
+      {
+        to: buildEnvironmentPath(activeEnvironmentId, "scheduler"),
+        labelKey: "navigation.scheduler",
+        icon: Clock3,
+      },
+      {
+        to: buildEnvironmentPath(activeEnvironmentId, "notifications"),
+        labelKey: "navigation.notifications",
+        icon: Bell,
+      },
+      {
+        to: "/settings",
+        labelKey: "navigation.settings",
+        icon: Settings2,
+      },
+    ];
+  }, [activeEnvironmentId]);
 
   const currentNav = useMemo(() => {
     return (
       navItems.find((item) => location.pathname === item.to || location.pathname.startsWith(`${item.to}/`)) ??
       navItems[0]
     );
-  }, [location.pathname]);
+  }, [location.pathname, navItems]);
   const currentTitle = useMemo(() => t(currentNav.labelKey), [currentNav.labelKey, i18n.resolvedLanguage, t]);
 
   useEffect(() => {
     document.title = `DockSentinel | ${currentTitle}`;
   }, [currentTitle]);
+
+  useEffect(() => {
+    const environmentId = getEnvironmentIdFromPathname(location.pathname);
+    if (environmentId) {
+      writeStoredEnvironmentId(environmentId);
+    }
+  }, [location.pathname]);
 
   useEffect(() => {
     try {
@@ -323,6 +358,7 @@ export function AppShell() {
             isCollapsed={isCollapsed}
             onToggleCollapse={() => setIsCollapsed((current) => !current)}
             onLogout={handleLogout}
+            navItems={navItems}
           />
 
           {!isCollapsed ? (
@@ -365,6 +401,7 @@ export function AppShell() {
                         isCollapsed={false}
                         onToggleCollapse={() => undefined}
                         onLogout={handleLogout}
+                        navItems={navItems}
                         onNavigate={() => setMobileOpen(false)}
                       />
                     </div>

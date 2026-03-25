@@ -95,6 +95,13 @@ export class UpdateSettingsDto {
   @IsOptional()
   notificationUnreadRetentionDays?: number;
 
+  @ApiProperty({ required: false, example: 5 })
+  @IsInt()
+  @Min(1)
+  @Max(1440)
+  @IsOptional()
+  environmentHealthcheckIntervalMin?: number;
+
   @ApiProperty({ required: false, nullable: true, example: 'admin@example.com' })
   @IsEmail()
   @IsOptional()

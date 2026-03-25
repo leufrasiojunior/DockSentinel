@@ -63,6 +63,9 @@ export class SafeSettingsDto {
   @ApiProperty({ example: 60 })
   notificationUnreadRetentionDays!: number;
 
+  @ApiProperty({ example: 5 })
+  environmentHealthcheckIntervalMin!: number;
+
   @ApiProperty({ nullable: true, example: 'admin@example.com' })
   notificationRecipientEmail!: string | null;
 

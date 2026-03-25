@@ -4,6 +4,12 @@ export class NotificationEventDto {
   @ApiProperty()
   id!: string
 
+  @ApiProperty({ example: "local" })
+  environmentId!: string
+
+  @ApiProperty({ example: "Local" })
+  environmentName!: string
+
   @ApiProperty({ enum: ["in_app"], example: "in_app" })
   channel!: "in_app"
 

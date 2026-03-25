@@ -1,0 +1,59 @@
+ARG APP_VERSION=dev
+
+FROM node:20-alpine AS build
+WORKDIR /app
+
+RUN apk add --no-cache \
+  python3 \
+  make \
+  g++ \
+  libc6-compat
+
+COPY package.json package-lock.json ./
+COPY apps/api/package.json apps/api/package.json
+COPY apps/agent/package.json apps/agent/package.json
+COPY apps/docksentinel-web/package.json apps/docksentinel-web/package.json
+COPY packages/shared/package.json packages/shared/package.json
+
+RUN npm ci
+
+COPY tsconfig.base.json tsconfig.base.json
+COPY apps/agent apps/agent
+
+RUN npm --workspace apps/agent run build
+
+FROM node:20-alpine AS prod-deps
+WORKDIR /app
+
+COPY package.json package-lock.json ./
+COPY apps/api/package.json apps/api/package.json
+COPY apps/agent/package.json apps/agent/package.json
+COPY apps/docksentinel-web/package.json apps/docksentinel-web/package.json
+COPY packages/shared/package.json packages/shared/package.json
+
+RUN npm ci --omit=dev --workspace apps/agent \
+  && npm cache clean --force
+
+FROM node:20-alpine AS runtime
+ARG APP_VERSION=dev
+WORKDIR /app
+
+RUN apk add --no-cache \
+  ca-certificates \
+  libstdc++ \
+  tzdata
+
+ENV NODE_ENV=production \
+  APP_VERSION=${APP_VERSION} \
+  PORT=45873 \
+  TZ=UTC
+
+LABEL com.docksentinel.role="agent"
+
+COPY --from=prod-deps /app/node_modules /app/node_modules
+COPY --from=build /app/apps/agent/dist /app/apps/agent/dist
+COPY --from=build /app/apps/agent/package.json /app/apps/agent/package.json
+
+EXPOSE 45873
+
+CMD ["node", "apps/agent/dist/main.js"]

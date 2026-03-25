@@ -48,7 +48,11 @@ async function readErrorMessage(res: Response) {
 
 export async function http<T>(path: string, options: HttpOptions = {}): Promise<T> {
   const baseUrl = getBaseUrl();
-  const url = `${baseUrl}${path.startsWith("/") ? path : `/${path}`}`;
+  const normalizedPath = path.startsWith("/") ? path : `/${path}`;
+  const url =
+    baseUrl && (normalizedPath === baseUrl || normalizedPath.startsWith(`${baseUrl}/`))
+      ? normalizedPath
+      : `${baseUrl}${normalizedPath}`;
 
   const headers: Record<string, string> = {
     "Accept-Language": getCurrentLocale(),

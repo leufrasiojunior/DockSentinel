@@ -1,7 +1,7 @@
 import { Injectable, Logger, OnModuleInit } from "@nestjs/common"
 import { UpdatesRepository } from "./updates.repository"
-import { DockerUpdateService } from "../docker/docker-update.service"
 import { NotificationsService } from "../notifications/notifications.service"
+import { RuntimeService } from "../runtime/runtime.service"
 
 @Injectable()
 export class UpdatesWorkerService implements OnModuleInit {
@@ -10,7 +10,7 @@ export class UpdatesWorkerService implements OnModuleInit {
 
   constructor(
     private readonly repo: UpdatesRepository,
-    private readonly updater: DockerUpdateService,
+    private readonly runtime: RuntimeService,
     private readonly notifications: NotificationsService,
   ) {}
 
@@ -37,10 +37,14 @@ export class UpdatesWorkerService implements OnModuleInit {
             throw new Error("Job has no image. Send image or implement auto-detect here.")
           }
 
-          const result = await this.updater.recreateContainerWithImage(
+          const result = await this.runtime.recreateContainer(
+            job.environmentId,
             job.container,
-            job.image,
-            { force: job.force, pull: job.pull },
+            {
+              image: job.image ?? undefined,
+              force: job.force,
+              pull: job.pull,
+            },
           )
 
           await this.repo.markSuccess(job.id, result)
@@ -51,6 +55,9 @@ export class UpdatesWorkerService implements OnModuleInit {
             image: job.image,
             finishedAt: new Date().toISOString(),
             error: null,
+          }, undefined, {
+            environmentId: job.environmentId,
+            environmentName: job.environmentName,
           })
         } catch (err: unknown) {
           const msg = err instanceof Error ? err.message : String(err)
@@ -63,6 +70,9 @@ export class UpdatesWorkerService implements OnModuleInit {
             image: job.image,
             finishedAt: new Date().toISOString(),
             error: msg,
+          }, undefined, {
+            environmentId: job.environmentId,
+            environmentName: job.environmentName,
           })
         }
       }

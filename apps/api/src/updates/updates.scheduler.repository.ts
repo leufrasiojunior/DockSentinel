@@ -14,22 +14,56 @@ export type SchedulerPatch = {
 export class UpdatesSchedulerRepository {
   constructor(private readonly prisma: PrismaService) {}
 
-  get() {
+  get(environmentId: string) {
     return this.prisma.client.updateSchedulerConfig.findUnique({
-      where: { id: 1 },
+      where: { environmentId },
     })
   }
 
-  async upsert(patch: SchedulerPatch) {
+  listAll() {
+    return this.prisma.client.updateSchedulerConfig.findMany({
+      orderBy: { createdAt: "asc" },
+    })
+  }
+
+  async ensureEnvironmentConfig(environmentId: string, environmentName: string) {
     return this.prisma.client.updateSchedulerConfig.upsert({
-      where: { id: 1 },
+      where: { environmentId },
       create: {
-        id: 1,
+        environmentId,
+        environmentName,
+      },
+      update: {
+        environmentName,
+      },
+    })
+  }
+
+  async upsert(environmentId: string, environmentName: string, patch: SchedulerPatch) {
+    return this.prisma.client.updateSchedulerConfig.upsert({
+      where: { environmentId },
+      create: {
+        environmentId,
+        environmentName,
         ...patch,
       },
       update: {
+        environmentName,
         ...patch,
       },
+    })
+  }
+
+  async renameEnvironment(environmentId: string, environmentName: string) {
+    return this.prisma.client.updateSchedulerConfig.updateMany({
+      where: { environmentId },
+      data: { environmentName },
+    })
+  }
+
+  async deleteEnvironmentConfig(environmentId: string) {
+    await this.prisma.client.updateSchedulerConfig.deleteMany({
+      where: { environmentId },
     })
   }
 }

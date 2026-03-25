@@ -17,6 +17,7 @@ export type SafeSettings = {
   notificationLevel: NotificationLevel;
   notificationReadRetentionDays: number;
   notificationUnreadRetentionDays: number;
+  environmentHealthcheckIntervalMin: number;
   notificationRecipientEmail: string | null;
   smtpHost: string | null;
   smtpPort: number | null;
@@ -37,6 +38,7 @@ export type UpdateSettingsBody = Partial<Pick<SafeSettings, "authMode" | "logLev
   notificationLevel?: NotificationLevel;
   notificationReadRetentionDays?: number;
   notificationUnreadRetentionDays?: number;
+  environmentHealthcheckIntervalMin?: number;
   notificationRecipientEmail?: string;
   smtpHost?: string;
   smtpPort?: number;

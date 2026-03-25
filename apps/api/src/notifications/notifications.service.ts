@@ -11,6 +11,12 @@ import type {
   NotificationEventType,
   NotificationLevel,
 } from "./notifications.types"
+import { LOCAL_ENVIRONMENT_ID, LOCAL_ENVIRONMENT_NAME } from "../environments/environment.constants"
+
+type NotificationEnvironmentContext = {
+  environmentId?: string
+  environmentName?: string
+}
 
 @Injectable()
 export class NotificationsService {
@@ -23,15 +29,18 @@ export class NotificationsService {
     private readonly mail: MailService,
   ) {}
 
-  async listForClient(input: { afterId?: string; take?: number }) {
+  async listForClient(input: { afterId?: string; take?: number; environmentId?: string }) {
     const items = await this.repo.listForClient({
       afterId: input.afterId,
       take: input.take ?? 20,
+      environmentId: input.environmentId ?? LOCAL_ENVIRONMENT_ID,
     })
 
     return {
       items: items.map((item) => ({
         id: item.id,
+        environmentId: item.environmentId,
+        environmentName: item.environmentName,
         channel: "in_app" as const,
         type: item.type as NotificationEventType,
         level: item.level === "error" ? "error" : "info",
@@ -52,8 +61,8 @@ export class NotificationsService {
     return this.repo.markUnread(id)
   }
 
-  async markAllRead() {
-    return this.repo.markAllRead()
+  async markAllRead(environmentId?: string) {
+    return this.repo.markAllRead(environmentId)
   }
 
   async deleteOne(id: string) {
@@ -71,7 +80,11 @@ export class NotificationsService {
     return this.repo.cleanupExpired(readDays, unreadDays)
   }
 
-  async emitJobSuccess(payload: JobNotificationPayload, locale?: AppLocale) {
+  async emitJobSuccess(
+    payload: JobNotificationPayload,
+    locale?: AppLocale,
+    environment?: NotificationEnvironmentContext,
+  ) {
     const resolvedLocale = await this.resolveLocale(locale)
 
     await this.emit({
@@ -81,10 +94,15 @@ export class NotificationsService {
       message: t("notifications.jobSuccessMessage", { container: payload.container }, resolvedLocale),
       payload,
       locale: resolvedLocale,
+      environment,
     })
   }
 
-  async emitJobFailed(payload: JobNotificationPayload, locale?: AppLocale) {
+  async emitJobFailed(
+    payload: JobNotificationPayload,
+    locale?: AppLocale,
+    environment?: NotificationEnvironmentContext,
+  ) {
     const resolvedLocale = await this.resolveLocale(locale)
 
     await this.emit({
@@ -101,10 +119,15 @@ export class NotificationsService {
       ),
       payload,
       locale: resolvedLocale,
+      environment,
     })
   }
 
-  async emitScanInfo(payload?: GenericNotificationPayload, locale?: AppLocale) {
+  async emitScanInfo(
+    payload?: GenericNotificationPayload,
+    locale?: AppLocale,
+    environment?: NotificationEnvironmentContext,
+  ) {
     const resolvedLocale = await this.resolveLocale(locale)
     const scanMeta = this.extractScanMeta(payload)
 
@@ -124,10 +147,15 @@ export class NotificationsService {
       ),
       payload,
       locale: resolvedLocale,
+      environment,
     })
   }
 
-  async emitScanError(payload?: GenericNotificationPayload, locale?: AppLocale) {
+  async emitScanError(
+    payload?: GenericNotificationPayload,
+    locale?: AppLocale,
+    environment?: NotificationEnvironmentContext,
+  ) {
     const resolvedLocale = await this.resolveLocale(locale)
     const scanMeta = this.extractScanMeta(payload)
 
@@ -148,10 +176,16 @@ export class NotificationsService {
       ),
       payload,
       locale: resolvedLocale,
+      environment,
     })
   }
 
-  async emitSystemError(message: string, payload?: GenericNotificationPayload, locale?: AppLocale) {
+  async emitSystemError(
+    message: string,
+    payload?: GenericNotificationPayload,
+    locale?: AppLocale,
+    environment?: NotificationEnvironmentContext,
+  ) {
     const resolvedLocale = await this.resolveLocale(locale)
 
     await this.emit({
@@ -159,6 +193,29 @@ export class NotificationsService {
       level: "error",
       title: t("notifications.systemErrorTitle", undefined, resolvedLocale),
       message: t("notifications.systemErrorMessage", { message }, resolvedLocale),
+      payload,
+      locale: resolvedLocale,
+      environment,
+    })
+  }
+
+  async emitEnvironmentOffline(
+    environmentName: string,
+    error: string,
+    payload?: GenericNotificationPayload,
+    locale?: AppLocale,
+  ) {
+    const resolvedLocale = await this.resolveLocale(locale)
+
+    await this.emit({
+      type: "system_error",
+      level: "error",
+      title: t("notifications.environmentOfflineTitle", { environment: environmentName }, resolvedLocale),
+      message: t(
+        "notifications.environmentOfflineMessage",
+        { environment: environmentName, error },
+        resolvedLocale,
+      ),
       payload,
       locale: resolvedLocale,
     })
@@ -171,12 +228,15 @@ export class NotificationsService {
     message: string
     payload?: GenericNotificationPayload
     locale: AppLocale
+    environment?: NotificationEnvironmentContext
   }) {
     const safe = await this.settings.getSafeSettings()
     if (!this.shouldDeliverByLevel(safe.notificationLevel, input.level)) return
 
     if (safe.notificationsInAppEnabled) {
       await this.repo.createInApp({
+        environmentId: input.environment?.environmentId ?? LOCAL_ENVIRONMENT_ID,
+        environmentName: input.environment?.environmentName ?? LOCAL_ENVIRONMENT_NAME,
         type: input.type,
         level: input.level,
         title: input.title,

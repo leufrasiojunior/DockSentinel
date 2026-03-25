@@ -18,23 +18,29 @@ import {
 } from './updates.orchestrator.service';
 import { NotificationsService } from '../notifications/notifications.service';
 import { t } from '../i18n/translate';
+import { EnvironmentsService } from '../environments/environments.service';
+import {
+  LOCAL_ENVIRONMENT_ID,
+  LOCAL_ENVIRONMENT_NAME,
+} from '../environments/environment.constants';
 
 const JOB_NAME = 'updates_scan_job';
+
+type SchedulerRuntimeState = {
+  applying: boolean;
+  applyQueued: boolean;
+  ticking: boolean;
+  nextScanAt: Date | null;
+  lastRunAt: Date | null;
+  lastFinishedAt: Date | null;
+  lastError: string | null;
+  lastResult: ScanAndEnqueueResult | null;
+};
 
 @Injectable()
 export class UpdatesSchedulerService implements OnModuleInit {
   private readonly logger = new Logger(UpdatesSchedulerService.name);
-
-  private applying = false;
-  private applyQueued = false;
-  private ticking = false;
-
-  // observabilidade simples (memória)
-  private nextScanAt: Date | null = null;
-  private lastRunAt: Date | null = null;
-  private lastFinishedAt: Date | null = null;
-  private lastError: string | null = null;
-  private lastResult: ScanAndEnqueueResult | null = null;
+  private readonly runtimeByEnvironment = new Map<string, SchedulerRuntimeState>();
   private readonly configuredTimeZone?: string;
   private readonly timeZone: string;
 
@@ -44,6 +50,7 @@ export class UpdatesSchedulerService implements OnModuleInit {
     private readonly orchestrator: UpdatesOrchestratorService,
     private readonly config: ConfigService<Env>,
     private readonly notifications: NotificationsService,
+    private readonly environments: EnvironmentsService,
   ) {
     this.configuredTimeZone = this.normalizeTimeZone(
       this.config.get('TZ', { infer: true }),
@@ -60,21 +67,34 @@ export class UpdatesSchedulerService implements OnModuleInit {
   }
 
   async onModuleInit() {
-    // garante singleton
-    await this.repo.upsert({});
-    await this.applyFromDb();
+    await this.repo.ensureEnvironmentConfig(
+      LOCAL_ENVIRONMENT_ID,
+      LOCAL_ENVIRONMENT_NAME,
+    );
+    const configs = await this.repo.listAll();
+    for (const cfg of configs) {
+      await this.applyFromDb(cfg.environmentId);
+    }
   }
 
-  async getConfig() {
-    return this.repo.get();
+  async getConfig(environmentId = LOCAL_ENVIRONMENT_ID) {
+    const existing = await this.repo.get(environmentId);
+    if (existing) return existing;
+    const environmentName =
+      environmentId === LOCAL_ENVIRONMENT_ID
+        ? LOCAL_ENVIRONMENT_NAME
+        : await this.environments.getEnvironmentNameOrThrow(environmentId);
+    await this.repo.ensureEnvironmentConfig(environmentId, environmentName);
+    return this.repo.get(environmentId);
   }
 
   /**
    * ✅ Retorna config + runtime status (para UI)
    */
-  async getStatus() {
-    const cfg = await this.repo.get();
-    const job = this.tryGetJob();
+  async getStatus(environmentId = LOCAL_ENVIRONMENT_ID) {
+    const cfg = await this.getConfig(environmentId);
+    const state = this.getState(environmentId);
+    const job = this.tryGetJob(environmentId);
     const nextScanAt = this.getNextDateSafe(job);
 
     return {
@@ -82,46 +102,51 @@ export class UpdatesSchedulerService implements OnModuleInit {
       runtime: {
         hasJob: Boolean(job),
         enabled: Boolean(cfg?.enabled),
-        ticking: this.ticking,
+        ticking: state.ticking,
         timeZone: this.timeZone,
         nextScanAt,
-        lastRunAt: this.lastRunAt,
-        lastFinishedAt: this.lastFinishedAt,
-        lastError: this.lastError,
-        lastResult: this.lastResult,
+        lastRunAt: state.lastRunAt,
+        lastFinishedAt: state.lastFinishedAt,
+        lastError: state.lastError,
+        lastResult: state.lastResult,
       },
     };
   }
 
-  async updateConfig(patch: SchedulerPatch) {
+  async updateConfig(environmentId = LOCAL_ENVIRONMENT_ID, patch: SchedulerPatch) {
     // valida cron se veio
     if (patch.cronExpr !== undefined) {
       this.assertCronValid(patch.cronExpr);
     }
 
-    const saved = await this.repo.upsert(patch);
-    await this.applyFromDb();
+    const environmentName =
+      environmentId === LOCAL_ENVIRONMENT_ID
+        ? LOCAL_ENVIRONMENT_NAME
+        : await this.environments.getEnvironmentNameOrThrow(environmentId);
+    const saved = await this.repo.upsert(environmentId, environmentName, patch);
+    await this.applyFromDb(environmentId);
     return saved;
   }
 
-  async applyFromDb() {
-    if (this.applying) {
-      this.applyQueued = true;
+  async applyFromDb(environmentId = LOCAL_ENVIRONMENT_ID) {
+    const state = this.getState(environmentId);
+    if (state.applying) {
+      state.applyQueued = true;
       return;
     }
-    this.applying = true;
+    state.applying = true;
 
     try {
-      const cfg = await this.repo.get();
+      const cfg = await this.getConfig(environmentId);
       if (!cfg) return;
 
-      const job = this.getOrCreateJob();
+      const job = this.getOrCreateJob(environmentId);
 
       // sempre para antes de reaplicar
       void job.stop();
 
       if (!cfg.enabled) {
-        this.logger.log('Scheduler disabled (db)');
+        this.logger.log(`Scheduler disabled (db) env=${environmentId}`);
         return;
       }
 
@@ -132,27 +157,29 @@ export class UpdatesSchedulerService implements OnModuleInit {
 
       const next = this.getNextDateSafe(job);
       this.logger.log(
-        `Scheduler enabled (db). cron=${cfg.cronExpr} mode=${cfg.mode} scope=${cfg.scope} tz=${this.timeZone} next=${this.formatDateForLog(next)}`,
+        `Scheduler enabled (db) env=${environmentId}. cron=${cfg.cronExpr} mode=${cfg.mode} scope=${cfg.scope} tz=${this.timeZone} next=${this.formatDateForLog(next)}`,
       );
     } catch (err: unknown) {
       // se algo der errado ao aplicar cron, loga (e não derruba app)
-      this.logger.error(`applyFromDb failed: ${this.getErrorMessage(err)}`);
+      this.logger.error(
+        `applyFromDb failed env=${environmentId}: ${this.getErrorMessage(err)}`,
+      );
       throw err;
     } finally {
-      this.applying = false;
-      if (this.applyQueued) {
-        this.applyQueued = false;
-        await this.applyFromDb();
+      state.applying = false;
+      if (state.applyQueued) {
+        state.applyQueued = false;
+        await this.applyFromDb(environmentId);
       }
     }
   }
 
-  stop() {
+  stop(environmentId = LOCAL_ENVIRONMENT_ID) {
     try {
-      const job = this.schedule.getCronJob(JOB_NAME);
+      const job = this.schedule.getCronJob(this.jobName(environmentId));
       void job.stop();
-      this.schedule.deleteCronJob(JOB_NAME);
-      this.logger.log('Scheduler job removed');
+      this.schedule.deleteCronJob(this.jobName(environmentId));
+      this.logger.log(`Scheduler job removed env=${environmentId}`);
     } catch {
       // ok, não existia
     }
@@ -161,27 +188,30 @@ export class UpdatesSchedulerService implements OnModuleInit {
   /**
    * ✅ Job criado UMA vez. Cron real vem do DB via setTime().
    */
-  private getOrCreateJob(): CronJob {
-    const existing = this.tryGetJob();
+  private getOrCreateJob(environmentId: string): CronJob {
+    const existing = this.tryGetJob(environmentId);
     if (existing) return existing;
+    const state = this.getState(environmentId);
 
     // placeholder (vai ser substituído por setTime)
     const job = new CronJob(
       '*/5 * * * *',
       async () => {
-        if (this.ticking) return;
-        this.ticking = true;
+        if (state.ticking) return;
+        state.ticking = true;
 
-        this.lastRunAt = new Date();
-        this.lastFinishedAt = null;
-        this.lastError = null;
-        this.lastResult = null;
+        state.lastRunAt = new Date();
+        state.lastFinishedAt = null;
+        state.lastError = null;
+        state.lastResult = null;
 
         try {
-          this.logger.log('[scheduler] tick start');
+          this.logger.log(`[scheduler] tick start env=${environmentId}`);
 
-          const result = await this.orchestrator.scanAndEnqueueFromDb();
-          this.lastResult = result;
+          const result = await this.orchestrator.scanAndEnqueueFromDb(
+            environmentId,
+          );
+          state.lastResult = result;
 
           // ✅ loga também quando for scan_only (antes você “não via nada”)
           const scanned = result?.scanned ?? '?';
@@ -195,29 +225,35 @@ export class UpdatesSchedulerService implements OnModuleInit {
             : 0;
 
           this.logger.log(
-            `[scheduler] tick ok mode=${mode} scanned=${scanned} queued=${queuedCount} skipped=${skippedCount}`,
+            `[scheduler] tick ok env=${environmentId} mode=${mode} scanned=${scanned} queued=${queuedCount} skipped=${skippedCount}`,
           );
 
           this.logger.log(
-            `[scheduler] tick ok mode=${mode} scanned=${scanned} queued=${queuedCount}`,
+            `[scheduler] tick ok env=${environmentId} mode=${mode} scanned=${scanned} queued=${queuedCount}`,
           );
         } catch (err: unknown) {
           const msg = this.getErrorMessage(err);
-          this.lastError = msg;
-          this.logger.error(`[scheduler] tick failed: ${msg}`);
+          state.lastError = msg;
+          this.logger.error(`[scheduler] tick failed env=${environmentId}: ${msg}`);
+          const cfg = await this.getConfig(environmentId);
           await this.notifications.emitSystemError(
             `Scheduler tick failed: ${msg}`,
             {
               scope: 'scheduler_tick',
             },
+            undefined,
+            {
+              environmentId,
+              environmentName: cfg?.environmentName ?? environmentId,
+            },
           );
         } finally {
-          this.lastFinishedAt = new Date();
-          this.nextScanAt = this.safeNextScan(job);
+          state.lastFinishedAt = new Date();
+          state.nextScanAt = this.safeNextScan(job);
           this.logger.log(
-            `[scheduler] tick done finishedAt=${this.lastFinishedAt.toISOString()} next=${this.nextScanAt ? this.nextScanAt.toString() : '?'}`,
+            `[scheduler] tick done env=${environmentId} finishedAt=${state.lastFinishedAt.toISOString()} next=${state.nextScanAt ? state.nextScanAt.toString() : '?'}`,
           );
-          this.ticking = false;
+          state.ticking = false;
         }
       },
       null,
@@ -225,14 +261,14 @@ export class UpdatesSchedulerService implements OnModuleInit {
       this.timeZone,
     );
 
-    this.schedule.addCronJob(JOB_NAME, job);
-    this.logger.log('Scheduler job registered (created once)');
+    this.schedule.addCronJob(this.jobName(environmentId), job);
+    this.logger.log(`Scheduler job registered env=${environmentId}`);
     return job;
   }
 
-  private tryGetJob(): CronJob | null {
+  private tryGetJob(environmentId: string): CronJob | null {
     try {
-      return this.schedule.getCronJob(JOB_NAME);
+      return this.schedule.getCronJob(this.jobName(environmentId));
     } catch {
       return null;
     }
@@ -335,5 +371,27 @@ export class UpdatesSchedulerService implements OnModuleInit {
     } catch {
       return '[unknown]';
     }
+  }
+
+  private getState(environmentId: string): SchedulerRuntimeState {
+    let state = this.runtimeByEnvironment.get(environmentId);
+    if (!state) {
+      state = {
+        applying: false,
+        applyQueued: false,
+        ticking: false,
+        nextScanAt: null,
+        lastRunAt: null,
+        lastFinishedAt: null,
+        lastError: null,
+        lastResult: null,
+      };
+      this.runtimeByEnvironment.set(environmentId, state);
+    }
+    return state;
+  }
+
+  private jobName(environmentId: string) {
+    return `${JOB_NAME}:${environmentId}`;
   }
 }

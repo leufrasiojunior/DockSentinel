@@ -2,8 +2,11 @@ import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { ScanAndEnqueueResultDto } from './scan-and-enqueue.dto';
 
 export class SchedulerConfigResponseDto {
-  @ApiProperty({ description: 'ID do registro', example: 1 })
-  id!: number;
+  @ApiProperty({ description: 'ID do environment', example: 'local' })
+  environmentId!: string;
+
+  @ApiProperty({ description: 'Nome do environment', example: 'Local' })
+  environmentName!: string;
 
   @ApiProperty({ description: 'Habilita o scheduler', example: true })
   enabled!: boolean;
