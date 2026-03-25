@@ -33,6 +33,7 @@ export type AgentInfo = {
 export type EnvironmentMutationResponse = {
   environment: Environment;
   agentToken: string;
+  installCommand: string;
 };
 
 export type EnvironmentTestResponse = {
@@ -93,18 +94,4 @@ export function buildEnvironmentPath(
   section: "dashboard" | "jobs" | "scheduler" | "notifications",
 ) {
   return `/environments/${encodeURIComponent(environmentId)}/${section}`;
-}
-
-export function buildAgentInstallCommand(agentToken: string, appVersion = __APP_VERSION__) {
-  const imageTag = appVersion || "latest";
-  return [
-    "docker run -d",
-    "--name docksentinel-agent",
-    "--restart unless-stopped",
-    "-p 45873:45873",
-    "-e PORT=45873",
-    `-e DOCKSENTINEL_AGENT_TOKEN='${agentToken}'`,
-    "-v /var/run/docker.sock:/var/run/docker.sock",
-    `leufrasiojunior/docksentinel-agent:${imageTag}`,
-  ].join(" ");
 }

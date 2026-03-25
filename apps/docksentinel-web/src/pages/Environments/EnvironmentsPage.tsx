@@ -10,7 +10,7 @@ import { Badge } from "../../components/ui/badge";
 import { Button } from "../../components/ui/button";
 import { Card } from "../../components/ui/card";
 import { Input } from "../../components/ui/input";
-import { buildEnvironmentPath, buildAgentInstallCommand, createRemoteEnvironment, deleteRemoteEnvironment, listEnvironments, rotateRemoteEnvironmentToken, testRemoteEnvironment, updateRemoteEnvironment, type Environment } from "../../features/environments/api/environments";
+import { buildEnvironmentPath, createRemoteEnvironment, deleteRemoteEnvironment, listEnvironments, rotateRemoteEnvironmentToken, testRemoteEnvironment, updateRemoteEnvironment, type Environment } from "../../features/environments/api/environments";
 import { useConfirm } from "../../shared/components/ui/ConfirmProvider";
 import { useToast } from "../../shared/components/ui/ToastProvider";
 import { formatDateTime } from "../../i18n/format";
@@ -59,7 +59,7 @@ export function EnvironmentsPage() {
       setNewBaseUrl("");
       setCommandByEnvironment((current) => ({
         ...current,
-        [data.environment.id]: buildAgentInstallCommand(data.agentToken),
+        [data.environment.id]: data.installCommand,
       }));
       toast.success(t("environments.created"), t("navigation.environments"));
       await qc.invalidateQueries({ queryKey: ["environments", "list"] });
@@ -100,7 +100,7 @@ export function EnvironmentsPage() {
     onSuccess: async (data) => {
       setCommandByEnvironment((current) => ({
         ...current,
-        [data.environment.id]: buildAgentInstallCommand(data.agentToken),
+        [data.environment.id]: data.installCommand,
       }));
       toast.success(t("environments.tokenRotated"), t("navigation.environments"));
       await qc.invalidateQueries({ queryKey: ["environments", "list"] });
@@ -344,15 +344,7 @@ export function EnvironmentsPage() {
                     </pre>
 
                     <div className="text-sm text-muted-foreground">
-                      {t("environments.installWarning")}{" "}
-                      <a
-                        href="https://github.com/leufrasiojunior/DockSentinel/dock_agent"
-                        target="_blank"
-                        rel="noreferrer"
-                        className="text-primary hover:underline"
-                      >
-                        {t("environments.installDocs")}
-                      </a>
+                      {t("environments.installWarning")}
                     </div>
                   </div>
                 ) : null}

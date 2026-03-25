@@ -25,8 +25,6 @@ Ele foi pensado para ambientes self-hosted e homelab onde voce precisa:
 
 - `docker pull leufrasiojunior/docksentinel:latest`
 - `docker pull leufrasiojunior/docksentinel:beta`
-- `docker pull leufrasiojunior/docksentinel-agent:latest`
-- `docker pull leufrasiojunior/docksentinel-agent:beta`
 
 ### 1. Crie o `docker-compose.yml`
 
@@ -83,57 +81,26 @@ DOCKSENTINEL_TAG=beta docker compose up -d
 Depois de subir o container:
 
 1. Acesse `http://localhost:8080`.
-2. Abra a tela `Environments` para entrar no ambiente `Local` ou cadastrar remotos.
+2. Abra `Settings > Environments` para entrar no ambiente `Local` ou cadastrar remotos.
 3. Rode a checagem de updates (manual ou automatica).
 4. Atualize containers individualmente ou em lote.
 5. Ajuste modo de autenticacao e scheduler em Settings.
 
 Se `SWAGGER_ENABLED=true`, a API fica disponivel em `http://localhost:3000/docs`.
 
-## Environments remotos com DockSentinel Agent
+## Environments remotos com DockSentinelAgent
 
-O DockSentinel agora suporta environments no estilo Portainer. O ambiente `local` continua embutido, e cada host remoto usa um `docksentinel-agent` separado.
+O DockSentinel suporta environments no estilo Portainer. O ambiente `local` continua embutido, e cada host remoto usa um `DockSentinelAgent` separado em projeto proprio.
 
 Fluxo resumido:
 
-1. Abra `Environments` no DockSentinel principal.
+1. Abra `Settings > Environments` no DockSentinel principal.
 2. Crie um environment remoto.
 3. Copie o comando `docker run` exibido pela UI.
 4. Execute esse comando no host remoto.
 5. Volte ao DockSentinel principal e teste a conexao.
 
-### Exemplo de instalacao manual do agente
-
-```bash
-docker run -d \
-  --name docksentinel-agent \
-  --restart unless-stopped \
-  -p 45873:45873 \
-  -e PORT=45873 \
-  -e DOCKSENTINEL_AGENT_TOKEN='SEU_TOKEN_AQUI' \
-  -v /var/run/docker.sock:/var/run/docker.sock \
-  leufrasiojunior/docksentinel-agent:latest
-```
-
-### Exemplo com Docker Compose
-
-```yaml
-services:
-  docksentinel-agent:
-    image: leufrasiojunior/docksentinel-agent:latest
-    container_name: docksentinel-agent
-    restart: unless-stopped
-    ports:
-      - "45873:45873"
-    environment:
-      PORT: "45873"
-      DOCKSENTINEL_AGENT_TOKEN: "SEU_TOKEN_AQUI"
-      TZ: "America/Sao_Paulo"
-    volumes:
-      - /var/run/docker.sock:/var/run/docker.sock
-```
-
-Mais detalhes em [`dock_agent/README.md`](dock_agent/README.md).
+O runtime remoto agora vive em um projeto separado chamado `DockSentinelAgent`. Este repositorio principal mantem apenas o contrato HTTP com o agent e o comando de instalacao exibido pela UI.
 
 ## Atualizacao da aplicacao
 
@@ -149,5 +116,5 @@ docker compose up -d
 - Troque `DOCKSENTINEL_SECRET` por um valor forte (minimo 32 caracteres). Para gerar automaticamente, voce pode usar: `https://www.random.org/passwords/`.
 - O mount `/var/run/docker.sock` e obrigatorio para o DockSentinel inspecionar e atualizar containers do host.
 - O banco SQLite fica persistido no volume `docksentinel_data`.
-- A porta padrao do agente e `45873`.
-- O `docksentinel-agent` nao deve ser instalado no mesmo host onde o DockSentinel principal ja esta rodando. Se isso acontecer, o agente registra o erro nos logs e encerra com `exit 1`.
+- A porta padrao do DockSentinelAgent e `45873`.
+- O DockSentinelAgent nao deve ser instalado no mesmo host onde o DockSentinel principal ja esta rodando. Se isso acontecer, o agent registra o erro nos logs e encerra com `exit 1`.

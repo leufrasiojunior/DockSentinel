@@ -67,6 +67,12 @@ export class RemoteEnvironmentMutationDto {
 
   @ApiProperty({ example: "dsa_very_secret_token" })
   agentToken!: string
+
+  @ApiProperty({
+    example:
+      "docker run -d --name docksentinel-agent --restart unless-stopped -p 45873:45873 -e PORT=45873 -e DOCKSENTINEL_AGENT_TOKEN='dsa_very_secret_token' -v /var/run/docker.sock:/var/run/docker.sock leufrasiojunior/docksentinel-agent:latest",
+  })
+  installCommand!: string
 }
 
 export class RemoteEnvironmentTestDto {

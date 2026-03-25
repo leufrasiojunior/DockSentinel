@@ -12,7 +12,6 @@ RUN apk add --no-cache \
 
 COPY package.json package-lock.json ./
 COPY apps/api/package.json apps/api/package.json
-COPY apps/agent/package.json apps/agent/package.json
 COPY apps/docksentinel-web/package.json apps/docksentinel-web/package.json
 COPY packages/shared/package.json packages/shared/package.json
 
@@ -48,7 +47,6 @@ RUN apk add --no-cache \
 
 COPY package.json package-lock.json ./
 COPY apps/api/package.json apps/api/package.json
-COPY apps/agent/package.json apps/agent/package.json
 COPY packages/shared/package.json packages/shared/package.json
 COPY apps/api/prisma.config.ts apps/api/prisma.config.ts
 COPY apps/api/prisma/schema.prisma apps/api/prisma/schema.prisma

@@ -107,6 +107,7 @@ export class EnvironmentsService implements OnModuleInit {
     return {
       environment: this.toDto(environment),
       agentToken,
+      installCommand: this.buildInstallCommand(agentToken),
     }
   }
 
@@ -151,6 +152,7 @@ export class EnvironmentsService implements OnModuleInit {
     return {
       environment: this.toDto(updated),
       agentToken,
+      installCommand: this.buildInstallCommand(agentToken),
     }
   }
 
@@ -267,6 +269,19 @@ export class EnvironmentsService implements OnModuleInit {
 
   private generateAgentToken() {
     return `dsa_${randomBytes(24).toString("base64url")}`
+  }
+
+  private buildInstallCommand(agentToken: string) {
+    return [
+      "docker run -d",
+      "--name docksentinel-agent",
+      "--restart unless-stopped",
+      `-p ${AGENT_DEFAULT_PORT}:${AGENT_DEFAULT_PORT}`,
+      `-e PORT=${AGENT_DEFAULT_PORT}`,
+      `-e DOCKSENTINEL_AGENT_TOKEN='${agentToken}'`,
+      "-v /var/run/docker.sock:/var/run/docker.sock",
+      "leufrasiojunior/docksentinel-agent:latest",
+    ].join(" ")
   }
 
   private async assertUniqueRemoteName(name: string, exceptId?: string) {
