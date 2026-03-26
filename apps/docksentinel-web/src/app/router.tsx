@@ -9,6 +9,7 @@ import { LoginPage } from "../pages/Auth/LoginPage";
 import { AppShell } from "../layouts/AppShell";
 import { SettingsPage } from "../pages/Settings/SettingsPage";
 import { NotificationsPage } from "../pages/Notifications/NotificationsPage";
+import { HomePage } from "../pages/Home/HomePage";
 
 export const router = createBrowserRouter([
   {
@@ -23,9 +24,10 @@ export const router = createBrowserRouter([
       </RequireAuth>
     ),
     children: [
-      { index: true, element: <Navigate to="/settings/environments" replace /> },
+      { index: true, element: <Navigate to="/home" replace /> },
 
       { path: "environments", element: <Navigate to="/settings/environments" replace /> },
+      { path: "home", element: <HomePage /> },
       { path: "environments/:environmentId/dashboard", element: <DashboardPage /> },
       { path: "environments/:environmentId/jobs", element: <JobsPage /> },
       { path: "environments/:environmentId/scheduler", element: <SchedulerPage /> },
@@ -43,5 +45,5 @@ export const router = createBrowserRouter([
   },
 
   // fallback para rotas desconhecidas
-  { path: "*", element: <Navigate to="/settings/environments" replace /> },
+  { path: "*", element: <Navigate to="/home" replace /> },
 ]);

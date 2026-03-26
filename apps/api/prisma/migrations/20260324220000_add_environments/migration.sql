@@ -82,8 +82,13 @@ FROM "UpdateSchedulerConfig";
 DROP TABLE "UpdateSchedulerConfig";
 ALTER TABLE "new_UpdateSchedulerConfig" RENAME TO "UpdateSchedulerConfig";
 
-INSERT INTO "UpdateSchedulerConfig" ("environmentId", "environmentName")
-SELECT 'local', 'Local'
+INSERT INTO "UpdateSchedulerConfig" (
+    "environmentId",
+    "environmentName",
+    "createdAt",
+    "updatedAt"
+)
+SELECT 'local', 'Local', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP
 WHERE NOT EXISTS (
     SELECT 1
     FROM "UpdateSchedulerConfig"

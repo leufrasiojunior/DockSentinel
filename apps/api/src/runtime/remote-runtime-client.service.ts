@@ -16,6 +16,12 @@ export class RemoteRuntimeClientService {
     return this.request(environmentId, "/agent/v1/containers")
   }
 
+  async listContainersReadonly(environmentId: string) {
+    return this.request(environmentId, "/agent/v1/containers", undefined, {
+      syncHealth: false,
+    })
+  }
+
   async getContainerDetails(environmentId: string, id: string) {
     return this.request(environmentId, `/agent/v1/containers/${encodeURIComponent(id)}`)
   }
@@ -60,6 +66,7 @@ export class RemoteRuntimeClientService {
     environmentId: string,
     path: string,
     init?: { method?: "GET" | "POST"; body?: unknown },
+    options?: { syncHealth?: boolean },
   ) {
     const environment = await this.environmentsRepo.findById(environmentId)
     if (!environment) {
@@ -84,19 +91,23 @@ export class RemoteRuntimeClientService {
 
     if (!response.ok) {
       const errorText = await response.text().catch(() => "")
-      await this.environmentsRepo.updateHealth(environment.id, {
-        lastError: errorText || `HTTP ${response.status}`,
-        connectivityStatus: "offline",
-      })
+      if (options?.syncHealth !== false) {
+        await this.environmentsRepo.updateHealth(environment.id, {
+          lastError: errorText || `HTTP ${response.status}`,
+          connectivityStatus: "offline",
+        })
+      }
       throw new BadRequestException(errorText || `Remote request failed: HTTP ${response.status}`)
     }
 
-    await this.environmentsRepo.updateHealth(environment.id, {
-      lastSeenAt: new Date(),
-      lastError: null,
-      connectivityStatus: "online",
-      offlineNotifiedAt: null,
-    })
+    if (options?.syncHealth !== false) {
+      await this.environmentsRepo.updateHealth(environment.id, {
+        lastSeenAt: new Date(),
+        lastError: null,
+        connectivityStatus: "online",
+        offlineNotifiedAt: null,
+      })
+    }
 
     return response.json()
   }

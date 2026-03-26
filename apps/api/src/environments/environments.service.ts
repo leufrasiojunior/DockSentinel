@@ -18,6 +18,8 @@ import { UpdatesSchedulerRepository } from "../updates/updates.scheduler.reposit
 import { t } from "../i18n/translate"
 import {
   AGENT_DEFAULT_PORT,
+  ENVIRONMENT_ROTATION_STATES,
+  type EnvironmentRotationState,
   LOCAL_ENVIRONMENT_ID,
   LOCAL_ENVIRONMENT_NAME,
 } from "./environment.constants"
@@ -25,6 +27,7 @@ import type {
   AgentInfoDto,
   CreateRemoteEnvironmentInput,
   EnvironmentDto,
+  RemoteEnvironmentRotationStatusDto,
   UpdateRemoteEnvironmentInput,
 } from "./dto/environment.dto"
 import { EnvironmentsRepository } from "./environments.repository"
@@ -33,6 +36,9 @@ type EnvironmentRow = Awaited<ReturnType<EnvironmentsRepository["findById"]>>
 type ProbeOptions = {
   notifyOnOffline: boolean
   throwOnFailure: boolean
+}
+type AgentRotationStatusPayload = {
+  state?: EnvironmentRotationState
 }
 
 @Injectable()
@@ -100,14 +106,16 @@ export class EnvironmentsService implements OnModuleInit {
       name,
       baseUrl,
       agentTokenEnc: this.crypto.encrypt(agentToken),
+      rotationState: "unpaired",
     })
 
     await this.schedulerRepo.ensureEnvironmentConfig(environment.id, environment.name)
 
     return {
       environment: this.toDto(environment),
-      agentToken,
       installCommand: this.buildInstallCommand(agentToken),
+      bootstrapToken: null,
+      setupUrl: this.buildSetupUrl(environment.baseUrl),
     }
   }
 
@@ -144,15 +152,151 @@ export class EnvironmentsService implements OnModuleInit {
       throw new BadRequestException("Only remote environments can rotate token")
     }
 
-    const agentToken = this.generateAgentToken()
+    const { baseUrl, token: currentCredential } = this.getRemoteAccess(current)
+
+    try {
+      await this.requestAgentJson(baseUrl, "/agent/v1/admin/rotation/enter", currentCredential, {
+        method: "POST",
+      })
+    } catch (error: unknown) {
+      throw new BadRequestException(
+        `Failed to put agent into rotation mode: ${this.getErrorMessage(error)}`,
+      )
+    }
+
+    const bootstrapToken = this.generateAgentToken()
     const updated = await this.repo.updateRemote(id, {
-      agentTokenEnc: this.crypto.encrypt(agentToken),
+      pendingBootstrapTokenEnc: this.crypto.encrypt(bootstrapToken),
+      rotationState: "pending_rotation",
+      lastError: null,
     })
 
     return {
       environment: this.toDto(updated),
-      agentToken,
-      installCommand: this.buildInstallCommand(agentToken),
+      bootstrapToken,
+      installCommand: null,
+      setupUrl: this.buildSetupUrl(updated.baseUrl),
+    }
+  }
+
+  async getRemoteRotationStatus(id: string): Promise<RemoteEnvironmentRotationStatusDto> {
+    const current = await this.getEnvironmentOrThrow(id)
+    if (current.kind !== "remote") {
+      throw new BadRequestException("Only remote environments have rotation status")
+    }
+
+    const { baseUrl, token } = this.getRemoteAccess(current)
+
+    let agentState: EnvironmentRotationState
+    try {
+      const result = await this.requestAgentJson<AgentRotationStatusPayload>(
+        baseUrl,
+        "/agent/v1/admin/rotation/status",
+        token,
+      )
+      agentState = this.normalizeRotationState(result?.state)
+    } catch (error: unknown) {
+      throw new BadRequestException(
+        `Failed to read agent rotation status: ${this.getErrorMessage(error)}`,
+      )
+    }
+
+    const nextState =
+      agentState === "paired" && current.pendingBootstrapTokenEnc
+        ? this.normalizeRotationState(current.rotationState)
+        : agentState
+
+    let environment = current
+    if (environment.rotationState !== nextState) {
+      environment = await this.repo.updateRemote(environment.id, {
+        rotationState: nextState,
+      })
+    }
+
+    return {
+      environment: this.toDto(environment),
+      agentState,
+      readyToComplete: agentState === "ready_to_complete",
+      setupUrl: this.buildSetupUrl(environment.baseUrl),
+    }
+  }
+
+  async completeRemoteRotation(id: string) {
+    const current = await this.getEnvironmentOrThrow(id)
+    if (current.kind !== "remote") {
+      throw new BadRequestException("Only remote environments can complete rotation")
+    }
+    if (!current.pendingBootstrapTokenEnc) {
+      if (this.normalizeRotationState(current.rotationState) === "unpaired") {
+        const result = await this.probeEnvironment(current, {
+          notifyOnOffline: false,
+          throwOnFailure: true,
+        })
+        if (!result) {
+          throw new BadRequestException(
+            "The agent is not reachable yet. Start the container and use Test connection again.",
+          )
+        }
+
+        return {
+          environment: result.environment,
+        }
+      }
+
+      throw new BadRequestException(
+        "This environment does not have a pending rotation. If this is a new installation, use Test connection to confirm the agent is online.",
+      )
+    }
+
+    const { baseUrl } = this.getRemoteAccess(current)
+
+    const status = await this.getRemoteRotationStatus(id)
+    if (!status.readyToComplete) {
+      throw new BadRequestException("The agent has not received the bootstrap token yet")
+    }
+
+    const nextCredential = this.generateAgentToken()
+    const bootstrapToken = this.crypto.decrypt(current.pendingBootstrapTokenEnc)
+
+    try {
+      await this.requestAgentJson(
+        baseUrl,
+        "/agent/v1/admin/rotation/complete",
+        bootstrapToken,
+        {
+          method: "POST",
+          body: { credential: nextCredential },
+        },
+      )
+    } catch (error: unknown) {
+      throw new BadRequestException(
+        `Failed to complete rotation on the agent: ${this.getErrorMessage(error)}`,
+      )
+    }
+
+    let info: AgentInfoDto | null = null
+    try {
+      info = await this.fetchAgentInfo(baseUrl, nextCredential)
+    } catch (error: unknown) {
+      this.logger.warn(
+        `Rotation completed for environment ${current.id}, but info refresh failed: ${this.getErrorMessage(error)}`,
+      )
+    }
+
+    const updated = await this.repo.updateRemote(id, {
+      agentTokenEnc: this.crypto.encrypt(nextCredential),
+      pendingBootstrapTokenEnc: null,
+      rotationState: "paired",
+      agentVersion: info?.agentVersion ?? current.agentVersion ?? null,
+      dockerVersion: info?.dockerVersion ?? current.dockerVersion ?? null,
+      lastSeenAt: info ? new Date() : current.lastSeenAt ?? null,
+      lastError: null,
+      connectivityStatus: info ? "online" : current.connectivityStatus,
+      offlineNotifiedAt: info ? null : current.offlineNotifiedAt ?? null,
+    })
+
+    return {
+      environment: this.toDto(updated),
     }
   }
 
@@ -195,10 +339,8 @@ export class EnvironmentsService implements OnModuleInit {
   async fetchAgentInfoForEnvironment(id: string) {
     const environment = await this.getEnvironmentOrThrow(id)
     if (environment.kind === "local") return this.getLocalInfo()
-    if (!environment.baseUrl || !environment.agentTokenEnc) {
-      throw new BadRequestException("Remote environment is missing baseUrl or token")
-    }
-    return this.fetchAgentInfo(environment.baseUrl, this.crypto.decrypt(environment.agentTokenEnc))
+    const { baseUrl, token } = this.getRemoteAccess(environment)
+    return this.fetchAgentInfo(baseUrl, token)
   }
 
   async getAgentTokenForEnvironment(id: string) {
@@ -222,11 +364,20 @@ export class EnvironmentsService implements OnModuleInit {
     try {
       url = new URL(value)
     } catch {
-      throw new BadRequestException(`Invalid baseUrl: ${raw}`)
+      throw new BadRequestException(this.buildInvalidBaseUrlMessage(raw, value))
     }
 
     if (url.protocol !== "http:" && url.protocol !== "https:") {
-      throw new BadRequestException("baseUrl must use http or https")
+      throw new BadRequestException(
+        `Invalid baseUrl "${raw}": only http:// or https:// are supported. ${this.baseUrlExamples()}`,
+      )
+    }
+
+    const hostError = this.validateHostname(url.hostname)
+    if (hostError) {
+      throw new BadRequestException(
+        `Invalid baseUrl "${raw}": ${hostError}. ${this.baseUrlExamples()}`,
+      )
     }
 
     if (!url.port) {
@@ -252,23 +403,64 @@ export class EnvironmentsService implements OnModuleInit {
   }
 
   private async fetchAgentInfo(baseUrl: string, token: string): Promise<AgentInfoDto> {
-    const res = await fetch(`${baseUrl}/agent/v1/info`, {
-      method: "GET",
-      headers: {
-        Authorization: `Bearer ${token}`,
-      },
-    })
-
-    if (!res.ok) {
-      const body = await res.text().catch(() => "")
-      throw new Error(body || `HTTP ${res.status}`)
-    }
-
-    return (await res.json()) as AgentInfoDto
+    return this.requestAgentJson<AgentInfoDto>(baseUrl, "/agent/v1/info", token)
   }
 
   private generateAgentToken() {
     return `dsa_${randomBytes(24).toString("base64url")}`
+  }
+
+  private buildInvalidBaseUrlMessage(raw: string, normalized: string) {
+    const inferred = this.inferHostError(normalized)
+    if (inferred) {
+      return `Invalid baseUrl "${raw}": ${inferred}. ${this.baseUrlExamples()}`
+    }
+
+    return `Invalid baseUrl "${raw}": use a valid host or URL. ${this.baseUrlExamples()}`
+  }
+
+  private inferHostError(value: string) {
+    const withoutProtocol = value.replace(/^[a-z]+:\/\//i, "")
+    const hostPort = withoutProtocol.split("/")[0] ?? ""
+    if (!hostPort) {
+      return "host is missing"
+    }
+
+    if (hostPort.startsWith("[") && hostPort.includes("]")) {
+      return null
+    }
+
+    const host = hostPort.replace(/:\d+$/, "")
+    return this.validateHostname(host)
+  }
+
+  private validateHostname(hostname: string) {
+    const host = hostname.trim()
+    if (!host) {
+      return "host is missing"
+    }
+
+    if (!/^\d+(?:\.\d+)+$/.test(host)) {
+      return null
+    }
+
+    const octets = host.split(".")
+    if (octets.length !== 4) {
+      return `IPv4 addresses must have exactly 4 blocks, but "${host}" has ${octets.length}`
+    }
+
+    for (const octet of octets) {
+      const value = Number(octet)
+      if (!Number.isInteger(value) || value < 0 || value > 255) {
+        return `IPv4 block "${octet}" is out of range (0-255)`
+      }
+    }
+
+    return null
+  }
+
+  private baseUrlExamples() {
+    return "Examples: 192.168.3.148, http://192.168.3.148:45873, https://docker.example.com:45873"
   }
 
   private buildInstallCommand(agentToken: string) {
@@ -280,8 +472,14 @@ export class EnvironmentsService implements OnModuleInit {
       `-e PORT=${AGENT_DEFAULT_PORT}`,
       `-e DOCKSENTINEL_AGENT_TOKEN='${agentToken}'`,
       "-v /var/run/docker.sock:/var/run/docker.sock",
+      "-v /opt/docksentinel-agent:/var/lib/docksentinel-agent",
       "leufrasiojunior/docksentinel-agent:latest",
     ].join(" ")
+  }
+
+  private buildSetupUrl(baseUrl?: string | null) {
+    if (!baseUrl) return null
+    return `${baseUrl}/setup`
   }
 
   private async assertUniqueRemoteName(name: string, exceptId?: string) {
@@ -305,6 +503,7 @@ export class EnvironmentsService implements OnModuleInit {
       name: environment.name,
       baseUrl: environment.baseUrl ?? null,
       hasToken: Boolean(environment.agentTokenEnc),
+      rotationState: this.normalizeRotationState(environment.rotationState),
       agentVersion: environment.agentVersion ?? null,
       dockerVersion: environment.dockerVersion ?? null,
       lastSeenAt: environment.lastSeenAt ?? null,
@@ -342,6 +541,8 @@ export class EnvironmentsService implements OnModuleInit {
       const updated = await this.repo.updateHealth(environment.id, {
         agentVersion: info.agentVersion,
         dockerVersion: info.dockerVersion ?? null,
+        rotationState:
+          environment.rotationState === "unpaired" ? "paired" : environment.rotationState,
         lastSeenAt: now,
         lastError: null,
         connectivityStatus: "online",
@@ -355,7 +556,7 @@ export class EnvironmentsService implements OnModuleInit {
     }
 
     if (!environment.baseUrl || !environment.agentTokenEnc) {
-      const message = "Remote environment is missing baseUrl or token"
+      const message = "Remote environment is missing baseUrl or active credential"
       await this.repo.updateHealth(environment.id, {
         lastError: message,
         connectivityStatus: "offline",
@@ -369,14 +570,14 @@ export class EnvironmentsService implements OnModuleInit {
     }
 
     try {
-      const info = await this.fetchAgentInfo(
-        environment.baseUrl,
-        this.crypto.decrypt(environment.agentTokenEnc),
-      )
+      const access = this.getRemoteAccess(environment)
+      const info = await this.fetchAgentInfo(access.baseUrl, access.token)
       const now = new Date()
       const updated = await this.repo.updateHealth(environment.id, {
         agentVersion: info.agentVersion,
         dockerVersion: info.dockerVersion ?? null,
+        rotationState:
+          environment.rotationState === "unpaired" ? "paired" : environment.rotationState,
         lastSeenAt: now,
         lastError: null,
         connectivityStatus: "online",
@@ -413,5 +614,51 @@ export class EnvironmentsService implements OnModuleInit {
 
       return null
     }
+  }
+
+  private getRemoteAccess(environment: NonNullable<EnvironmentRow>) {
+    if (!environment.baseUrl || !environment.agentTokenEnc) {
+      throw new BadRequestException("Remote environment is missing baseUrl or active credential")
+    }
+
+    return {
+      baseUrl: environment.baseUrl,
+      token: this.crypto.decrypt(environment.agentTokenEnc),
+    }
+  }
+
+  private normalizeRotationState(value?: string | null): EnvironmentRotationState {
+    if (value && ENVIRONMENT_ROTATION_STATES.includes(value as EnvironmentRotationState)) {
+      return value as EnvironmentRotationState
+    }
+    return "paired"
+  }
+
+  private async requestAgentJson<T>(
+    baseUrl: string,
+    path: string,
+    token: string,
+    init?: { method?: "GET" | "POST"; body?: unknown },
+  ): Promise<T> {
+    const response = await fetch(`${baseUrl}${path}`, {
+      method: init?.method ?? "GET",
+      headers: {
+        Authorization: `Bearer ${token}`,
+        ...(init?.body === undefined ? {} : { "Content-Type": "application/json" }),
+      },
+      body: init?.body === undefined ? undefined : JSON.stringify(init.body),
+    })
+
+    if (!response.ok) {
+      const body = await response.text().catch(() => "")
+      throw new Error(body || `HTTP ${response.status}`)
+    }
+
+    const contentType = response.headers.get("content-type") ?? ""
+    if (!contentType.includes("application/json")) {
+      return undefined as T
+    }
+
+    return (await response.json()) as T
   }
 }

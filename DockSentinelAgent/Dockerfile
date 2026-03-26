@@ -26,6 +26,7 @@ ARG APP_VERSION=dev
 WORKDIR /app
 
 RUN apk add --no-cache ca-certificates tzdata
+RUN mkdir -p /var/lib/docksentinel-agent
 
 ENV NODE_ENV=production \
   APP_VERSION=${APP_VERSION} \

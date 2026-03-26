@@ -59,6 +59,7 @@ export class EnvironmentsRepository {
     name: string
     baseUrl: string
     agentTokenEnc: string
+    rotationState?: string
   }) {
     return this.prisma.client.environment.create({
       data: {
@@ -67,6 +68,7 @@ export class EnvironmentsRepository {
         name: input.name,
         baseUrl: input.baseUrl,
         agentTokenEnc: input.agentTokenEnc,
+        rotationState: input.rotationState,
       },
     })
   }
@@ -77,6 +79,8 @@ export class EnvironmentsRepository {
       name?: string
       baseUrl?: string
       agentTokenEnc?: string
+      pendingBootstrapTokenEnc?: string | null
+      rotationState?: string
       agentVersion?: string | null
       dockerVersion?: string | null
       lastSeenAt?: Date | null
@@ -102,6 +106,7 @@ export class EnvironmentsRepository {
     input: {
       agentVersion?: string | null
       dockerVersion?: string | null
+      rotationState?: string
       lastSeenAt?: Date | null
       lastError?: string | null
       connectivityStatus?: string

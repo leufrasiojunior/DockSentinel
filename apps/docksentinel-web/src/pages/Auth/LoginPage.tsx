@@ -37,7 +37,7 @@ export function LoginPage() {
   });
 
   const authMode = statusQuery.data?.authMode ?? "password";
-  const from = ((location.state as { from?: string } | null)?.from) ?? "/settings/environments";
+  const from = ((location.state as { from?: string } | null)?.from) ?? "/home";
   const hints = loginHint(authMode);
   const pageTitle = t("login.title");
 

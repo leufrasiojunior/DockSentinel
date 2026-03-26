@@ -14,6 +14,7 @@ import {
   ChevronLeft,
   ChevronRight,
   Clock3,
+  House,
   LayoutDashboard,
   LogOut,
   Menu,
@@ -69,12 +70,7 @@ interface SidebarLinkProps {
 
 type NavItem = {
   to: string;
-  labelKey:
-    | "navigation.dashboard"
-    | "navigation.jobs"
-    | "navigation.scheduler"
-    | "navigation.notifications"
-    | "navigation.settings";
+  label: string;
   icon: LucideIcon;
 };
 
@@ -153,7 +149,7 @@ function SidebarContent({
             <SidebarLink
               key={item.to}
               to={item.to}
-              label={t(item.labelKey)}
+              label={item.label}
               icon={item.icon}
               isCollapsed={isCollapsed}
               onNavigate={onNavigate}
@@ -216,32 +212,37 @@ export function AppShell() {
     const dashboardPath = buildEnvironmentPath(activeEnvironmentId, "dashboard");
     return [
       {
+        to: "/home",
+        label: "Home",
+        icon: House,
+      },
+      {
         to: dashboardPath,
-        labelKey: "navigation.dashboard",
+        label: t("navigation.dashboard"),
         icon: LayoutDashboard,
       },
       {
         to: buildEnvironmentPath(activeEnvironmentId, "jobs"),
-        labelKey: "navigation.jobs",
+        label: t("navigation.jobs"),
         icon: TerminalSquare,
       },
       {
         to: buildEnvironmentPath(activeEnvironmentId, "scheduler"),
-        labelKey: "navigation.scheduler",
+        label: t("navigation.scheduler"),
         icon: Clock3,
       },
       {
         to: buildEnvironmentPath(activeEnvironmentId, "notifications"),
-        labelKey: "navigation.notifications",
+        label: t("navigation.notifications"),
         icon: Bell,
       },
       {
         to: "/settings",
-        labelKey: "navigation.settings",
+        label: t("navigation.settings"),
         icon: Settings2,
       },
     ];
-  }, [activeEnvironmentId]);
+  }, [activeEnvironmentId, i18n.resolvedLanguage, t]);
 
   const currentNav = useMemo(() => {
     return (
@@ -249,7 +250,7 @@ export function AppShell() {
       navItems[0]
     );
   }, [location.pathname, navItems]);
-  const currentTitle = useMemo(() => t(currentNav.labelKey), [currentNav.labelKey, i18n.resolvedLanguage, t]);
+  const currentTitle = useMemo(() => currentNav.label, [currentNav.label]);
 
   useEffect(() => {
     document.title = `DockSentinel | ${currentTitle}`;

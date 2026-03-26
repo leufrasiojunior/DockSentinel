@@ -11,7 +11,9 @@ import {
   CreateRemoteEnvironmentDto,
   EnvironmentDto,
   EnvironmentListDto,
+  RemoteEnvironmentCompleteRotationDto,
   RemoteEnvironmentMutationDto,
+  RemoteEnvironmentRotationStatusDto,
   RemoteEnvironmentTestDto,
   UpdateRemoteEnvironmentDto,
   updateRemoteEnvironmentSchema,
@@ -65,6 +67,20 @@ export class EnvironmentsController {
   @ApiOkResponse({ type: RemoteEnvironmentMutationDto })
   async rotateToken(@Param("id") id: string) {
     return this.environments.rotateRemoteToken(id)
+  }
+
+  @Get("remote/:id/rotation-status")
+  @ApiOperation({ summary: "Get remote environment rotation status" })
+  @ApiOkResponse({ type: RemoteEnvironmentRotationStatusDto })
+  async rotationStatus(@Param("id") id: string) {
+    return this.environments.getRemoteRotationStatus(id)
+  }
+
+  @Post("remote/:id/complete-rotation")
+  @ApiOperation({ summary: "Complete remote environment token rotation" })
+  @ApiOkResponse({ type: RemoteEnvironmentCompleteRotationDto })
+  async completeRotation(@Param("id") id: string) {
+    return this.environments.completeRemoteRotation(id)
   }
 
   @Delete("remote/:id")

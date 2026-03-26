@@ -17,14 +17,6 @@ function resolvePort() {
   return Number.isFinite(raw) && raw > 0 ? raw : DEFAULT_PORT
 }
 
-function getAgentToken() {
-  const token = process.env.DOCKSENTINEL_AGENT_TOKEN?.trim()
-  if (!token) {
-    throw new Error("DOCKSENTINEL_AGENT_TOKEN is required")
-  }
-  return token
-}
-
 function getAppVersion() {
   return process.env.APP_VERSION ?? process.env.npm_package_version ?? "dev"
 }
@@ -78,7 +70,6 @@ async function assertNoDockSentinelServerConflict(logger: Logger) {
 
 async function bootstrap() {
   const logger = new Logger("AgentBootstrap")
-  getAgentToken()
   await assertNoDockSentinelServerConflict(logger)
 
   const app = await NestFactory.create(AppModule, { bufferLogs: true })

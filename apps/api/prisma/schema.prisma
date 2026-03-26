@@ -59,6 +59,8 @@ model Environment {
   name String
   baseUrl String?
   agentTokenEnc String?
+  pendingBootstrapTokenEnc String?
+  rotationState String @default("paired") // unpaired | paired | pending_rotation | ready_to_complete
   agentVersion String?
   dockerVersion String?
   lastSeenAt DateTime?

@@ -18,6 +18,12 @@ export class RuntimeService {
       : this.remote.listContainers(environmentId)
   }
 
+  async listContainersReadonly(environmentId: string) {
+    return this.isLocal(environmentId)
+      ? this.local.listContainers()
+      : this.remote.listContainersReadonly(environmentId)
+  }
+
   async getContainerDetails(environmentId: string, id: string) {
     return this.isLocal(environmentId)
       ? this.local.getContainerDetails(id)
