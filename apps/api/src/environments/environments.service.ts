@@ -531,7 +531,7 @@ export class EnvironmentsService implements OnModuleInit {
   }
 
   private buildInstallCommand() {
-    return [
+    const runCommand = [
       "docker run -d",
       "--name docksentinel-agent",
       "--restart unless-stopped",
@@ -541,6 +541,8 @@ export class EnvironmentsService implements OnModuleInit {
       "-v /opt/docksentinel-agent:/var/lib/docksentinel-agent",
       "leufrasiojunior/docksentinelagent:latest",
     ].join(" ")
+
+    return `docker rm -f docksentinel-agent >/dev/null 2>&1 || true && ${runCommand}`
   }
 
   private buildSetupUrl(baseUrl?: string | null) {
