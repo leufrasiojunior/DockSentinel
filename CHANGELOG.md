@@ -1,5 +1,23 @@
 # Changelog
 
+## [2.5.0](https://github.com/leufrasiojunior/DockSentinel/compare/v2.4.1...v2.5.0) (2026-03-27)
+
+
+### Features
+
+* modificacao para criacao do docksentiel_agent ([a2c3b89](https://github.com/leufrasiojunior/DockSentinel/commit/a2c3b8933ac5d06cdb232e0495bcd93def3c7fc6))
+* move DockSentinel agent to separated item ([95a19bc](https://github.com/leufrasiojunior/DockSentinel/commit/95a19bc4f83b4c2f0c3d7a5a4ee298dddb957bc1))
+
+
+### Bug Fixes
+
+* agent names changed ([23ab1d6](https://github.com/leufrasiojunior/DockSentinel/commit/23ab1d6798eec9c7e0fbd5db9039b122de5174ef))
+* alteracao no agewnte para comunicacao segura ([c2e1e9a](https://github.com/leufrasiojunior/DockSentinel/commit/c2e1e9ade63bf3f3609134b3b9ae956ed8baebbd))
+* conflitos ajustados ([d635019](https://github.com/leufrasiojunior/DockSentinel/commit/d6350193a1a3299b1b34a8817b0265d7598e3eb0))
+* conflitos ajustados ([1cecad4](https://github.com/leufrasiojunior/DockSentinel/commit/1cecad407d715ec892ed88f31b8fb3c635a2f3fb))
+* remove db file ([8e61294](https://github.com/leufrasiojunior/DockSentinel/commit/8e612947de393720da3fe7eae8f1df047d5ba561))
+* routes vite proxy changed ([72902b3](https://github.com/leufrasiojunior/DockSentinel/commit/72902b33ded39bae0673270da22868867bb0dd57))
+
 ## [2.4.1](https://github.com/leufrasiojunior/DockSentinel/compare/v2.4.0...v2.4.1) (2026-03-24)
 
 
