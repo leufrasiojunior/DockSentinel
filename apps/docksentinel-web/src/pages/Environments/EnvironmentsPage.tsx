@@ -52,6 +52,7 @@ import {
 import { formatDateTime } from "../../i18n/format";
 import { useConfirm } from "../../shared/components/ui/ConfirmProvider";
 import { useToast } from "../../shared/components/ui/ToastProvider";
+import { copyToClipboard } from "../../shared/lib/utils/copyToClipboard";
 
 type Drafts = Record<string, { name: string; baseUrl: string }>;
 type SetupFlow = "install" | "rotation";
@@ -418,7 +419,7 @@ export function EnvironmentsPage() {
 
   async function copyText(text: string, successMessage: string) {
     try {
-      await navigator.clipboard.writeText(text);
+      await copyToClipboard(text);
       toast.success(successMessage, t("navigation.environments"));
     } catch (error: unknown) {
       toast.error(
