@@ -43,7 +43,9 @@ export class EnvironmentHealthMonitorService implements OnModuleInit {
 
     try {
       const environments = await this.repo.listAll()
-      const remotes = environments.filter((environment) => environment.kind === "remote")
+      const remotes = environments.filter(
+        (environment) => environment.kind === "remote" && Boolean(environment.agentTokenEnc),
+      )
 
       for (const environment of remotes) {
         try {

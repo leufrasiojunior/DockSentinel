@@ -4,9 +4,16 @@ export type EnvironmentKind = "local" | "remote";
 export type EnvironmentStatus = "online" | "offline";
 export type EnvironmentRotationState =
   | "unpaired"
+  | "ready_to_pair"
   | "paired"
   | "pending_rotation"
   | "ready_to_complete";
+export type EnvironmentSetupPhase =
+  | "waiting_for_agent"
+  | "waiting_for_token"
+  | "ready_to_complete"
+  | "blocked";
+export type EnvironmentSetupBlockingReason = "agent_already_paired";
 
 export type Environment = {
   id: string;
@@ -48,11 +55,14 @@ export type EnvironmentTestResponse = {
   info: AgentInfo;
 };
 
-export type EnvironmentRotationStatusResponse = {
+export type EnvironmentSetupStatusResponse = {
   environment: Environment;
   agentState: EnvironmentRotationState;
+  phase: EnvironmentSetupPhase;
   readyToComplete: boolean;
   setupUrl?: string | null;
+  blockingReason?: EnvironmentSetupBlockingReason | null;
+  lastError?: string | null;
 };
 
 export type EnvironmentOverview = {
@@ -121,23 +131,45 @@ export async function rotateRemoteEnvironmentToken(id: string): Promise<Environm
   );
 }
 
+export async function getRemoteEnvironmentSetupStatus(
+  id: string,
+): Promise<EnvironmentSetupStatusResponse> {
+  return http<EnvironmentSetupStatusResponse>(
+    `${API_PREFIX}/remote/${encodeURIComponent(id)}/setup-status`,
+  );
+}
+
+export async function completeRemoteEnvironmentSetup(
+  id: string,
+): Promise<{ environment: Environment }> {
+  return http<{ environment: Environment }>(
+    `${API_PREFIX}/remote/${encodeURIComponent(id)}/complete-setup`,
+    {
+      method: "POST",
+    },
+  );
+}
+
+export async function reportRemoteEnvironmentSetupTimeout(
+  id: string,
+  body: { flow?: "install" | "rotation"; lastError?: string },
+): Promise<{ ok: boolean }> {
+  return http<{ ok: boolean }>(`${API_PREFIX}/remote/${encodeURIComponent(id)}/setup-timeout`, {
+    method: "POST",
+    body,
+  });
+}
+
 export async function getRemoteEnvironmentRotationStatus(
   id: string,
-): Promise<EnvironmentRotationStatusResponse> {
-  return http<EnvironmentRotationStatusResponse>(
-    `${API_PREFIX}/remote/${encodeURIComponent(id)}/rotation-status`,
-  );
+): Promise<EnvironmentSetupStatusResponse> {
+  return getRemoteEnvironmentSetupStatus(id);
 }
 
 export async function completeRemoteEnvironmentRotation(
   id: string,
 ): Promise<{ environment: Environment }> {
-  return http<{ environment: Environment }>(
-    `${API_PREFIX}/remote/${encodeURIComponent(id)}/complete-rotation`,
-    {
-      method: "POST",
-    },
-  );
+  return completeRemoteEnvironmentSetup(id);
 }
 
 export async function deleteRemoteEnvironment(id: string): Promise<{ ok: boolean }> {

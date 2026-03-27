@@ -1,8 +1,6 @@
 import {
   BadRequestException,
   Injectable,
-  Logger,
-  NotFoundException,
   OnModuleInit,
   UnauthorizedException,
 } from "@nestjs/common"
@@ -35,7 +33,6 @@ type StoredAuthState = {
 
 @Injectable()
 export class AgentAuthStateService implements OnModuleInit {
-  private readonly logger = new Logger(AgentAuthStateService.name)
   private readonly stateDir =
     process.env.DOCKSENTINEL_AGENT_STATE_DIR?.trim() || "/var/lib/docksentinel-agent"
   private readonly keyFile = join(this.stateDir, "auth.key")
@@ -65,17 +62,10 @@ export class AgentAuthStateService implements OnModuleInit {
 
   async getExpectedTokenForPath(path: string) {
     await this.ensureLoaded()
-    if (path.includes("/agent/v1/admin/rotation/complete")) {
+    if (path.includes("/agent/v1/setup/complete")) {
       return this.state.pendingBootstrapToken
     }
     return this.state.activeCredential
-  }
-
-  async assertSetupAvailable() {
-    const state = await this.getRotationState()
-    if (state === "paired") {
-      throw new NotFoundException("Setup UI is not available for a paired agent")
-    }
   }
 
   async enterPendingRotation() {
@@ -140,15 +130,6 @@ export class AgentAuthStateService implements OnModuleInit {
     await mkdir(this.stateDir, { recursive: true })
     this.key = await this.loadOrCreateKey()
     this.state = await this.loadStateFile()
-
-    const envToken = process.env.DOCKSENTINEL_AGENT_TOKEN?.trim()
-    if (!this.state.activeCredential && envToken) {
-      this.state.activeCredential = envToken
-      this.state.rotationState = "paired"
-      await this.persist()
-      this.logger.log("Seeded active credential from DOCKSENTINEL_AGENT_TOKEN")
-      return
-    }
 
     if (this.state.activeCredential && this.state.rotationState === "unpaired") {
       this.state.rotationState = "paired"

@@ -5,9 +5,9 @@ DockSentinelAgent e o runtime remoto do DockSentinel para controlar um Docker En
 ## Requisitos
 
 - Docker Engine acessivel pelo socket `/var/run/docker.sock`
-- `DOCKSENTINEL_AGENT_TOKEN` gerado pela instancia principal do DockSentinel
 - Porta padrao `45873`
 - Diretorio persistente para o estado local do agent em `/var/lib/docksentinel-agent`
+- Pareamento inicial feito pela pagina local `/setup` com o bootstrap token gerado pela instancia principal do DockSentinel
 
 ## Execucao manual
 
@@ -17,7 +17,6 @@ docker run -d \
   --restart unless-stopped \
   -p 45873:45873 \
   -e PORT=45873 \
-  -e DOCKSENTINEL_AGENT_TOKEN='SEU_TOKEN_AQUI' \
   -v /var/run/docker.sock:/var/run/docker.sock \
   -v /opt/docksentinel-agent:/var/lib/docksentinel-agent \
   leufrasiojunior/docksentinel-agent:latest
@@ -30,12 +29,12 @@ npm install
 npm run build
 ```
 
-## Rotacao de token
+## Setup e rotacao de token
 
-- Quando o DockSentinel principal iniciar uma rotacao, o agent entra em `pending_rotation`.
-- Abra `http://HOST:45873/setup`, cole o bootstrap token e volte ao app principal.
-- O DockSentinel principal conclui a rotacao automaticamente quando o agent estiver pronto, mas tambem oferece o botao `Complete rotation`.
-- Depois da rotacao, o agent passa a usar a credencial salva no estado local e deixa de depender do token antigo em `env`.
+- No primeiro pareamento, suba o container e abra `http://HOST:45873/setup`.
+- Cole o bootstrap token mostrado pelo DockSentinel principal e volte ao app principal.
+- O DockSentinel principal monitora o setup e conclui automaticamente quando o agent estiver pronto, mas tambem oferece o botao `Complete setup`.
+- Quando houver rotacao, o fluxo reaproveita a mesma pagina `/setup`.
 
 ## Observacoes
 

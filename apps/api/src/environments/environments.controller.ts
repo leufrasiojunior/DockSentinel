@@ -11,13 +11,18 @@ import {
   CreateRemoteEnvironmentDto,
   EnvironmentDto,
   EnvironmentListDto,
+  RemoteEnvironmentCompleteSetupDto,
   RemoteEnvironmentCompleteRotationDto,
   RemoteEnvironmentMutationDto,
   RemoteEnvironmentRotationStatusDto,
+  RemoteEnvironmentSetupTimeoutDto,
+  remoteEnvironmentSetupTimeoutSchema,
+  RemoteEnvironmentSetupStatusDto,
   RemoteEnvironmentTestDto,
   UpdateRemoteEnvironmentDto,
   updateRemoteEnvironmentSchema,
 } from "./dto/environment.dto"
+import { OkResponseDto } from "../common/dto/ok-response.dto"
 import { EnvironmentsService } from "./environments.service"
 
 @ApiTags("Environments")
@@ -67,6 +72,32 @@ export class EnvironmentsController {
   @ApiOkResponse({ type: RemoteEnvironmentMutationDto })
   async rotateToken(@Param("id") id: string) {
     return this.environments.rotateRemoteToken(id)
+  }
+
+  @Get("remote/:id/setup-status")
+  @ApiOperation({ summary: "Get remote environment setup status" })
+  @ApiOkResponse({ type: RemoteEnvironmentSetupStatusDto })
+  async setupStatus(@Param("id") id: string) {
+    return this.environments.getRemoteSetupStatus(id)
+  }
+
+  @Post("remote/:id/complete-setup")
+  @ApiOperation({ summary: "Complete remote environment setup" })
+  @ApiOkResponse({ type: RemoteEnvironmentCompleteSetupDto })
+  async completeSetup(@Param("id") id: string) {
+    return this.environments.completeRemoteSetup(id)
+  }
+
+  @Post("remote/:id/setup-timeout")
+  @ApiOperation({ summary: "Register a remote environment setup timeout" })
+  @ApiBody({ type: RemoteEnvironmentSetupTimeoutDto })
+  @ApiOkResponse({ type: OkResponseDto })
+  async setupTimeout(
+    @Param("id") id: string,
+    @Body(new ZodValidationPipe(remoteEnvironmentSetupTimeoutSchema))
+    body: RemoteEnvironmentSetupTimeoutDto,
+  ) {
+    return this.environments.reportRemoteSetupTimeout(id, body)
   }
 
   @Get("remote/:id/rotation-status")

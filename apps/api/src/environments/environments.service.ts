@@ -28,6 +28,8 @@ import type {
   CreateRemoteEnvironmentInput,
   EnvironmentDto,
   RemoteEnvironmentRotationStatusDto,
+  RemoteEnvironmentSetupStatusDto,
+  RemoteEnvironmentSetupTimeoutInput,
   UpdateRemoteEnvironmentInput,
 } from "./dto/environment.dto"
 import { EnvironmentsRepository } from "./environments.repository"
@@ -37,9 +39,11 @@ type ProbeOptions = {
   notifyOnOffline: boolean
   throwOnFailure: boolean
 }
-type AgentRotationStatusPayload = {
+type AgentSetupStatusPayload = {
   state?: EnvironmentRotationState
 }
+type SetupPhase = "waiting_for_agent" | "waiting_for_token" | "ready_to_complete" | "blocked"
+type SetupBlockingReason = "agent_already_paired"
 
 @Injectable()
 export class EnvironmentsService implements OnModuleInit {
@@ -63,7 +67,9 @@ export class EnvironmentsService implements OnModuleInit {
   async listEnvironments() {
     await this.repo.ensureLocalEnvironment()
     const items = await this.repo.listAll()
-    const localFirst = items.sort((a, b) => {
+    const localFirst = items
+      .filter((item) => this.isVisibleEnvironment(item))
+      .sort((a, b) => {
       if (a.id === LOCAL_ENVIRONMENT_ID) return -1
       if (b.id === LOCAL_ENVIRONMENT_ID) return 1
       return a.createdAt.getTime() - b.createdAt.getTime()
@@ -100,21 +106,22 @@ export class EnvironmentsService implements OnModuleInit {
     await this.assertUniqueRemoteName(name)
     await this.assertUniqueRemoteBaseUrl(baseUrl)
 
-    const agentToken = this.generateAgentToken()
+    const bootstrapToken = this.generateAgentToken()
     const environment = await this.repo.createRemote({
       id: randomUUID(),
       name,
       baseUrl,
-      agentTokenEnc: this.crypto.encrypt(agentToken),
-      rotationState: "unpaired",
+      agentTokenEnc: null,
+      pendingBootstrapTokenEnc: this.crypto.encrypt(bootstrapToken),
+      rotationState: "ready_to_pair",
     })
 
     await this.schedulerRepo.ensureEnvironmentConfig(environment.id, environment.name)
 
     return {
       environment: this.toDto(environment),
-      installCommand: this.buildInstallCommand(agentToken),
-      bootstrapToken: null,
+      installCommand: this.buildInstallCommand(),
+      bootstrapToken,
       setupUrl: this.buildSetupUrl(environment.baseUrl),
     }
   }
@@ -152,116 +159,150 @@ export class EnvironmentsService implements OnModuleInit {
       throw new BadRequestException("Only remote environments can rotate token")
     }
 
-    const { baseUrl, token: currentCredential } = this.getRemoteAccess(current)
+    let nextState: EnvironmentRotationState = "ready_to_pair"
+    if (current.agentTokenEnc && this.normalizeRotationState(current.rotationState) === "paired") {
+      const { baseUrl, token: currentCredential } = this.getRemoteAccess(current)
 
-    try {
-      await this.requestAgentJson(baseUrl, "/agent/v1/admin/rotation/enter", currentCredential, {
-        method: "POST",
-      })
-    } catch (error: unknown) {
-      throw new BadRequestException(
-        `Failed to put agent into rotation mode: ${this.getErrorMessage(error)}`,
-      )
+      try {
+        await this.requestAgentJson(baseUrl, "/agent/v1/setup/prepare-rotation", currentCredential, {
+          method: "POST",
+        })
+      } catch (error: unknown) {
+        throw new BadRequestException(
+          `Failed to put agent into rotation mode: ${this.getErrorMessage(error)}`,
+        )
+      }
+
+      nextState = "pending_rotation"
     }
 
     const bootstrapToken = this.generateAgentToken()
     const updated = await this.repo.updateRemote(id, {
       pendingBootstrapTokenEnc: this.crypto.encrypt(bootstrapToken),
-      rotationState: "pending_rotation",
+      rotationState: nextState,
       lastError: null,
     })
 
     return {
       environment: this.toDto(updated),
       bootstrapToken,
-      installCommand: null,
+      installCommand: nextState === "ready_to_pair" ? this.buildInstallCommand() : null,
       setupUrl: this.buildSetupUrl(updated.baseUrl),
     }
   }
 
-  async getRemoteRotationStatus(id: string): Promise<RemoteEnvironmentRotationStatusDto> {
+  async getRemoteSetupStatus(id: string): Promise<RemoteEnvironmentSetupStatusDto> {
     const current = await this.getEnvironmentOrThrow(id)
     if (current.kind !== "remote") {
-      throw new BadRequestException("Only remote environments have rotation status")
+      throw new BadRequestException("Only remote environments have setup status")
     }
 
-    const { baseUrl, token } = this.getRemoteAccess(current)
+    const setupUrl = this.buildSetupUrl(current.baseUrl)
+    if (!current.baseUrl) {
+      return {
+        environment: this.toDto(current),
+        agentState: this.normalizeRotationState(current.rotationState),
+        phase: "waiting_for_agent",
+        readyToComplete: false,
+        setupUrl,
+        blockingReason: null,
+        lastError: "Remote environment is missing baseUrl",
+      }
+    }
 
-    let agentState: EnvironmentRotationState
     try {
-      const result = await this.requestAgentJson<AgentRotationStatusPayload>(
-        baseUrl,
-        "/agent/v1/admin/rotation/status",
-        token,
+      const result = await this.fetchAgentSetupStatus(current.baseUrl)
+      const agentState = this.normalizeRotationState(result?.state)
+      const currentState = this.normalizeRotationState(current.rotationState)
+      const nextState = this.deriveSetupState(
+        currentState,
+        agentState,
+        Boolean(current.pendingBootstrapTokenEnc),
       )
-      agentState = this.normalizeRotationState(result?.state)
+      const phase = this.deriveSetupPhase(current, agentState)
+      const blockingReason = this.deriveSetupBlockingReason(current, agentState)
+
+      let nextLastError: string | null = null
+      if (blockingReason === "agent_already_paired") {
+        nextLastError =
+          `This agent is already paired with another DockSentinel environment. ` +
+          `Rotate the token in the original environment or clear the agent local state to pair it here.`
+      }
+
+      let environment = current
+      if (
+        environment.rotationState !== nextState ||
+        (environment.lastError ?? null) !== nextLastError
+      ) {
+        environment = await this.repo.updateRemote(environment.id, {
+          rotationState: nextState,
+          lastError: nextLastError,
+        })
+      }
+
+      if (
+        blockingReason === "agent_already_paired" &&
+        (current.lastError ?? null) !== nextLastError &&
+        nextLastError
+      ) {
+        await this.emitSetupFailureNotification(environment, nextLastError)
+      }
+
+      return {
+        environment: this.toDto(environment),
+        agentState,
+        phase,
+        readyToComplete: agentState === "ready_to_complete",
+        setupUrl,
+        blockingReason,
+        lastError: nextLastError,
+      }
     } catch (error: unknown) {
-      throw new BadRequestException(
-        `Failed to read agent rotation status: ${this.getErrorMessage(error)}`,
-      )
-    }
-
-    const nextState =
-      agentState === "paired" && current.pendingBootstrapTokenEnc
-        ? this.normalizeRotationState(current.rotationState)
-        : agentState
-
-    let environment = current
-    if (environment.rotationState !== nextState) {
-      environment = await this.repo.updateRemote(environment.id, {
-        rotationState: nextState,
-      })
-    }
-
-    return {
-      environment: this.toDto(environment),
-      agentState,
-      readyToComplete: agentState === "ready_to_complete",
-      setupUrl: this.buildSetupUrl(environment.baseUrl),
+      return {
+        environment: this.toDto(current),
+        agentState: this.normalizeRotationState(current.rotationState),
+        phase: "waiting_for_agent",
+        readyToComplete: false,
+        setupUrl,
+        blockingReason: null,
+        lastError: this.getErrorMessage(error),
+      }
     }
   }
 
-  async completeRemoteRotation(id: string) {
+  async completeRemoteSetup(id: string) {
     const current = await this.getEnvironmentOrThrow(id)
     if (current.kind !== "remote") {
-      throw new BadRequestException("Only remote environments can complete rotation")
+      throw new BadRequestException("Only remote environments can complete setup")
     }
-    if (!current.pendingBootstrapTokenEnc) {
-      if (this.normalizeRotationState(current.rotationState) === "unpaired") {
-        const result = await this.probeEnvironment(current, {
-          notifyOnOffline: false,
-          throwOnFailure: true,
-        })
-        if (!result) {
-          throw new BadRequestException(
-            "The agent is not reachable yet. Start the container and use Test connection again.",
-          )
-        }
 
+    if (!current.pendingBootstrapTokenEnc) {
+      if (current.agentTokenEnc && this.normalizeRotationState(current.rotationState) === "paired") {
         return {
-          environment: result.environment,
+          environment: this.toDto(current),
         }
       }
 
-      throw new BadRequestException(
-        "This environment does not have a pending rotation. If this is a new installation, use Test connection to confirm the agent is online.",
-      )
+      throw new BadRequestException("This environment does not have a pending setup token")
     }
 
-    const { baseUrl } = this.getRemoteAccess(current)
-
-    const status = await this.getRemoteRotationStatus(id)
+    const status = await this.getRemoteSetupStatus(id)
     if (!status.readyToComplete) {
-      throw new BadRequestException("The agent has not received the bootstrap token yet")
+      throw new BadRequestException("The agent setup is not ready to complete yet")
+    }
+
+    const currentAgain = await this.getEnvironmentOrThrow(id)
+    if (currentAgain.kind !== "remote" || !currentAgain.baseUrl || !currentAgain.pendingBootstrapTokenEnc) {
+      throw new BadRequestException("This environment does not have a pending setup token")
     }
 
     const nextCredential = this.generateAgentToken()
-    const bootstrapToken = this.crypto.decrypt(current.pendingBootstrapTokenEnc)
+    const bootstrapToken = this.crypto.decrypt(currentAgain.pendingBootstrapTokenEnc)
 
     try {
       await this.requestAgentJson(
-        baseUrl,
-        "/agent/v1/admin/rotation/complete",
+        currentAgain.baseUrl,
+        "/agent/v1/setup/complete",
         bootstrapToken,
         {
           method: "POST",
@@ -269,17 +310,17 @@ export class EnvironmentsService implements OnModuleInit {
         },
       )
     } catch (error: unknown) {
-      throw new BadRequestException(
-        `Failed to complete rotation on the agent: ${this.getErrorMessage(error)}`,
-      )
+      const message = `Failed to complete agent setup: ${this.getErrorMessage(error)}`
+      await this.emitSetupFailureNotification(currentAgain, message)
+      throw new BadRequestException(message)
     }
 
     let info: AgentInfoDto | null = null
     try {
-      info = await this.fetchAgentInfo(baseUrl, nextCredential)
+      info = await this.fetchAgentInfo(currentAgain.baseUrl, nextCredential)
     } catch (error: unknown) {
       this.logger.warn(
-        `Rotation completed for environment ${current.id}, but info refresh failed: ${this.getErrorMessage(error)}`,
+        `Setup completed for environment ${currentAgain.id}, but info refresh failed: ${this.getErrorMessage(error)}`,
       )
     }
 
@@ -287,17 +328,43 @@ export class EnvironmentsService implements OnModuleInit {
       agentTokenEnc: this.crypto.encrypt(nextCredential),
       pendingBootstrapTokenEnc: null,
       rotationState: "paired",
-      agentVersion: info?.agentVersion ?? current.agentVersion ?? null,
-      dockerVersion: info?.dockerVersion ?? current.dockerVersion ?? null,
-      lastSeenAt: info ? new Date() : current.lastSeenAt ?? null,
+      agentVersion: info?.agentVersion ?? currentAgain.agentVersion ?? null,
+      dockerVersion: info?.dockerVersion ?? currentAgain.dockerVersion ?? null,
+      lastSeenAt: info ? new Date() : currentAgain.lastSeenAt ?? null,
       lastError: null,
-      connectivityStatus: info ? "online" : current.connectivityStatus,
-      offlineNotifiedAt: info ? null : current.offlineNotifiedAt ?? null,
+      connectivityStatus: info ? "online" : currentAgain.connectivityStatus,
+      offlineNotifiedAt: info ? null : currentAgain.offlineNotifiedAt ?? null,
     })
 
     return {
       environment: this.toDto(updated),
     }
+  }
+
+  async reportRemoteSetupTimeout(id: string, input: RemoteEnvironmentSetupTimeoutInput) {
+    const current = await this.getEnvironmentOrThrow(id)
+    if (current.kind !== "remote") {
+      throw new BadRequestException("Only remote environments can report setup timeout")
+    }
+
+    const flow = input.flow === "rotation" ? "rotation" : "install"
+    const suffix = input.lastError?.trim() ? ` Last error: ${input.lastError.trim()}` : ""
+    const message =
+      flow === "rotation"
+        ? `Agent rotation timed out after 2 minutes for environment "${current.name}".${suffix}`
+        : `Agent setup timed out after 2 minutes for environment "${current.name}".${suffix}`
+
+    await this.emitSetupFailureNotification(current, message)
+
+    return { ok: true as const }
+  }
+
+  async getRemoteRotationStatus(id: string): Promise<RemoteEnvironmentRotationStatusDto> {
+    return this.getRemoteSetupStatus(id)
+  }
+
+  async completeRemoteRotation(id: string) {
+    return this.completeRemoteSetup(id)
   }
 
   async testEnvironment(id: string) {
@@ -463,14 +530,13 @@ export class EnvironmentsService implements OnModuleInit {
     return "Examples: 192.168.3.148, http://192.168.3.148:45873, https://docker.example.com:45873"
   }
 
-  private buildInstallCommand(agentToken: string) {
+  private buildInstallCommand() {
     return [
       "docker run -d",
       "--name docksentinel-agent",
       "--restart unless-stopped",
       `-p ${AGENT_DEFAULT_PORT}:${AGENT_DEFAULT_PORT}`,
       `-e PORT=${AGENT_DEFAULT_PORT}`,
-      `-e DOCKSENTINEL_AGENT_TOKEN='${agentToken}'`,
       "-v /var/run/docker.sock:/var/run/docker.sock",
       "-v /opt/docksentinel-agent:/var/lib/docksentinel-agent",
       "leufrasiojunior/docksentinel-agent:latest",
@@ -541,8 +607,7 @@ export class EnvironmentsService implements OnModuleInit {
       const updated = await this.repo.updateHealth(environment.id, {
         agentVersion: info.agentVersion,
         dockerVersion: info.dockerVersion ?? null,
-        rotationState:
-          environment.rotationState === "unpaired" ? "paired" : environment.rotationState,
+        rotationState: this.normalizeRotationState(environment.rotationState),
         lastSeenAt: now,
         lastError: null,
         connectivityStatus: "online",
@@ -555,8 +620,26 @@ export class EnvironmentsService implements OnModuleInit {
       }
     }
 
-    if (!environment.baseUrl || !environment.agentTokenEnc) {
-      const message = "Remote environment is missing baseUrl or active credential"
+    if (!environment.baseUrl) {
+      const message = "Remote environment is missing baseUrl"
+      await this.repo.updateHealth(environment.id, {
+        lastError: message,
+        connectivityStatus: "offline",
+      })
+
+      if (options.throwOnFailure) {
+        throw new BadRequestException(message)
+      }
+
+      return null
+    }
+
+    if (!environment.agentTokenEnc) {
+      if (this.isWaitingInitialSetup(environment)) {
+        return null
+      }
+
+      const message = "Remote environment is missing an active credential"
       await this.repo.updateHealth(environment.id, {
         lastError: message,
         connectivityStatus: "offline",
@@ -576,8 +659,7 @@ export class EnvironmentsService implements OnModuleInit {
       const updated = await this.repo.updateHealth(environment.id, {
         agentVersion: info.agentVersion,
         dockerVersion: info.dockerVersion ?? null,
-        rotationState:
-          environment.rotationState === "unpaired" ? "paired" : environment.rotationState,
+        rotationState: this.normalizeRotationState(environment.rotationState),
         lastSeenAt: now,
         lastError: null,
         connectivityStatus: "online",
@@ -632,6 +714,109 @@ export class EnvironmentsService implements OnModuleInit {
       return value as EnvironmentRotationState
     }
     return "paired"
+  }
+
+  private async fetchAgentSetupStatus(baseUrl: string): Promise<AgentSetupStatusPayload> {
+    const response = await fetch(`${baseUrl}/agent/v1/setup/status`)
+
+    if (!response.ok) {
+      const body = await response.text().catch(() => "")
+      throw new Error(body || `HTTP ${response.status}`)
+    }
+
+    const contentType = response.headers.get("content-type") ?? ""
+    if (!contentType.includes("application/json")) {
+      return {}
+    }
+
+    return (await response.json()) as AgentSetupStatusPayload
+  }
+
+  private deriveSetupState(
+    currentState: EnvironmentRotationState,
+    agentState: EnvironmentRotationState,
+    hasPendingBootstrap: boolean,
+  ): EnvironmentRotationState {
+    if (agentState === "ready_to_complete") return "ready_to_complete"
+    if (agentState === "pending_rotation") return "pending_rotation"
+
+    if (agentState === "paired") {
+      if (
+        hasPendingBootstrap &&
+        (currentState === "pending_rotation" || currentState === "ready_to_complete")
+      ) {
+        return currentState
+      }
+      return "paired"
+    }
+
+    if (agentState === "unpaired") {
+      if (!hasPendingBootstrap) return "unpaired"
+      return currentState === "pending_rotation" ? "pending_rotation" : "ready_to_pair"
+    }
+
+    if (agentState === "ready_to_pair") {
+      return hasPendingBootstrap ? "ready_to_pair" : "unpaired"
+    }
+
+    return currentState
+  }
+
+  private deriveSetupPhase(
+    environment: NonNullable<EnvironmentRow>,
+    agentState: EnvironmentRotationState,
+  ): SetupPhase {
+    if (!environment.agentTokenEnc && agentState === "paired") {
+      return "blocked"
+    }
+
+    if (agentState === "ready_to_complete") {
+      return "ready_to_complete"
+    }
+
+    return "waiting_for_token"
+  }
+
+  private deriveSetupBlockingReason(
+    environment: NonNullable<EnvironmentRow>,
+    agentState: EnvironmentRotationState,
+  ): SetupBlockingReason | null {
+    if (!environment.agentTokenEnc && agentState === "paired") {
+      return "agent_already_paired"
+    }
+
+    return null
+  }
+
+  private isWaitingInitialSetup(environment: NonNullable<EnvironmentRow>) {
+    if (!environment.pendingBootstrapTokenEnc) return false
+
+    const state = this.normalizeRotationState(environment.rotationState)
+    return state === "unpaired" || state === "ready_to_pair" || state === "ready_to_complete"
+  }
+
+  private isVisibleEnvironment(environment: NonNullable<EnvironmentRow>) {
+    return environment.kind === "local" || Boolean(environment.agentTokenEnc)
+  }
+
+  private async emitSetupFailureNotification(
+    environment: NonNullable<EnvironmentRow>,
+    message: string,
+  ) {
+    await this.notifications.emitSystemError(
+      message,
+      {
+        environmentId: environment.id,
+        environmentName: environment.name,
+        baseUrl: environment.baseUrl,
+        rotationState: this.normalizeRotationState(environment.rotationState),
+      },
+      undefined,
+      {
+        environmentId: environment.id,
+        environmentName: environment.name,
+      },
+    )
   }
 
   private async requestAgentJson<T>(

@@ -1,19 +1,14 @@
-import { Body, Controller, Get, Post } from "@nestjs/common"
+import { Body, Controller, Post } from "@nestjs/common"
 import { AgentAuthStateService } from "./agent-auth-state.service"
 
-@Controller("agent/v1/admin/rotation")
+@Controller("agent/v1/setup")
 export class RotationAdminController {
   constructor(private readonly authState: AgentAuthStateService) {}
 
-  @Post("enter")
-  async enter() {
+  @Post("prepare-rotation")
+  async prepareRotation() {
     const state = await this.authState.enterPendingRotation()
     return { ok: true as const, state }
-  }
-
-  @Get("status")
-  async status() {
-    return this.authState.getStatus()
   }
 
   @Post("complete")

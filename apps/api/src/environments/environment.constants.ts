@@ -3,6 +3,7 @@ export const LOCAL_ENVIRONMENT_NAME = "Local"
 export const AGENT_DEFAULT_PORT = 45873
 export const ENVIRONMENT_ROTATION_STATES = [
   "unpaired",
+  "ready_to_pair",
   "paired",
   "pending_rotation",
   "ready_to_complete",

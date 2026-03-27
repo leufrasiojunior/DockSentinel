@@ -58,7 +58,8 @@ export class EnvironmentsRepository {
     id: string
     name: string
     baseUrl: string
-    agentTokenEnc: string
+    agentTokenEnc?: string | null
+    pendingBootstrapTokenEnc?: string | null
     rotationState?: string
   }) {
     return this.prisma.client.environment.create({
@@ -67,7 +68,8 @@ export class EnvironmentsRepository {
         kind: "remote",
         name: input.name,
         baseUrl: input.baseUrl,
-        agentTokenEnc: input.agentTokenEnc,
+        agentTokenEnc: input.agentTokenEnc ?? null,
+        pendingBootstrapTokenEnc: input.pendingBootstrapTokenEnc ?? null,
         rotationState: input.rotationState,
       },
     })

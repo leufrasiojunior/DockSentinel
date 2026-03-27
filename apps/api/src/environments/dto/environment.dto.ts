@@ -115,7 +115,7 @@ export class RemoteEnvironmentMutationDto {
 
   @ApiPropertyOptional({
     example:
-      "docker run -d --name docksentinel-agent --restart unless-stopped -p 45873:45873 -e PORT=45873 -e DOCKSENTINEL_AGENT_TOKEN='dsa_very_secret_token' -v /var/run/docker.sock:/var/run/docker.sock -v /opt/docksentinel-agent:/var/lib/docksentinel-agent leufrasiojunior/docksentinel-agent:latest",
+      "docker run -d --name docksentinel-agent --restart unless-stopped -p 45873:45873 -e PORT=45873 -v /var/run/docker.sock:/var/run/docker.sock -v /opt/docksentinel-agent:/var/lib/docksentinel-agent leufrasiojunior/docksentinel-agent:latest",
     nullable: true,
   })
   installCommand?: string | null
@@ -131,16 +131,67 @@ export class RemoteEnvironmentRotationStatusDto {
   @ApiProperty({ enum: ENVIRONMENT_ROTATION_STATES, example: "pending_rotation" })
   agentState!: (typeof ENVIRONMENT_ROTATION_STATES)[number]
 
+  @ApiProperty({
+    enum: ["waiting_for_agent", "waiting_for_token", "ready_to_complete", "blocked"],
+    example: "waiting_for_token",
+  })
+  phase!: "waiting_for_agent" | "waiting_for_token" | "ready_to_complete" | "blocked"
+
   @ApiProperty({ example: false })
   readyToComplete!: boolean
 
   @ApiPropertyOptional({ example: "http://192.168.1.50:45873/setup", nullable: true })
   setupUrl?: string | null
+
+  @ApiPropertyOptional({ enum: ["agent_already_paired"], example: "agent_already_paired", nullable: true })
+  blockingReason?: "agent_already_paired" | null
+
+  @ApiPropertyOptional({ example: null, nullable: true })
+  lastError?: string | null
 }
 
 export class RemoteEnvironmentCompleteRotationDto {
   @ApiProperty({ type: EnvironmentDto })
   environment!: EnvironmentDto
+}
+
+export class RemoteEnvironmentSetupStatusDto {
+  @ApiProperty({ type: EnvironmentDto })
+  environment!: EnvironmentDto
+
+  @ApiProperty({ enum: ENVIRONMENT_ROTATION_STATES, example: "ready_to_pair" })
+  agentState!: (typeof ENVIRONMENT_ROTATION_STATES)[number]
+
+  @ApiProperty({
+    enum: ["waiting_for_agent", "waiting_for_token", "ready_to_complete", "blocked"],
+    example: "waiting_for_token",
+  })
+  phase!: "waiting_for_agent" | "waiting_for_token" | "ready_to_complete" | "blocked"
+
+  @ApiProperty({ example: false })
+  readyToComplete!: boolean
+
+  @ApiPropertyOptional({ example: "http://192.168.1.50:45873/setup", nullable: true })
+  setupUrl?: string | null
+
+  @ApiPropertyOptional({ enum: ["agent_already_paired"], example: "agent_already_paired", nullable: true })
+  blockingReason?: "agent_already_paired" | null
+
+  @ApiPropertyOptional({ example: null, nullable: true })
+  lastError?: string | null
+}
+
+export class RemoteEnvironmentCompleteSetupDto {
+  @ApiProperty({ type: EnvironmentDto })
+  environment!: EnvironmentDto
+}
+
+export class RemoteEnvironmentSetupTimeoutDto {
+  @ApiPropertyOptional({ enum: ["install", "rotation"], example: "install" })
+  flow?: "install" | "rotation"
+
+  @ApiPropertyOptional({ example: "Agent setup did not reach ready state within 2 minutes." })
+  lastError?: string
 }
 
 export class RemoteEnvironmentTestDto {
@@ -179,5 +230,11 @@ export const updateRemoteEnvironmentSchema = z.object({
   message: "name or baseUrl is required",
 })
 
+export const remoteEnvironmentSetupTimeoutSchema = z.object({
+  flow: z.enum(["install", "rotation"]).optional(),
+  lastError: z.string().trim().min(1).max(500).optional(),
+})
+
 export type CreateRemoteEnvironmentInput = z.infer<typeof createRemoteEnvironmentSchema>
 export type UpdateRemoteEnvironmentInput = z.infer<typeof updateRemoteEnvironmentSchema>
+export type RemoteEnvironmentSetupTimeoutInput = z.infer<typeof remoteEnvironmentSetupTimeoutSchema>
