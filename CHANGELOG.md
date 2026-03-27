@@ -1,5 +1,13 @@
 # Changelog
 
+## [2.5.1](https://github.com/leufrasiojunior/DockSentinel/compare/v2.5.0...v2.5.1) (2026-03-27)
+
+
+### Bug Fixes
+
+* copy to clipboard button fixed ([5258e05](https://github.com/leufrasiojunior/DockSentinel/commit/5258e058984a96d7751967a85f53bfed84c5d1d5))
+* copy to clipboard button fixed ([2209403](https://github.com/leufrasiojunior/DockSentinel/commit/220940329c1248675f4c5916f6963508464611b7))
+
 ## [2.5.0](https://github.com/leufrasiojunior/DockSentinel/compare/v2.4.1...v2.5.0) (2026-03-27)
 
 
