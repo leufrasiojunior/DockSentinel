@@ -1,5 +1,13 @@
 # Changelog
 
+## [2.5.2](https://github.com/leufrasiojunior/DockSentinel/compare/v2.5.1...v2.5.2) (2026-03-27)
+
+
+### Bug Fixes
+
+* button copy commando to cpliboard ajusted ([ae9ec53](https://github.com/leufrasiojunior/DockSentinel/commit/ae9ec539b2453ff479d3f1e7096851ea4471613b))
+* button copy commando to cpliboard ajusted ([fb4b8b7](https://github.com/leufrasiojunior/DockSentinel/commit/fb4b8b77f5e7d7ee9d418dd5663a9388285491b4))
+
 ## [2.5.1](https://github.com/leufrasiojunior/DockSentinel/compare/v2.5.0...v2.5.1) (2026-03-27)
 
 
