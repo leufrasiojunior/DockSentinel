@@ -168,7 +168,7 @@ export const translationPtBr = {
     enterPanel: "Entrar no painel",
     title: "Login",
     loadingAuthMode: "Carregando modo de autenticação...",
-    loadStatusError: "Falha ao carregar /auth/status: {{message}}",
+    loadStatusError: "Falha ao carregar /api/auth/status: {{message}}",
     password: "Senha",
     passwordPlaceholder: "Sua senha",
     totp: "TOTP",

@@ -9,6 +9,15 @@ TAR_NAME="docksentinel-agent-manual.tar"
 TAR_PATH="${BUILD_DIR}/${TAR_NAME}"
 REMOTE_TARGET="leonald@192.168.31.48:~/"
 
+cleanup() {
+  if [ -d "${BUILD_DIR}" ]; then
+    echo "Cleaning temporary build artifacts..."
+    rm -rf "${BUILD_DIR}"
+  fi
+}
+
+trap cleanup EXIT
+
 mkdir -p "${BUILD_DIR}"
 
 cd "${SCRIPT_DIR}"

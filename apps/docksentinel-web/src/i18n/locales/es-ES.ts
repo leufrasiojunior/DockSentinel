@@ -172,7 +172,7 @@ export const translationEsEs = {
     enterPanel: "Entrar en el panel",
     title: "Inicio de sesión",
     loadingAuthMode: "Cargando modo de autenticación...",
-    loadStatusError: "Error al cargar /auth/status: {{message}}",
+    loadStatusError: "Error al cargar /api/auth/status: {{message}}",
     password: "Contraseña",
     passwordPlaceholder: "Tu contraseña",
     totp: "TOTP",

@@ -10,7 +10,7 @@ const appVersion = rootPackageJson.version ?? "0.0.0";
 
 export default defineConfig(({ mode }) => {
   const env = loadEnv(mode, __dirname, "");
-  const apiTarget = (env.API_PROXY_TARGET || env.VITE_API_URL || "http://localhost:3000").replace(/\/$/, "");
+  const apiProxyTarget = (env.API_PROXY_TARGET || "http://localhost:3000").replace(/\/$/, "");
 
   return {
     define: {
@@ -27,63 +27,11 @@ export default defineConfig(({ mode }) => {
     },
     server: {
       proxy: {
-        // AUTH
-        "^/auth/.*": {
-          target: apiTarget,
-          changeOrigin: true,
-          secure: false,
-        },
-
-        // DOCKER
-        "^/docker/.*": {
-          target: apiTarget,
-          changeOrigin: true,
-          secure: false,
-        },
-
-        // UPDATES
-        "^/updates/.*": {
-          target: apiTarget,
-          changeOrigin: true,
-          secure: false,
-        },
-
-        // NOTIFICATIONS API (avoid clash with SPA route /notifications)
-        "/api/notifications": {
-          target: apiTarget,
+        "/api": {
+          target: apiProxyTarget,
           changeOrigin: true,
           secure: false,
           rewrite: (path) => path.replace(/^\/api/, ""),
-        },
-
-        "/api/environments": {
-          target: apiTarget,
-          changeOrigin: true,
-          secure: false,
-          rewrite: (path) => path.replace(/^\/api/, ""),
-        },
-
-        // SETTINGS/SETUP/HEALTH
-        "/settings": {
-          target: apiTarget,
-          changeOrigin: true,
-          secure: false,
-        },
-
-        "^/setup$": {
-          target: apiTarget,
-          changeOrigin: true,
-          secure: false,
-        },
-        "^/health$": {
-          target: apiTarget,
-          changeOrigin: true,
-          secure: false,
-        },
-        "/settings/totp": {
-          target: apiTarget,
-          changeOrigin: true,
-          secure: false,
         },
       },
     },

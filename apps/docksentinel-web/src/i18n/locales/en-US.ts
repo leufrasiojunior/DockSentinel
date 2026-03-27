@@ -168,7 +168,7 @@ export const translationEnUs = {
     enterPanel: "Sign in to the dashboard",
     title: "Login",
     loadingAuthMode: "Loading authentication mode...",
-    loadStatusError: "Failed to load /auth/status: {{message}}",
+    loadStatusError: "Failed to load /api/auth/status: {{message}}",
     password: "Password",
     passwordPlaceholder: "Your password",
     totp: "TOTP",
