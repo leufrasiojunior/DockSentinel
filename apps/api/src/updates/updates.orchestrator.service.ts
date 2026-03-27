@@ -1,13 +1,12 @@
 import { Injectable, Logger } from '@nestjs/common';
-import { DockerService } from 'src/docker/docker.service';
-import {
-  DockerUpdateService,
-  type ContainerUpdateCheck,
-} from 'src/docker/docker-update.service';
+import { type ContainerUpdateCheck } from 'src/docker/docker-update.service';
 import { UpdatesRepository } from './updates.repository';
 import { UpdatesWorkerService } from './updates.worker.service';
 import { UpdatesSchedulerRepository } from './updates.scheduler.repository';
 import { NotificationsService } from '../notifications/notifications.service';
+import { RuntimeService } from '../runtime/runtime.service';
+import { EnvironmentsService } from '../environments/environments.service';
+import { LOCAL_ENVIRONMENT_ID } from '../environments/environment.constants';
 
 export type ScanMode = 'scan_only' | 'scan_and_update';
 export type ScanScope = 'all' | 'labeled';
@@ -39,19 +38,22 @@ export class UpdatesOrchestratorService {
   private readonly logger = new Logger(UpdatesOrchestratorService.name);
 
   constructor(
-    private readonly dockerService: DockerService,
-    private readonly updater: DockerUpdateService,
+    private readonly runtime: RuntimeService,
     private readonly repo: UpdatesRepository,
     private readonly worker: UpdatesWorkerService,
     private readonly schedRepo: UpdatesSchedulerRepository,
     private readonly notifications: NotificationsService,
+    private readonly environments: EnvironmentsService,
   ) {}
 
-  async scanAndEnqueueFromDb(): Promise<ScanAndEnqueueResult> {
-    const cfg = await this.schedRepo.get();
+  async scanAndEnqueueFromDb(
+    environmentId = LOCAL_ENVIRONMENT_ID,
+  ): Promise<ScanAndEnqueueResult> {
+    const cfg = await this.schedRepo.get(environmentId);
     if (!cfg) throw new Error('Scheduler config missing');
 
     return this.scanAndEnqueue({
+      environmentId,
       mode: this.normalizeMode(cfg.mode),
       scope: this.normalizeScope(cfg.scope),
       scanLabelKey: cfg.scanLabelKey ?? 'docksentinel.scan',
@@ -71,12 +73,16 @@ export class UpdatesOrchestratorService {
   }
 
   async scanAndEnqueue(input: {
+    environmentId: string;
     mode: ScanMode;
     scope?: ScanScope;
     scanLabelKey?: string;
     updateLabelKey: string;
   }): Promise<ScanAndEnqueueResult> {
-    const all = await this.dockerService.listContainers();
+    const environmentName = await this.environments.getEnvironmentNameOrThrow(
+      input.environmentId,
+    );
+    const all = await this.runtime.listContainers(input.environmentId);
     const scope = input.scope ?? 'all';
     const scanLabelKey = input.scanLabelKey ?? 'docksentinel.scan';
     const selected =
@@ -88,6 +94,8 @@ export class UpdatesOrchestratorService {
 
     const results: ScanResult[] = [];
     const toQueue: {
+      environmentId: string;
+      environmentName: string;
       container: string;
       image?: string | null;
       force?: boolean;
@@ -108,7 +116,7 @@ export class UpdatesOrchestratorService {
       const allowAutoUpdate = !autoUpdateDisabled;
 
       try {
-        const check = await this.updater.canUpdateContainer(name);
+        const check = await this.runtime.updateCheck(input.environmentId, name);
 
         results.push({
           name,
@@ -123,6 +131,8 @@ export class UpdatesOrchestratorService {
           allowAutoUpdate
         ) {
           toQueue.push({
+            environmentId: input.environmentId,
+            environmentName,
             container: name,
             image: check.imageRef, // atualiza usando a tag atual do container
             pull: true,
@@ -170,6 +180,9 @@ export class UpdatesOrchestratorService {
           errors: errored,
           scannedImages,
           updateCandidates,
+        }, undefined, {
+          environmentId: input.environmentId,
+          environmentName,
         });
       } else {
         await this.notifications.emitScanInfo({
@@ -178,6 +191,9 @@ export class UpdatesOrchestratorService {
           queued: enq.queued.length,
           scannedImages,
           updateCandidates,
+        }, undefined, {
+          environmentId: input.environmentId,
+          environmentName,
         });
       }
 
@@ -196,6 +212,9 @@ export class UpdatesOrchestratorService {
         errors: errored,
         scannedImages,
         updateCandidates,
+      }, undefined, {
+        environmentId: input.environmentId,
+        environmentName,
       });
     } else {
       await this.notifications.emitScanInfo({
@@ -203,6 +222,9 @@ export class UpdatesOrchestratorService {
         scanned: results.length,
         scannedImages,
         updateCandidates,
+      }, undefined, {
+        environmentId: input.environmentId,
+        environmentName,
       });
     }
 

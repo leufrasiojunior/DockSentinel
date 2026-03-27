@@ -39,6 +39,7 @@ model GlobalSettings {
   notificationLevel String @default("all") // all | errors_only
   notificationReadRetentionDays Int @default(15)
   notificationUnreadRetentionDays Int @default(60)
+  environmentHealthcheckIntervalMin Int @default(5)
   notificationRecipientEmail String?
   smtpHost String?
   smtpPort Int?
@@ -52,8 +53,31 @@ model GlobalSettings {
   updatedAt DateTime @updatedAt
 }
 
+model Environment {
+  id String @id
+  kind String // local | remote
+  name String
+  baseUrl String?
+  agentTokenEnc String?
+  pendingBootstrapTokenEnc String?
+  rotationState String @default("paired") // unpaired | paired | pending_rotation | ready_to_complete
+  agentVersion String?
+  dockerVersion String?
+  lastSeenAt DateTime?
+  lastError String?
+  connectivityStatus String @default("unknown") // unknown | online | offline
+  offlineNotifiedAt DateTime?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([kind, createdAt(sort: Desc)])
+  @@index([name])
+}
+
 model NotificationEvent {
   id String @id @default(cuid())
+  environmentId String @default("local")
+  environmentName String @default("Local")
   type String // job_success | job_failed | scan_info | scan_error | system_error
   level String @default("info") // info | error
   channel String @default("in_app")
@@ -66,10 +90,13 @@ model NotificationEvent {
   @@index([createdAt(sort: Desc)])
   @@index([readAt])
   @@index([id])
+  @@index([environmentId, createdAt(sort: Desc)])
 }
 
 model UpdateJob {
   id        String  @id @default(cuid())
+  environmentId String @default("local")
+  environmentName String @default("Local")
   status    String // queued | running | success | failed
   container String
   image     String?
@@ -88,10 +115,12 @@ model UpdateJob {
 
   @@index([status, createdAt])
   @@index([lockedAt])
+  @@index([environmentId, status, createdAt])
 }
 
 model UpdateSchedulerConfig {
-  id Int @id @default(1)
+  environmentId String @id
+  environmentName String @default("Local")
 
   enabled Boolean @default(false)
 

@@ -54,6 +54,7 @@ export class SettingsService {
       notificationLevel: row?.notificationLevel === "errors_only" ? "errors_only" : "all",
       notificationReadRetentionDays: row?.notificationReadRetentionDays ?? 15,
       notificationUnreadRetentionDays: row?.notificationUnreadRetentionDays ?? 60,
+      environmentHealthcheckIntervalMin: row?.environmentHealthcheckIntervalMin ?? 5,
       notificationRecipientEmail: row?.notificationRecipientEmail ?? null,
       smtpHost: row?.smtpHost ?? null,
       smtpPort: row?.smtpPort ?? null,
@@ -114,6 +115,7 @@ export class SettingsService {
       notificationLevel?: "all" | "errors_only"
       notificationReadRetentionDays?: number
       notificationUnreadRetentionDays?: number
+      environmentHealthcheckIntervalMin?: number
       notificationRecipientEmail?: string | null
       smtpHost?: string | null
       smtpPort?: number | null
@@ -157,6 +159,11 @@ export class SettingsService {
       patch.notificationUnreadRetentionDays = this.validateRetentionDays(
         "notificationUnreadRetentionDays",
         dto.notificationUnreadRetentionDays,
+      )
+    }
+    if (dto.environmentHealthcheckIntervalMin !== undefined) {
+      patch.environmentHealthcheckIntervalMin = this.validateEnvironmentHealthcheckInterval(
+        dto.environmentHealthcheckIntervalMin,
       )
     }
     if (dto.notificationRecipientEmail !== undefined) {
@@ -287,5 +294,18 @@ export class SettingsService {
   private validateLocale(value: unknown): AppLocale {
     const locale = normalizeLocale(value)
     return locale ?? DEFAULT_LOCALE
+  }
+
+  private validateEnvironmentHealthcheckInterval(value: unknown) {
+    if (typeof value !== "number" || !Number.isFinite(value)) {
+      throw new BadRequestException(t("settings.environmentHealthcheckIntervalFinite"))
+    }
+
+    const minutes = Math.floor(value)
+    if (minutes < 1 || minutes > 1440) {
+      throw new BadRequestException(t("settings.environmentHealthcheckIntervalRange"))
+    }
+
+    return minutes
   }
 }

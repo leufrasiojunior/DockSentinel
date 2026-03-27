@@ -19,9 +19,38 @@ type HttpOptions = {
 };
 
 function getBaseUrl() {
-  // opcional: se você preferir usar ENV ao invés de proxy
+  // usa /api por padrão para manter o contrato igual ao ambiente com proxy
   const env = import.meta.env.VITE_API_URL as string | undefined;
-  return (env ?? "").replace(/\/$/, "");
+  return (env ?? "/api").replace(/\/$/, "");
+}
+
+function getBasePath(baseUrl: string) {
+  if (/^https?:\/\//.test(baseUrl)) {
+    try {
+      return new URL(baseUrl).pathname.replace(/\/$/, "");
+    } catch {
+      return "";
+    }
+  }
+
+  return baseUrl.startsWith("/") ? baseUrl : "";
+}
+
+function normalizePath(path: string, baseUrl: string) {
+  if (/^https?:\/\//.test(path)) return path;
+
+  const normalizedPath = path.startsWith("/") ? path : `/${path}`;
+  const basePath = getBasePath(baseUrl);
+
+  if (basePath && (normalizedPath === basePath || normalizedPath.startsWith(`${basePath}/`))) {
+    return normalizedPath.slice(basePath.length) || "/";
+  }
+
+  if (/^https?:\/\//.test(baseUrl) && normalizedPath.startsWith("/api/")) {
+    return normalizedPath.replace(/^\/api/, "") || "/";
+  }
+
+  return normalizedPath;
 }
 
 async function readErrorMessage(res: Response) {
@@ -48,7 +77,8 @@ async function readErrorMessage(res: Response) {
 
 export async function http<T>(path: string, options: HttpOptions = {}): Promise<T> {
   const baseUrl = getBaseUrl();
-  const url = `${baseUrl}${path.startsWith("/") ? path : `/${path}`}`;
+  const normalizedPath = normalizePath(path, baseUrl);
+  const url = /^https?:\/\//.test(normalizedPath) ? normalizedPath : `${baseUrl}${normalizedPath}`;
 
   const headers: Record<string, string> = {
     "Accept-Language": getCurrentLocale(),

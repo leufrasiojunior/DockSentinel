@@ -5,6 +5,18 @@ export class UpdateJobDto {
   id!: string;
 
   @ApiProperty({
+    description: 'ID do environment',
+    example: 'local',
+  })
+  environmentId!: string;
+
+  @ApiProperty({
+    description: 'Nome do environment',
+    example: 'Local',
+  })
+  environmentName!: string;
+
+  @ApiProperty({
     description: 'Status do job',
     enum: ['queued', 'running', 'success', 'failed'],
     example: 'queued',

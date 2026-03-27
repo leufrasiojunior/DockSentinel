@@ -12,6 +12,8 @@ import { DockerModule } from "./docker/docker.module"
 import { UpdatesModule } from "./updates/updates.module"
 import { ScheduleModule } from "@nestjs/schedule"
 import { NotificationsModule } from "./notifications/notifications.module"
+import { EnvironmentsModule } from "./environments/environments.module"
+import { EnvironmentApiModule } from "./environment-api/environment-api.module"
 
 
 @Module({
@@ -25,7 +27,9 @@ import { NotificationsModule } from "./notifications/notifications.module"
     CryptoModule,
     DockerModule,
     NotificationsModule,
+    EnvironmentsModule,
     UpdatesModule,
+    EnvironmentApiModule,
   ],
   providers: [
     {

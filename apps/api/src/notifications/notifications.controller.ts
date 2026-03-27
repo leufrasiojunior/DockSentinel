@@ -18,6 +18,7 @@ import {
   deleteNotificationsSchema,
   NotificationsAffectedResponseDto,
 } from "./dto/notifications-mutations.dto"
+import { LOCAL_ENVIRONMENT_ID } from "../environments/environment.constants"
 
 @ApiTags("Notifications")
 @Controller("notifications")
@@ -37,6 +38,7 @@ export class NotificationsController {
           ? query.take
           : undefined
     return this.notifications.listForClient({
+      environmentId: LOCAL_ENVIRONMENT_ID,
       afterId: query.afterId,
       take,
     })
@@ -64,7 +66,7 @@ export class NotificationsController {
   @ApiOperation({ summary: "Marcar todas notificações como lidas" })
   @ApiOkResponse({ type: NotificationsAffectedResponseDto })
   async markAllRead() {
-    return this.notifications.markAllRead()
+    return this.notifications.markAllRead(LOCAL_ENVIRONMENT_ID)
   }
 
   @Delete(":id")

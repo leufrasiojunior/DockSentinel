@@ -1,4 +1,6 @@
-import { LockKeyhole, Mail, ShieldAlert } from "lucide-react";
+import { Boxes, LockKeyhole, Mail, ShieldAlert } from "lucide-react";
+import { useMemo } from "react";
+import { useLocation, useNavigate } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 
 import { EmptyState } from "../../components/product/empty-state";
@@ -7,13 +9,16 @@ import { AuthSettings } from "../../features/settings/components/AuthSettings";
 import { NotificationSettings } from "../../features/settings/components/NotificationSettings";
 import { useSettings } from "../../features/settings/hooks/useSettings";
 import { useConfirm } from "../../shared/components/ui/ConfirmProvider";
+import { EnvironmentsPage } from "../Environments/EnvironmentsPage";
+
+type SettingsTab = "auth" | "notifications" | "environments";
 
 export function SettingsPage() {
   const { t } = useTranslation();
   const confirm = useConfirm();
+  const location = useLocation();
+  const navigate = useNavigate();
   const {
-    activeTab,
-    setActiveTab,
     statusQuery,
     settingsQuery,
     currentMode,
@@ -38,6 +43,8 @@ export function SettingsPage() {
     setNotificationReadRetentionDays,
     notificationUnreadRetentionDays,
     setNotificationUnreadRetentionDays,
+    environmentHealthcheckIntervalMin,
+    setEnvironmentHealthcheckIntervalMin,
     smtpHost,
     setSmtpHost,
     smtpPort,
@@ -55,6 +62,21 @@ export function SettingsPage() {
     saveMutation,
     smtpTestMutation,
   } = useSettings();
+
+  const activeTab = useMemo<SettingsTab>(() => {
+    if (location.pathname.startsWith("/settings/environments")) return "environments";
+    if (location.pathname.startsWith("/settings/notifications")) return "notifications";
+    return "auth";
+  }, [location.pathname]);
+
+  function handleTabChange(value: string) {
+    const nextTab = value as SettingsTab;
+    if (nextTab === "auth") {
+      navigate("/settings");
+      return;
+    }
+    navigate(`/settings/${nextTab}`);
+  }
 
   function buildChangeConfirmText() {
     if (currentMode === "none") {
@@ -108,7 +130,7 @@ export function SettingsPage() {
       ) : null}
 
       {safe ? (
-        <Tabs value={activeTab} onValueChange={(value) => setActiveTab(value as "auth" | "notifications")}>
+        <Tabs value={activeTab} onValueChange={handleTabChange}>
           <TabsList>
             <TabsTrigger value="auth">
               <LockKeyhole className="size-4" />
@@ -117,6 +139,10 @@ export function SettingsPage() {
             <TabsTrigger value="notifications">
               <Mail className="size-4" />
               {t("settings.tabs.notifications")}
+            </TabsTrigger>
+            <TabsTrigger value="environments">
+              <Boxes className="size-4" />
+              {t("settings.tabs.environments")}
             </TabsTrigger>
           </TabsList>
 
@@ -150,6 +176,8 @@ export function SettingsPage() {
               setNotificationReadRetentionDays={setNotificationReadRetentionDays}
               notificationUnreadRetentionDays={notificationUnreadRetentionDays}
               setNotificationUnreadRetentionDays={setNotificationUnreadRetentionDays}
+              environmentHealthcheckIntervalMin={environmentHealthcheckIntervalMin}
+              setEnvironmentHealthcheckIntervalMin={setEnvironmentHealthcheckIntervalMin}
               smtpHost={smtpHost}
               setSmtpHost={setSmtpHost}
               smtpPort={smtpPort}
@@ -171,6 +199,10 @@ export function SettingsPage() {
               onTestSmtp={() => smtpTestMutation.mutate(undefined)}
               isTestingSmtp={smtpTestMutation.isPending}
             />
+          </TabsContent>
+
+          <TabsContent value="environments">
+            <EnvironmentsPage />
           </TabsContent>
         </Tabs>
       ) : null}

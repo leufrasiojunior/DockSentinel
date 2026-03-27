@@ -15,6 +15,7 @@ import {
   SchedulerStatusDto,
 } from './dto/scheduler-status.dto';
 import { ScanResultErrorDto, ScanResultOkDto } from './dto/scan-and-enqueue.dto';
+import { LOCAL_ENVIRONMENT_ID } from '../environments/environment.constants';
 
 @ApiTags('Updates')
 @ApiExtraModels(ScanResultOkDto, ScanResultErrorDto)
@@ -40,7 +41,7 @@ export class UpdatesSchedulerController {
     body: UpdateSchedulerConfigPatchDto,
   ) {
     // body já validado pelo ZodValidationPipe
-    return this.scheduler.updateConfig(body);
+    return this.scheduler.updateConfig(LOCAL_ENVIRONMENT_ID, body);
   }
 
   @Get('scheduler')

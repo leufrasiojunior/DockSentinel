@@ -1,17 +1,11 @@
 import {
-  BadRequestException,
   Body,
   Controller,
   Get,
-  Inject,
   Param,
   Post,
 } from '@nestjs/common';
 import { DockerService } from './docker.service';
-import { DockerUpdateService } from './docker-update.service';
-import Docker from 'dockerode';
-import { DockerDigestService } from './docker-digest.service';
-import { DOCKER_CLIENT } from './docker.constants';
 import {
   ApiBadRequestResponse,
   ApiBody,
@@ -40,7 +34,7 @@ import {
   UpdateContainerResultDto,
 } from './dto/update-result.dto';
 import { NotificationsService } from '../notifications/notifications.service';
-import { t } from '../i18n/translate';
+import { DockerOperationsService } from './docker-operations.service';
 
 @ApiTags('Docker')
 @ApiExtraModels(
@@ -55,9 +49,7 @@ import { t } from '../i18n/translate';
 export class DockerController {
   constructor(
     private readonly DockerService: DockerService,
-    private readonly updater: DockerUpdateService,
-    @Inject(DOCKER_CLIENT) private readonly docker: Docker,
-    private readonly digests: DockerDigestService,
+    private readonly operations: DockerOperationsService,
     private readonly notifications: NotificationsService,
   ) {}
 
@@ -120,62 +112,7 @@ export class DockerController {
     @Param('name') name: string,
     @Body(new ZodValidationPipe(recreateBodySchema)) body: RecreateDto, // Zod valida o body
   ) {
-    const targetFromBody = body.image?.trim();
-    const force = body.force ?? false;
-    const pull = body.pull ?? true;
-
-    // 1) Descobre targetImage (se não veio no body, usa a do container)
-    let targetImage = targetFromBody;
-    if (!targetImage) {
-      const c = this.docker.getContainer(name);
-      const inspect = await c.inspect();
-      targetImage = inspect?.Config?.Image;
-    }
-
-    if (!targetImage) {
-      throw new BadRequestException(t('docker.targetImageRequired'));
-    }
-
-    // 2) Regra simples do MVP:
-    //    - Se o user tentou trocar a imagem manualmente (body.image diferente),
-    //      exige force=true (porque o hasUpdate é calculado sobre a imagem atual do container).
-    const check = await this.updater.canUpdateContainer(name);
-
-    const isChangingImage = targetFromBody && targetFromBody !== check.imageRef;
-    if (isChangingImage && !force) {
-      throw new BadRequestException(
-        t('docker.forceRequiredForImageChange', {
-          current: check.imageRef,
-          requested: targetFromBody,
-        }),
-      );
-    }
-
-    // 3) Se NÃO está trocando imagem e a engine consegue checar local+remoto,
-    //    e não tem update, retorna NOOP (não puxa, não recria)
-    if (
-      !isChangingImage &&
-      check.canCheckRemote &&
-      check.canCheckLocal &&
-      check.hasUpdate === false &&
-      !force
-    ) {
-      return {
-        status: 'noop',
-        reason: 'already_up_to_date',
-        container: name,
-        imageRef: check.imageRef,
-        remoteDigest: check.remoteDigest,
-        repoDigests: check.repoDigests,
-        hasUpdate: false,
-      };
-    }
-
-    // 4) Se chegou aqui: tem update OU force OU troca de imagem
-    return this.updater.recreateContainerWithImage(name, targetImage, {
-      force,
-      pull,
-    });
+    return this.operations.recreateContainer(name, body);
   }
   /**
    * GET /docker/containers/:name/update-check
@@ -198,60 +135,28 @@ export class DockerController {
   @ApiNotFoundResponse({ description: 'Container não encontrado.' })
   async updateCheck(@Param('name') name: string) {
     try {
-      const c = this.docker.getContainer(name);
-      const inspect = await c.inspect();
-
-      const imageRef = inspect?.Config?.Image as string;
-      const localImageId = inspect?.Image as string;
-
-      const remoteDigest = await this.digests.getRemoteDigest(imageRef);
-
-      if (!remoteDigest) {
+      const result = await this.operations.updateCheck(name);
+      if (!result.canCheckRemote) {
         await this.notifications.emitScanError({
           mode: 'manual_check',
           scanned: 1,
           errors: 1,
           container: name,
-          imageRef,
+          imageRef: result.imageRef,
           reason: 'remote_digest_not_found',
-          scannedImages: [`${name} => ${imageRef}`],
+          scannedImages: [`${name} => ${result.imageRef}`],
           updateCandidates: [],
         });
-        return {
-          container: name,
-          imageRef,
-          localImageId,
-          canCheckRemote: false,
-          canCheckLocal: true,
-          hasUpdate: false,
-          reason: 'remote_digest_not_found',
-        };
       }
-
-      const img = this.docker.getImage(localImageId);
-      const imgInspect = await img.inspect();
-
-      const repoDigests: string[] = imgInspect?.RepoDigests ?? [];
-
-      const hasUpdate = this.updater.hasUpdate(repoDigests, remoteDigest);
 
       await this.notifications.emitScanInfo({
         mode: 'manual_check',
         scanned: 1,
-        scannedImages: [`${name} => ${imageRef}`],
-        updateCandidates: hasUpdate ? [`${name} => ${imageRef}`] : [],
+        scannedImages: [`${name} => ${result.imageRef}`],
+        updateCandidates: result.hasUpdate ? [`${name} => ${result.imageRef}`] : [],
       });
 
-      return {
-        container: name,
-        imageRef,
-        localImageId,
-        remoteDigest,
-        repoDigests,
-        canCheckRemote: true,
-        canCheckLocal: true,
-        hasUpdate,
-      };
+      return result;
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : String(err);
       await this.notifications.emitSystemError(`Falha em update-check manual: ${name} -> ${msg}`, {
@@ -282,64 +187,6 @@ export class DockerController {
     @Param('name') name: string,
     @Body(new ZodValidationPipe(updateBodySchema)) body: UpdateDto,
   ) {
-    const force = body.force ?? false;
-    const pull = body.pull ?? true;
-
-    // 1) Faz o check no servidor (fonte da verdade)
-    const check = await this.updater.canUpdateContainer(name);
-
-    // 2) Se não dá pra checar remoto (tag local / registry inacessível etc)
-    //    - MVP recomendado: não atualiza a menos que force=true
-    if (!check.canCheckRemote) {
-      if (!force) {
-        return {
-          status: 'noop',
-          reason: check.reason ?? 'cannot_check_remote',
-          container: name,
-          check,
-        };
-      }
-      // force=true: continua e tenta recriar usando a mesma imageRef do container
-    }
-
-    // 3) Se dá pra checar e já está ok, devolve NOOP
-    if (
-      check.canCheckRemote &&
-      check.canCheckLocal &&
-      check.hasUpdate === false &&
-      !force
-    ) {
-      return {
-        status: 'noop',
-        reason: 'already_up_to_date',
-        container: name,
-        check,
-      };
-    }
-
-    // 4) Aqui: tem update OU force
-    //    Atualiza usando a MESMA tag do container (imageRef atual)
-    const targetImage = check.imageRef;
-    if (!targetImage) {
-      throw new BadRequestException(t('docker.imageRefRequired'));
-    }
-
-    const result = await this.updater.recreateContainerWithImage(
-      name,
-      targetImage,
-      { force, pull },
-    );
-
-    // (Opcional) re-check para o front já receber a confirmação final:
-    const after = await this.updater.canUpdateContainer(name).catch(() => null);
-
-    return {
-      status: result.status,
-      container: name,
-      targetImage,
-      checkBefore: check,
-      result,
-      checkAfter: after,
-    };
+    return this.operations.updateContainer(name, body);
   }
 }

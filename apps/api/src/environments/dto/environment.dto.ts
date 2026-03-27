@@ -115,7 +115,11 @@ export class RemoteEnvironmentMutationDto {
 
   @ApiPropertyOptional({
     example:
+<<<<<<< HEAD
       "docker run -d --name docksentinel-agent --restart unless-stopped -p 45873:45873 -e PORT=45873 -v /var/run/docker.sock:/var/run/docker.sock -v /opt/docksentinel-agent:/var/lib/docksentinel-agent leufrasiojunior/docksentinelagent:latest",
+=======
+      "docker run -d --name docksentinel-agent --restart unless-stopped -p 45873:45873 -e PORT=45873 -v /var/run/docker.sock:/var/run/docker.sock -v /opt/docksentinel-agent:/var/lib/docksentinel-agent leufrasiojunior/docksentinel-agent:latest",
+>>>>>>> 9a13910a4401cd3ce70dabcacb503c471cec9383
     nullable: true,
   })
   installCommand?: string | null

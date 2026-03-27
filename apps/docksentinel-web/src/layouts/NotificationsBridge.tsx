@@ -3,16 +3,18 @@ import { useQuery } from "@tanstack/react-query";
 import { listNotifications } from "../features/notifications/api/notifications";
 import { usePageVisibility } from "../hooks/usePageVisibility";
 import { useToast } from "../shared/components/ui/ToastProvider";
+import { useEnvironmentRoute } from "../features/environments/hooks/useEnvironmentRoute";
 
 export function NotificationsBridge() {
   const toast = useToast();
   const visible = usePageVisibility();
+  const { environmentId } = useEnvironmentRoute();
 
   const seenRef = useRef<Set<string>>(new Set());
 
   const query = useQuery({
-    queryKey: ["notifications", "in-app", "latest"],
-    queryFn: () => listNotifications({ take: 25 }),
+    queryKey: ["notifications", environmentId, "in-app", "latest"],
+    queryFn: () => listNotifications({ environmentId, take: 25 }),
     refetchInterval: visible ? 5_000 : false,
     retry: false,
   });

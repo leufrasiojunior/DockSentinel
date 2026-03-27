@@ -539,7 +539,11 @@ export class EnvironmentsService implements OnModuleInit {
       `-e PORT=${AGENT_DEFAULT_PORT}`,
       "-v /var/run/docker.sock:/var/run/docker.sock",
       "-v /opt/docksentinel-agent:/var/lib/docksentinel-agent",
+<<<<<<< HEAD
       "leufrasiojunior/docksentinelagent:latest",
+=======
+      "leufrasiojunior/docksentinel-agent:latest",
+>>>>>>> 9a13910a4401cd3ce70dabcacb503c471cec9383
     ].join(" ")
   }
 

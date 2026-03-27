@@ -17,6 +17,7 @@ export type SafeSettings = {
   notificationLevel: NotificationLevel;
   notificationReadRetentionDays: number;
   notificationUnreadRetentionDays: number;
+  environmentHealthcheckIntervalMin: number;
   notificationRecipientEmail: string | null;
   smtpHost: string | null;
   smtpPort: number | null;
@@ -37,6 +38,7 @@ export type UpdateSettingsBody = Partial<Pick<SafeSettings, "authMode" | "logLev
   notificationLevel?: NotificationLevel;
   notificationReadRetentionDays?: number;
   notificationUnreadRetentionDays?: number;
+  environmentHealthcheckIntervalMin?: number;
   notificationRecipientEmail?: string;
   smtpHost?: string;
   smtpPort?: number;
@@ -59,13 +61,13 @@ export type SmtpTestBody = {
 };
 
 export async function getSettings(): Promise<SafeSettings> {
-  return http<SafeSettings>("/settings");
+  return http<SafeSettings>("/api/settings");
 }
 
 export async function updateSettings(body: UpdateSettingsBody): Promise<unknown> {
-  return http("/settings", { method: "PUT", body });
+  return http("/api/settings", { method: "PUT", body });
 }
 
 export async function testSmtp(body?: SmtpTestBody): Promise<{ ok: boolean }> {
-  return http<{ ok: boolean }>("/settings/smtp/test", { method: "POST", body });
+  return http<{ ok: boolean }>("/api/settings/smtp/test", { method: "POST", body });
 }
