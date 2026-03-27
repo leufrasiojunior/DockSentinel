@@ -5,6 +5,8 @@ export type JobStatus = "queued" | "running" | "done" | "failed" | string;
 export type UpdateJob = {
   id: string;
   status: JobStatus;
+  environmentId: string;
+  environmentName: string;
 
   // seu backend usa "container"
   container?: string;
@@ -41,8 +43,10 @@ function normalizeJobs(data: unknown): UpdateJob[] {
   return [];
 }
 
-export async function listJobs(): Promise<UpdateJob[]> {
-  const data = await http<JobsResponse | UpdateJob[]>("/updates/jobs");
+export async function listJobs(environmentId: string): Promise<UpdateJob[]> {
+  const data = await http<JobsResponse | UpdateJob[]>(
+    `/api/environments/${encodeURIComponent(environmentId)}/updates/jobs`,
+  );
   return normalizeJobs(data);
 }
 

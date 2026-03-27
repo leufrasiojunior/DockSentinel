@@ -21,9 +21,9 @@ export type TotpConfirmResponse = {
 };
 
 export async function totpInit(body: TotpInitDto): Promise<TotpInitResponse> {
-  return http<TotpInitResponse>("/settings/totp/init", { method: "POST", body });
+  return http<TotpInitResponse>("/api/settings/totp/init", { method: "POST", body });
 }
 
 export async function totpConfirm(body: TotpConfirmDto): Promise<TotpConfirmResponse> {
-  return http<TotpConfirmResponse>("/settings/totp/confirm", { method: "POST", body });
+  return http<TotpConfirmResponse>("/api/settings/totp/confirm", { method: "POST", body });
 }

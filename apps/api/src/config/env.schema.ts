@@ -112,6 +112,8 @@ export const envSchema = z
     CORS_ORIGINS: z
   .string()
   .default("http://localhost:5173,http://127.0.0.1:5173"),
+
+    REMOTE_ENVIRONMENTS_LIMIT: z.coerce.number().int().default(3),
   })
 
   .superRefine((val, ctx) => {

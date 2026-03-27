@@ -1,1 +1,19 @@
-node_modules
+# Dependencies
+node_modules/
+**/node_modules/
+
+# Build outputs
+dist/
+**/dist/
+build/
+**/build/
+coverage/
+**/coverage/
+*.tsbuildinfo
+
+# Local runtime data
+apps/api/data/
+*.db
+
+# OS/editor noise
+.DS_Store

@@ -3,6 +3,10 @@ import { DockerUpdateService } from '../docker/docker-update.service';
 import { UpdateJob, UpdateJobPayload } from './updates.types';
 import { UpdatesRepository } from './updates.repository';
 import { UpdatesWorkerService } from './updates.worker.service';
+import {
+  LOCAL_ENVIRONMENT_ID,
+  LOCAL_ENVIRONMENT_NAME,
+} from '../environments/environment.constants';
 
 @Injectable()
 export class UpdatesQueueService {
@@ -95,6 +99,8 @@ export class UpdatesQueueService {
     pull?: boolean;
   }) {
     const items = payload.containers.map((c) => ({
+      environmentId: LOCAL_ENVIRONMENT_ID,
+      environmentName: LOCAL_ENVIRONMENT_NAME,
       container: c,
       image: payload.image ?? null,
       force: payload.force,

@@ -2,6 +2,8 @@ import { http } from "../../../shared/api/http";
 
 export type InAppNotification = {
   id: string;
+  environmentId: string;
+  environmentName: string;
   channel: "in_app";
   type: "job_success" | "job_failed" | "scan_info" | "scan_error" | "system_error";
   level: "info" | "error";
@@ -16,7 +18,12 @@ export type NotificationsResponse = {
   items: InAppNotification[];
 };
 
+function environmentPath(environmentId: string, suffix = "") {
+  return `/api/environments/${encodeURIComponent(environmentId)}/notifications${suffix}`;
+}
+
 export async function listNotifications(params?: {
+  environmentId?: string;
   afterId?: string;
   take?: number;
 }): Promise<NotificationsResponse> {
@@ -25,36 +32,52 @@ export async function listNotifications(params?: {
   if (typeof params?.take === "number") q.set("take", String(params.take));
 
   const suffix = q.toString();
-  const path = suffix ? `/api/notifications?${suffix}` : "/api/notifications";
+  const path = suffix
+    ? `${environmentPath(params?.environmentId ?? "local")}?${suffix}`
+    : environmentPath(params?.environmentId ?? "local");
   return http<NotificationsResponse>(path);
 }
 
-export async function markNotificationRead(id: string): Promise<{ ok: boolean }> {
-  return http<{ ok: boolean }>(`/api/notifications/${encodeURIComponent(id)}/read`, {
+export async function markNotificationRead(
+  environmentId: string,
+  id: string,
+): Promise<{ ok: boolean }> {
+  return http<{ ok: boolean }>(environmentPath(environmentId, `/${encodeURIComponent(id)}/read`), {
     method: "POST",
   });
 }
 
-export async function markNotificationUnread(id: string): Promise<{ ok: boolean }> {
-  return http<{ ok: boolean }>(`/api/notifications/${encodeURIComponent(id)}/unread`, {
+export async function markNotificationUnread(
+  environmentId: string,
+  id: string,
+): Promise<{ ok: boolean }> {
+  return http<{ ok: boolean }>(environmentPath(environmentId, `/${encodeURIComponent(id)}/unread`), {
     method: "POST",
   });
 }
 
-export async function markAllNotificationsRead(): Promise<{ ok: boolean; affected: number }> {
-  return http<{ ok: boolean; affected: number }>("/api/notifications/read-all", {
+export async function markAllNotificationsRead(
+  environmentId: string,
+): Promise<{ ok: boolean; affected: number }> {
+  return http<{ ok: boolean; affected: number }>(environmentPath(environmentId, "/read-all"), {
     method: "POST",
   });
 }
 
-export async function deleteNotification(id: string): Promise<{ ok: boolean }> {
-  return http<{ ok: boolean }>(`/api/notifications/${encodeURIComponent(id)}`, {
+export async function deleteNotification(
+  environmentId: string,
+  id: string,
+): Promise<{ ok: boolean }> {
+  return http<{ ok: boolean }>(environmentPath(environmentId, `/${encodeURIComponent(id)}`), {
     method: "DELETE",
   });
 }
 
-export async function deleteNotifications(ids: string[]): Promise<{ ok: boolean; affected: number }> {
-  return http<{ ok: boolean; affected: number }>("/api/notifications/delete-many", {
+export async function deleteNotifications(
+  environmentId: string,
+  ids: string[],
+): Promise<{ ok: boolean; affected: number }> {
+  return http<{ ok: boolean; affected: number }>(environmentPath(environmentId, "/delete-many"), {
     method: "POST",
     body: { ids },
   });

@@ -4,6 +4,10 @@ import type { ContainerSummary } from "../docker/docker.service";
 import { DockerUpdateService } from "../docker/docker-update.service";
 import { UpdatesRepository } from "./updates.repository";
 import { UpdatesWorkerService } from "./updates.worker.service";
+import {
+  LOCAL_ENVIRONMENT_ID,
+  LOCAL_ENVIRONMENT_NAME,
+} from "../environments/environment.constants";
 
 @Injectable()
 export class UpdatesScanService {
@@ -40,6 +44,8 @@ export class UpdatesScanService {
     const targets = filtered.map((c) => c.name).slice(0, limit);
 
     const itemsToEnqueue: {
+      environmentId: string;
+      environmentName: string;
       container: string;
       image?: string | null;
       force?: boolean;
@@ -69,6 +75,8 @@ export class UpdatesScanService {
         }
 
         itemsToEnqueue.push({
+          environmentId: LOCAL_ENVIRONMENT_ID,
+          environmentName: LOCAL_ENVIRONMENT_NAME,
           container: name,
           image: check.imageRef, // importante: enfileira com a própria tag atual do container
           pull,

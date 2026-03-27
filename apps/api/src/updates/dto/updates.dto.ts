@@ -40,6 +40,13 @@ export class BatchDto {
 
 export class JobsQueryDto {
   @ApiProperty({
+    description: "Filtra por environment",
+    required: false,
+    example: "local",
+  })
+  environmentId?: string
+
+  @ApiProperty({
     description: "Filtra por container",
     required: false,
     example: "homarr",
@@ -81,6 +88,7 @@ export const batchSchema = z.object({
 })
 
 export const jobsQuerySchema = z.object({
+  environmentId: z.string().min(1).optional(),
   container: z.string().min(1).optional(),
   status: z.enum(["queued", "running", "success", "failed"]).optional(),
   take: z.coerce.number().int().min(1).max(200).optional().default(50),

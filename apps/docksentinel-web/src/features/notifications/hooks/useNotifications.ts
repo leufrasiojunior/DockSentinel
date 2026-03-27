@@ -19,17 +19,19 @@ import {
   snapshotNotificationsCache,
 } from "../utils/cache";
 import { sortNewestFirst } from "../utils/date";
+import { useEnvironmentRoute } from "../../environments/hooks/useEnvironmentRoute";
 
 export function useNotifications() {
   const visible = usePageVisibility();
   const qc = useQueryClient();
+  const { environmentId } = useEnvironmentRoute();
   const [markReadPendingId, setMarkReadPendingId] = useState<string | null>(null);
   const [markUnreadPendingId, setMarkUnreadPendingId] = useState<string | null>(null);
   const [deletePendingId, setDeletePendingId] = useState<string | null>(null);
 
   const query = useQuery({
-    queryKey: ["notifications", "all"],
-    queryFn: () => listNotifications({ take: 100 }),
+    queryKey: ["notifications", environmentId, "all"],
+    queryFn: () => listNotifications({ environmentId, take: 100 }),
     refetchInterval: visible ? 5_000 : false,
     retry: false,
   });
@@ -38,7 +40,7 @@ export function useNotifications() {
   const unreadCount = items.filter((n) => !n.readAt).length;
 
   const markReadMutation = useMutation({
-    mutationFn: async (id: string) => markNotificationRead(id),
+    mutationFn: async (id: string) => markNotificationRead(environmentId, id),
     onMutate: async (id: string) => {
       setMarkReadPendingId(id);
       await qc.cancelQueries({ queryKey: ["notifications"] });
@@ -55,7 +57,7 @@ export function useNotifications() {
   });
 
   const markAllReadMutation = useMutation({
-    mutationFn: async () => markAllNotificationsRead(),
+    mutationFn: async () => markAllNotificationsRead(environmentId),
     onMutate: async () => {
       await qc.cancelQueries({ queryKey: ["notifications"] });
       const snapshot = snapshotNotificationsCache(qc);
@@ -68,7 +70,7 @@ export function useNotifications() {
   });
 
   const markUnreadMutation = useMutation({
-    mutationFn: async (id: string) => markNotificationUnread(id),
+    mutationFn: async (id: string) => markNotificationUnread(environmentId, id),
     onMutate: async (id: string) => {
       setMarkUnreadPendingId(id);
       await qc.cancelQueries({ queryKey: ["notifications"] });
@@ -85,7 +87,7 @@ export function useNotifications() {
   });
 
   const deleteOneMutation = useMutation({
-    mutationFn: async (id: string) => deleteNotification(id),
+    mutationFn: async (id: string) => deleteNotification(environmentId, id),
     onMutate: async (id: string) => {
       setDeletePendingId(id);
       await qc.cancelQueries({ queryKey: ["notifications"] });
@@ -102,7 +104,7 @@ export function useNotifications() {
   });
 
   const deleteManyMutation = useMutation({
-    mutationFn: async (ids: string[]) => deleteNotifications(ids),
+    mutationFn: async (ids: string[]) => deleteNotifications(environmentId, ids),
     onMutate: async (ids: string[]) => {
       await qc.cancelQueries({ queryKey: ["notifications"] });
       const snapshot = snapshotNotificationsCache(qc);
@@ -133,6 +135,7 @@ export function useNotifications() {
     deletePendingId,
     deleteMany: deleteManyMutation.mutate,
     deleteManyPending: deleteManyMutation.isPending,
+    environmentId,
     visible,
   };
 }

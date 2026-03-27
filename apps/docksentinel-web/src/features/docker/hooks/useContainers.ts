@@ -14,16 +14,18 @@ import { useToast } from "../../../shared/components/ui/ToastProvider";
 import { useConfirm } from "../../../shared/components/ui/ConfirmProvider";
 import { type CheckState, type ContainerDetails, type BusyState } from "../types";
 import { formatList } from "../../../i18n/format";
+import { useEnvironmentRoute } from "../../environments/hooks/useEnvironmentRoute";
 
 export function useContainers() {
   const { t } = useTranslation();
   const qc = useQueryClient();
   const toast = useToast();
   const confirm = useConfirm();
+  const { environmentId } = useEnvironmentRoute();
 
   const containersQuery = useQuery({
-    queryKey: ["docker", "containers"],
-    queryFn: listContainers,
+    queryKey: ["docker", "containers", environmentId],
+    queryFn: () => listContainers(environmentId),
     refetchInterval: 10_000,
   });
 
@@ -41,10 +43,10 @@ export function useContainers() {
   const [detailsId, setDetailsId] = useState<string | null>(null);
 
   const detailsQuery = useQuery({
-    queryKey: ["docker", "containers", "details", detailsId],
+    queryKey: ["docker", "containers", environmentId, "details", detailsId],
     queryFn: async () => {
       const id = detailsId!;
-      return (await getContainerDetails(id)) as ContainerDetails;
+      return (await getContainerDetails(environmentId, id)) as ContainerDetails;
     },
     enabled: !!detailsId,
     retry: false,
@@ -81,7 +83,7 @@ export function useContainers() {
   async function runUpdateCheckOne(name: string) {
     setChecks((prev) => ({ ...prev, [name]: { status: "checking" } }));
     try {
-      const result = await updateCheck(name);
+      const result = await updateCheck(environmentId, name);
       setChecks((prev) => ({
         ...prev,
         [name]: { status: "done", result, checkedAt: new Date().toISOString() },
@@ -109,7 +111,7 @@ export function useContainers() {
     });
 
     const results = await Promise.allSettled(
-      containers.map((c) => updateCheck(c.name)),
+      containers.map((c) => updateCheck(environmentId, c.name)),
     );
 
     setChecks((prev) => {
@@ -191,7 +193,7 @@ export function useContainers() {
       });
 
       try {
-        await updateContainer(c.name, { pull: true, force: false });
+        await updateContainer(environmentId, c.name, { pull: true, force: false });
         toast.success(t("containers.updateTriggered", { name: c.name }), t("containers.updateTitle"));
         await runUpdateCheckOne(c.name);
       } catch (e: any) {
@@ -204,7 +206,7 @@ export function useContainers() {
       }
     }
 
-    await qc.invalidateQueries({ queryKey: ["docker", "containers"] });
+    await qc.invalidateQueries({ queryKey: ["docker", "containers", environmentId] });
     setBusy(null);
   }
 
@@ -213,7 +215,7 @@ export function useContainers() {
 
     setBusy({ kind: "scanOnly", progressText: t("dashboard.busy.scanOnly") });
     try {
-      const result = await scanAndEnqueue("scan_only");
+      const result = await scanAndEnqueue(environmentId, "scan_only");
       toast.success(t("containers.scanDone"), t("containers.scanTitle"));
 
       if (result && typeof result === "object") {
@@ -226,7 +228,7 @@ export function useContainers() {
         }
       }
 
-      await qc.invalidateQueries({ queryKey: ["docker", "containers"] });
+      await qc.invalidateQueries({ queryKey: ["docker", "containers", environmentId] });
     } catch (e: any) {
       const msg = e?.message ?? t("containers.scanError");
       toast.error(msg, t("containers.scanTitle"));
@@ -253,9 +255,9 @@ export function useContainers() {
     });
 
     try {
-      await scanAndEnqueue("scan_and_update");
+      await scanAndEnqueue(environmentId, "scan_and_update");
       toast.success(t("containers.queueSuccess"), t("containers.queueTitle"));
-      await qc.invalidateQueries({ queryKey: ["docker", "containers"] });
+      await qc.invalidateQueries({ queryKey: ["docker", "containers", environmentId] });
     } catch (e: any) {
       const msg = e?.message ?? t("containers.scanAndUpdateError");
       toast.error(msg, t("containers.queueTitle"));
@@ -282,7 +284,7 @@ export function useContainers() {
     setUpdatingNames((prev) => ({ ...prev, [name]: true }));
 
     try {
-      await updateContainer(name, { pull: true, force: false });
+      await updateContainer(environmentId, name, { pull: true, force: false });
       toast.success(t("containers.updateTriggered", { name }), t("containers.updateTitle"));
       await runUpdateCheckOne(name);
     } catch (e: any) {
@@ -302,6 +304,7 @@ export function useContainers() {
     loading: containersQuery.isLoading,
     error: containersQuery.error,
     refetch: containersQuery.refetch,
+    environmentId,
     selected,
     selectedNames,
     allSelected,

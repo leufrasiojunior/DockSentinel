@@ -22,6 +22,7 @@ import {
   hasFiveCronFields,
   tryParseGuidedSchedule,
 } from "../utils/cron";
+import { useEnvironmentRoute } from "../../environments/hooks/useEnvironmentRoute";
 
 function getErrorMessage(error: unknown) {
   if (error instanceof Error) return error.message;
@@ -34,10 +35,11 @@ export function useScheduler() {
   const toast = useToast();
   const confirm = useConfirm();
   const visible = usePageVisibility();
+  const { environmentId } = useEnvironmentRoute();
 
   const bundleQuery = useQuery({
-    queryKey: ["updates", "scheduler", "bundle"],
-    queryFn: getSchedulerBundle,
+    queryKey: ["updates", "scheduler", "bundle", environmentId],
+    queryFn: () => getSchedulerBundle(environmentId),
     refetchInterval: visible ? 5_000 : false,
     retry: false,
   });
@@ -174,7 +176,7 @@ export function useScheduler() {
 
     setSaving(true);
     try {
-      await patchSchedulerConfig({
+      await patchSchedulerConfig(environmentId, {
         enabled,
         cronExpr: effectiveCron,
         mode,
@@ -183,7 +185,7 @@ export function useScheduler() {
         updateLabelKey,
       });
       toast.success(t("scheduler.success.saved"), "Scheduler");
-      await qc.invalidateQueries({ queryKey: ["updates", "scheduler", "bundle"] });
+      await qc.invalidateQueries({ queryKey: ["updates", "scheduler", "bundle", environmentId] });
     } catch (error: unknown) {
       toast.error(getErrorMessage(error) || t("scheduler.errors.saveError"), "Scheduler");
     } finally {
@@ -202,11 +204,11 @@ export function useScheduler() {
 
     setScanning(true);
     try {
-      await scanAndEnqueue();
+      await scanAndEnqueue(environmentId);
       toast.success(t("scheduler.success.scanTriggered"), "Updates");
       await Promise.all([
-        qc.invalidateQueries({ queryKey: ["updates", "scheduler", "bundle"] }),
-        qc.invalidateQueries({ queryKey: ["updates", "jobs"] }),
+        qc.invalidateQueries({ queryKey: ["updates", "scheduler", "bundle", environmentId] }),
+        qc.invalidateQueries({ queryKey: ["updates", "jobs", environmentId] }),
       ]);
     } catch (error: unknown) {
       toast.error(getErrorMessage(error) || t("scheduler.errors.scanError"), "Updates");
@@ -247,6 +249,7 @@ export function useScheduler() {
     scanning,
     handleSave,
     handleScanAndEnqueue,
+    environmentId,
     visible,
   };
 }
