@@ -2,16 +2,18 @@ import { useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { usePageVisibility } from "../../../hooks/usePageVisibility";
 import { listJobs } from "../api/jobs";
+import { useEnvironmentRoute } from "../../environments/hooks/useEnvironmentRoute";
 
 export type JobFilter = "all" | "queued" | "running" | "done" | "failed";
 
 export function useJobs() {
   const visible = usePageVisibility();
+  const { environmentId } = useEnvironmentRoute();
   const [filter, setFilter] = useState<JobFilter>("all");
 
   const jobsQuery = useQuery({
-    queryKey: ["updates", "jobs"],
-    queryFn: listJobs,
+    queryKey: ["updates", "jobs", environmentId],
+    queryFn: () => listJobs(environmentId),
     refetchInterval: visible ? 4_000 : false,
     retry: false,
   });
@@ -53,6 +55,7 @@ export function useJobs() {
     loading: jobsQuery.isLoading,
     isFetching: jobsQuery.isFetching,
     refetch: jobsQuery.refetch,
+    environmentId,
     visible,
   };
 }

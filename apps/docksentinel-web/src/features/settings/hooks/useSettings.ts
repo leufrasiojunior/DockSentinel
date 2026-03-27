@@ -62,6 +62,7 @@ export function useSettings() {
   const [notificationLevel, setNotificationLevel] = useState<NotificationLevel>("all");
   const [notificationReadRetentionDays, setNotificationReadRetentionDays] = useState("15");
   const [notificationUnreadRetentionDays, setNotificationUnreadRetentionDays] = useState("60");
+  const [environmentHealthcheckIntervalMin, setEnvironmentHealthcheckIntervalMin] = useState("5");
   const [smtpHost, setSmtpHost] = useState("");
   const [smtpPort, setSmtpPort] = useState("587");
   const [smtpSecureMode, setSmtpSecureMode] = useState<SmtpSecureMode>("starttls");
@@ -84,6 +85,7 @@ export function useSettings() {
     setNotificationLevel((safe.notificationLevel as NotificationLevel) ?? "all");
     setNotificationReadRetentionDays(String(safe.notificationReadRetentionDays ?? 15));
     setNotificationUnreadRetentionDays(String(safe.notificationUnreadRetentionDays ?? 60));
+    setEnvironmentHealthcheckIntervalMin(String(safe.environmentHealthcheckIntervalMin ?? 5));
     setSmtpHost(safe.smtpHost ?? "");
     setSmtpPort(String(safe.smtpPort ?? 587));
     setSmtpSecureMode((safe.smtpSecureMode as SmtpSecureMode) ?? "starttls");
@@ -103,6 +105,7 @@ export function useSettings() {
         body.notificationLevel = notificationLevel;
         body.notificationReadRetentionDays = Number(notificationReadRetentionDays);
         body.notificationUnreadRetentionDays = Number(notificationUnreadRetentionDays);
+        body.environmentHealthcheckIntervalMin = Number(environmentHealthcheckIntervalMin);
         body.smtpHost = smtpHost.trim();
         body.smtpPort = Number(smtpPort);
         body.smtpSecureMode = smtpSecureMode;
@@ -188,6 +191,8 @@ export function useSettings() {
     setNotificationReadRetentionDays,
     notificationUnreadRetentionDays,
     setNotificationUnreadRetentionDays,
+    environmentHealthcheckIntervalMin,
+    setEnvironmentHealthcheckIntervalMin,
     smtpHost,
     setSmtpHost,
     smtpPort,

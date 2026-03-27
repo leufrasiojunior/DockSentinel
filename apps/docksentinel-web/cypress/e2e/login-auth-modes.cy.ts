@@ -4,8 +4,6 @@ type Scenario = {
   mode: AuthMode;
   hint: string;
   expectedBody: Record<string, string>;
-  needsPassword: boolean;
-  needsTotp: boolean;
 };
 
 const scenarios: Scenario[] = [
@@ -13,42 +11,93 @@ const scenarios: Scenario[] = [
     mode: "none",
     hint: "Sem login: clique em Entrar.",
     expectedBody: {},
-    needsPassword: false,
-    needsTotp: false,
   },
   {
     mode: "password",
     hint: "Informe a senha.",
     expectedBody: { password: "StrongPass123!" },
-    needsPassword: true,
-    needsTotp: false,
   },
   {
     mode: "totp",
     hint: "Informe o código TOTP (6 dígitos).",
     expectedBody: { totp: "123456" },
-    needsPassword: false,
-    needsTotp: true,
   },
   {
     mode: "both",
     hint: "Informe senha + TOTP.",
     expectedBody: { password: "StrongPass123!", totp: "123456" },
-    needsPassword: true,
-    needsTotp: true,
   },
 ];
 
+const safeSettingsResponse = {
+  authMode: "password",
+  logLevel: "info",
+  hasPassword: true,
+  hasTotp: false,
+  defaultLocale: "pt-BR",
+  notificationsInAppEnabled: true,
+  notificationsEmailEnabled: false,
+  notificationLevel: "all",
+  notificationReadRetentionDays: 15,
+  notificationUnreadRetentionDays: 60,
+  environmentHealthcheckIntervalMin: 5,
+  notificationRecipientEmail: null,
+  smtpHost: null,
+  smtpPort: null,
+  smtpSecureMode: "starttls",
+  smtpUsername: null,
+  hasSmtpPassword: false,
+  smtpFromName: null,
+  smtpFromEmail: null,
+  createdAt: "2026-02-01T10:00:00.000Z",
+  updatedAt: "2026-02-01T10:00:00.000Z",
+};
+
 function setupCommonInterceptors(mode: AuthMode) {
-  cy.intercept("GET", "**/auth/status", { statusCode: 200, body: { authMode: mode } }).as(
+  cy.intercept("GET", "**/api/auth/status", { statusCode: 200, body: { authMode: mode } }).as(
     "authStatus",
   );
-  cy.intercept("GET", "**/auth/me", { statusCode: 200, body: { authenticated: true } }).as(
+  cy.intercept("GET", "**/api/auth/me", { statusCode: 200, body: { authenticated: true } }).as(
     "authMe",
   );
-  cy.intercept("GET", "**/docker/containers*", { statusCode: 200, body: [] }).as(
-    "dockerContainers",
+  cy.intercept("GET", "**/api/environments/overview", {
+    statusCode: 200,
+    body: { items: [] },
+  }).as("overview");
+}
+
+function setupSettingsPageInterceptors(pathname: string) {
+  cy.intercept("GET", "**/api/auth/status", { statusCode: 200, body: { authMode: "none" } }).as(
+    "authStatus",
   );
+  cy.intercept("GET", "**/api/settings", { statusCode: 200, body: safeSettingsResponse }).as(
+    "safeSettings",
+  );
+
+  if (pathname.startsWith("/settings/environments")) {
+    cy.intercept("GET", "**/api/environments", {
+      statusCode: 200,
+      body: {
+        items: [
+          {
+            id: "local",
+            kind: "local",
+            name: "Local",
+            baseUrl: null,
+            hasToken: false,
+            rotationState: "paired",
+            agentVersion: null,
+            dockerVersion: null,
+            lastSeenAt: null,
+            lastError: null,
+            status: "online",
+            createdAt: "2026-02-01T10:00:00.000Z",
+            updatedAt: "2026-02-01T10:00:00.000Z",
+          },
+        ],
+      },
+    }).as("listEnvironments");
+  }
 }
 
 function parseRequestBody(body: unknown) {
@@ -98,9 +147,9 @@ describe("Login - modos de autenticação aceitos", () => {
       assertModeUi(scenario.mode, scenario.hint);
     });
 
-    it(`envia payload correto e navega para dashboard em authMode=${scenario.mode}`, () => {
+    it(`envia payload correto e navega para home em authMode=${scenario.mode}`, () => {
       setupCommonInterceptors(scenario.mode);
-      cy.intercept("POST", "**/auth/login", (req) => {
+      cy.intercept("POST", "**/api/auth/login", (req) => {
         const actualBody = parseRequestBody(req.body);
         expect(actualBody).to.deep.equal(scenario.expectedBody);
         req.reply({ statusCode: 200, body: { ok: true } });
@@ -112,14 +161,15 @@ describe("Login - modos de autenticação aceitos", () => {
       cy.contains("button", "Entrar").click();
 
       cy.wait("@authLogin");
-      cy.location("pathname").should("eq", "/dashboard");
+      cy.wait("@overview");
+      cy.location("pathname").should("eq", "/home");
     });
 
     it(`exibe erro quando backend rejeita login em authMode=${scenario.mode}`, () => {
       const errorMessage = `Credenciais inválidas (${scenario.mode})`;
 
       setupCommonInterceptors(scenario.mode);
-      cy.intercept("POST", "**/auth/login", {
+      cy.intercept("POST", "**/api/auth/login", {
         statusCode: 401,
         body: { message: errorMessage },
       }).as("authLoginFailed");
@@ -139,11 +189,11 @@ describe("Login - modos de autenticação aceitos", () => {
 describe("Login - cenários adicionais", () => {
   it("atualiza UI quando o backend troca authMode de password para both", () => {
     cy.intercept(
-      { method: "GET", url: "**/auth/status", times: 1 },
+      { method: "GET", url: "**/api/auth/status", times: 1 },
       { statusCode: 200, body: { authMode: "password" } },
     ).as("statusPassword");
 
-    cy.intercept("GET", "**/auth/status", {
+    cy.intercept("GET", "**/api/auth/status", {
       statusCode: 200,
       body: { authMode: "both" },
     }).as("statusBoth");
@@ -159,11 +209,11 @@ describe("Login - cenários adicionais", () => {
 
   it("atualiza UI quando o backend troca authMode de totp para password", () => {
     cy.intercept(
-      { method: "GET", url: "**/auth/status", times: 1 },
+      { method: "GET", url: "**/api/auth/status", times: 1 },
       { statusCode: 200, body: { authMode: "totp" } },
     ).as("statusTotp");
 
-    cy.intercept("GET", "**/auth/status", {
+    cy.intercept("GET", "**/api/auth/status", {
       statusCode: 200,
       body: { authMode: "password" },
     }).as("statusPassword");
@@ -177,42 +227,14 @@ describe("Login - cenários adicionais", () => {
     assertModeUi("password", "Informe a senha.");
   });
 
-  it("redireciona para /settings ao clicar no botão Configurar", () => {
-    setupCommonInterceptors("password");
-    cy.intercept("GET", "**/settings", {
-      statusCode: 200,
-      body: {
-        authMode: "password",
-        logLevel: "info",
-        hasPassword: true,
-        hasTotp: false,
-        createdAt: "2026-02-01T10:00:00.000Z",
-        updatedAt: "2026-02-01T10:00:00.000Z",
-      },
-    }).as("safeSettings");
-    cy.visit("/login");
-
-    cy.contains("button", "Configurar").click();
-    cy.wait("@safeSettings");
-    cy.location("pathname").should("eq", "/settings");
-  });
-
   it("respeita a rota de origem (location.state.from) após login", () => {
     setupCommonInterceptors("password");
-    cy.intercept("POST", "**/auth/login", { statusCode: 200, body: { ok: true } }).as(
+    cy.intercept("POST", "**/api/auth/login", { statusCode: 200, body: { ok: true } }).as(
       "authLogin",
     );
-    cy.intercept("GET", "**/settings", {
-      statusCode: 200,
-      body: {
-        authMode: "password",
-        logLevel: "info",
-        hasPassword: true,
-        hasTotp: false,
-        createdAt: "2026-02-01T10:00:00.000Z",
-        updatedAt: "2026-02-01T10:00:00.000Z",
-      },
-    }).as("safeSettings");
+    cy.intercept("GET", "**/api/settings", { statusCode: 200, body: safeSettingsResponse }).as(
+      "safeSettings",
+    );
 
     cy.visit("/login", {
       onBeforeLoad(win) {
@@ -229,12 +251,12 @@ describe("Login - cenários adicionais", () => {
   });
 
   it("mostra erro de /auth/status e ainda permite tentativa de login", () => {
-    cy.intercept("GET", "**/auth/status", {
+    cy.intercept("GET", "**/api/auth/status", {
       statusCode: 503,
       body: { message: "status indisponível" },
     }).as("statusError");
 
-    cy.intercept("POST", "**/auth/login", (req) => {
+    cy.intercept("POST", "**/api/auth/login", (req) => {
       const actualBody = parseRequestBody(req.body);
       expect(actualBody).to.deep.equal({ password: "FallbackPass123" });
       req.reply({ statusCode: 401, body: { message: "Falha no login" } });
@@ -249,5 +271,43 @@ describe("Login - cenários adicionais", () => {
 
     cy.wait("@authLoginFallback");
     cy.contains("Falha no login").should("be.visible");
+  });
+});
+
+describe("Settings - navegação direta", () => {
+  it("carrega a SPA ao abrir /settings diretamente", () => {
+    setupSettingsPageInterceptors("/settings");
+
+    cy.visit("/settings");
+
+    cy.wait("@authStatus");
+    cy.wait("@safeSettings");
+    cy.location("pathname").should("eq", "/settings");
+    cy.contains("button", "Autenticação").should("have.attr", "data-state", "active");
+  });
+
+  it("carrega a SPA ao abrir /settings/notifications diretamente", () => {
+    setupSettingsPageInterceptors("/settings/notifications");
+
+    cy.visit("/settings/notifications");
+
+    cy.wait("@authStatus");
+    cy.wait("@safeSettings");
+    cy.location("pathname").should("eq", "/settings/notifications");
+    cy.contains("button", "Notificações").should("have.attr", "data-state", "active");
+    cy.contains("SMTP").should("be.visible");
+  });
+
+  it("carrega a SPA ao abrir /settings/environments diretamente", () => {
+    setupSettingsPageInterceptors("/settings/environments");
+
+    cy.visit("/settings/environments");
+
+    cy.wait("@authStatus");
+    cy.wait("@safeSettings");
+    cy.wait("@listEnvironments");
+    cy.location("pathname").should("eq", "/settings/environments");
+    cy.contains("button", "Environments").should("have.attr", "data-state", "active");
+    cy.contains("Local").should("be.visible");
   });
 });

@@ -1,3 +1,5 @@
+ARG APP_VERSION=dev
+
 FROM node:20-alpine AS build
 WORKDIR /app
 
@@ -54,6 +56,7 @@ RUN npm ci --omit=dev --workspace apps/api \
   && npm cache clean --force
 
 FROM node:20-alpine AS runtime
+ARG APP_VERSION=dev
 WORKDIR /app
 
 RUN apk add --no-cache \
@@ -65,6 +68,7 @@ RUN apk add --no-cache \
   && rm -f /etc/nginx/http.d/default.conf
 
 ENV NODE_ENV=production \
+  APP_VERSION=${APP_VERSION} \
   PORT=3000 \
   LOG_LEVEL=info \
   DATABASE_URL=file:/data/docksentinel.db \
@@ -86,6 +90,8 @@ COPY --from=build /app/apps/docksentinel-web/dist /app/apps/docksentinel-web/dis
 COPY docker/nginx.conf /etc/nginx/http.d/default.conf
 COPY docker/entrypoint.sh /entrypoint.sh
 RUN chmod +x /entrypoint.sh && mkdir -p /data
+
+LABEL com.docksentinel.role="server"
 
 EXPOSE 80
 VOLUME ["/data"]

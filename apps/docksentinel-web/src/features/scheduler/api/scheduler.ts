@@ -4,7 +4,8 @@ export type SchedulerMode = "scan_only" | "scan_and_update" | string;
 export type SchedulerScope = "all" | "labeled" | string;
 
 export type SchedulerConfig = {
-  id: number;
+  environmentId: string;
+  environmentName: string;
   enabled: boolean;
   cronExpr: string;
   mode: SchedulerMode;
@@ -42,17 +43,19 @@ export type SchedulerBundle = {
 };
 
 /**
- * GET /updates/scheduler/scheduler
+ * GET environment scheduler status
  */
-export async function getSchedulerBundle(): Promise<SchedulerBundle> {
-  return http<SchedulerBundle>("/updates/scheduler/scheduler");
+export async function getSchedulerBundle(environmentId: string): Promise<SchedulerBundle> {
+  return http<SchedulerBundle>(
+    `/api/environments/${encodeURIComponent(environmentId)}/scheduler/status`,
+  );
 }
 
 /**
  * PATCH /updates/scheduler/config
  * (UpdateSchedulerConfigPatchDto)
  */
-export async function patchSchedulerConfig(body: {
+export async function patchSchedulerConfig(environmentId: string, body: {
   enabled?: boolean;
   cronExpr?: string;
   mode?: SchedulerMode;
@@ -60,7 +63,7 @@ export async function patchSchedulerConfig(body: {
   scanLabelKey?: string;
   updateLabelKey?: string;
 }): Promise<any> {
-  return http<any>("/updates/scheduler/config", {
+  return http<any>(`/api/environments/${encodeURIComponent(environmentId)}/scheduler/config`, {
     method: "PATCH",
     body,
   });
@@ -70,6 +73,8 @@ export async function patchSchedulerConfig(body: {
  * POST /updates/scan-and-enqueue
  * (sem body no Swagger)
  */
-export async function scanAndEnqueue(): Promise<any> {
-  return http<any>("/updates/scan-and-enqueue", { method: "POST" });
+export async function scanAndEnqueue(environmentId: string): Promise<any> {
+  return http<any>(`/api/environments/${encodeURIComponent(environmentId)}/updates/scan-and-enqueue`, {
+    method: "POST",
+  });
 }

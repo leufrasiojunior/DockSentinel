@@ -6,6 +6,8 @@ import { JobsQuery } from './dto/updates.dto';
 import { t } from '../i18n/translate';
 
 type EnqueueInput = {
+  environmentId: string;
+  environmentName: string;
   container: string;
   image?: string | null;
   force?: boolean;
@@ -16,9 +18,10 @@ type EnqueueInput = {
 export class UpdatesRepository {
   constructor(private readonly prisma: PrismaService) {}
 
-  async listJobs(query: JobsQuery) {
+  async listJobs(query: JobsQuery & { environmentId?: string }) {
     const where: Prisma.UpdateJobWhereInput = {}
 
+    if (query.environmentId) where.environmentId = query.environmentId
     if (query.container) where.container = query.container
     if (query.status) where.status = query.status
 
@@ -42,6 +45,8 @@ export class UpdatesRepository {
   }
 
   create(data: {
+    environmentId: string;
+    environmentName: string;
     container: string;
     image?: string;
     force?: boolean;
@@ -49,6 +54,8 @@ export class UpdatesRepository {
   }) {
     return this.prisma.client.updateJob.create({
       data: {
+        environmentId: data.environmentId,
+        environmentName: data.environmentName,
         status: 'queued',
         container: data.container,
         image: data.image,
@@ -170,6 +177,7 @@ export class UpdatesRepository {
     for (const it of items) {
       const exists = await this.prisma.client.updateJob.findFirst({
         where: {
+          environmentId: it.environmentId,
           container: it.container,
           status: { in: ['queued', 'running'] },
         },
@@ -183,6 +191,8 @@ export class UpdatesRepository {
 
       const job = await this.prisma.client.updateJob.create({
         data: {
+          environmentId: it.environmentId,
+          environmentName: it.environmentName,
           container: it.container,
           image: it.image ?? null,
           force: Boolean(it.force),
@@ -195,5 +205,22 @@ export class UpdatesRepository {
     }
 
     return { queued, skipped };
+  }
+
+  async failPendingJobsForEnvironment(environmentId: string, reason: string) {
+    const now = new Date()
+    await this.prisma.client.updateJob.updateMany({
+      where: {
+        environmentId,
+        status: { in: ["queued", "running"] },
+      },
+      data: {
+        status: "failed",
+        finishedAt: now,
+        error: reason,
+        lockedAt: null,
+        lockedBy: null,
+      },
+    })
   }
 }

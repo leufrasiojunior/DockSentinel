@@ -21,39 +21,46 @@ export function getAllowAutoUpdateFromLabels(labels: Record<string, string>) {
   return v !== "false";
 }
 
-export async function listContainers(): Promise<DockerContainer[]> {
-  // Pelo HANDOFF, isso é um ARRAY puro.
-  return http<DockerContainer[]>("/docker/containers");
+function path(environmentId: string, suffix: string) {
+  return `/api/environments/${encodeURIComponent(environmentId)}${suffix}`;
 }
 
-export async function getContainerDetails(id: string) {
-  return http<any>(`/docker/containers/${encodeURIComponent(id)}`);
+export async function listContainers(environmentId: string): Promise<DockerContainer[]> {
+  return http<DockerContainer[]>(path(environmentId, "/docker/containers"));
 }
 
-export async function updateCheck(name: string): Promise<UpdateCheckResult> {
+export async function getContainerDetails(environmentId: string, id: string) {
+  return http<any>(path(environmentId, `/docker/containers/${encodeURIComponent(id)}`));
+}
+
+export async function updateCheck(
+  environmentId: string,
+  name: string,
+): Promise<UpdateCheckResult> {
   return http<UpdateCheckResult>(
-    `/docker/containers/${encodeURIComponent(name)}/update-check`,
+    path(environmentId, `/docker/containers/${encodeURIComponent(name)}/update-check`),
   );
 }
 
 export async function updateContainer(
+  environmentId: string,
   name: string,
   body: { pull: boolean; force: boolean },
 ): Promise<any> {
-  return http<any>(`/docker/containers/${encodeURIComponent(name)}/update`, {
+  return http<any>(path(environmentId, `/docker/containers/${encodeURIComponent(name)}/update`), {
     method: "POST",
     body,
   });
 }
 
-export async function recreateContainer(name: string): Promise<any> {
-  return http<any>(`/docker/containers/${encodeURIComponent(name)}/recreate`, {
+export async function recreateContainer(environmentId: string, name: string): Promise<any> {
+  return http<any>(path(environmentId, `/docker/containers/${encodeURIComponent(name)}/recreate`), {
     method: "POST",
   });
 }
 
-export async function recreatePlan(containerId: string): Promise<any> {
+export async function recreatePlan(environmentId: string, containerId: string): Promise<any> {
   return http<any>(
-    `/docker/containers/${encodeURIComponent(containerId)}/recreate-plan`,
+    path(environmentId, `/docker/containers/${encodeURIComponent(containerId)}/recreate-plan`),
   );
 }

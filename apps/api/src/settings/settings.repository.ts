@@ -16,6 +16,7 @@ export type SettingsPatch = {
   notificationLevel?: "all" | "errors_only";
   notificationReadRetentionDays?: number;
   notificationUnreadRetentionDays?: number;
+  environmentHealthcheckIntervalMin?: number;
   notificationRecipientEmail?: string | null;
   smtpHost?: string | null;
   smtpPort?: number | null;

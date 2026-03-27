@@ -41,6 +41,10 @@ import {
 import { SchedulerConfigResponseDto } from './dto/scheduler-status.dto';
 import { OkResponseDto } from '../common/dto/ok-response.dto';
 import { t } from '../i18n/translate';
+import {
+  LOCAL_ENVIRONMENT_ID,
+  LOCAL_ENVIRONMENT_NAME,
+} from '../environments/environment.constants';
 
 @ApiTags('Updates')
 @ApiExtraModels(ScanResultOkDto, ScanResultErrorDto)
@@ -62,7 +66,13 @@ export class UpdatesController {
   })
   @ApiBadRequestResponse({ description: 'Dados inválidos.' })
   async enqueue(@Body(new ZodValidationPipe(enqueueSchema)) body: EnqueueDto) {
-    const result = await this.repo.enqueueMany([body]);
+    const result = await this.repo.enqueueMany([
+      {
+        environmentId: LOCAL_ENVIRONMENT_ID,
+        environmentName: LOCAL_ENVIRONMENT_NAME,
+        ...body,
+      },
+    ]);
 
     // 🔥 fire-and-forget (NÃO await)
     this.worker.kick().catch((err) => {
@@ -81,7 +91,13 @@ export class UpdatesController {
   })
   @ApiBadRequestResponse({ description: 'Dados inválidos.' })
   async batch(@Body(new ZodValidationPipe(batchSchema)) body: BatchDto) {
-    const result = await this.repo.enqueueMany(body.items ?? []);
+    const result = await this.repo.enqueueMany(
+      (body.items ?? []).map((item) => ({
+        environmentId: LOCAL_ENVIRONMENT_ID,
+        environmentName: LOCAL_ENVIRONMENT_NAME,
+        ...item,
+      })),
+    );
 
     // 🔥 fire-and-forget (NÃO await)
     this.worker.kick().catch((err) => {
@@ -166,7 +182,7 @@ export class UpdatesController {
     @Body(new ZodValidationPipe(schedulerPatchSchema))
     body: SchedulerConfigDto,
   ) {
-    return this.scheduler.updateConfig(body);
+    return this.scheduler.updateConfig(LOCAL_ENVIRONMENT_ID, body);
   }
 
   @Post('scan-and-enqueue')
@@ -208,6 +224,7 @@ export class UpdatesController {
     // - mode default: scan_only
     // - updateLabelKey default: docksentinel.update
     return this.orchestrator.scanAndEnqueue({
+      environmentId: 'local',
       mode: body.mode ?? 'scan_only',
       updateLabelKey: body.updateLabelKey?.trim() || 'docksentinel.update',
     });
