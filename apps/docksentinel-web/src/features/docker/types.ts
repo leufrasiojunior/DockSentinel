@@ -32,6 +32,6 @@ export type ContainerDetails = {
 };
 
 export type BusyState = {
-  kind: "checkAll" | "updateSelected" | "scanOnly" | "scanAndUpdate";
+  kind: "checkAll" | "updateSelected" | "scanAndUpdate";
   progressText: string;
 } | null;

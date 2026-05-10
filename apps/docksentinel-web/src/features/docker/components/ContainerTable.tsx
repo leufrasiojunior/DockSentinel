@@ -33,7 +33,6 @@ interface ContainerTableProps {
   onRefetch: () => Promise<unknown>;
   onCheckAll: () => void | Promise<void>;
   onUpdateSelected: () => void | Promise<void>;
-  onScanOnly: () => void | Promise<void>;
   onScanAndUpdate: () => void | Promise<void>;
   activeDetailsId: string | null;
   isDetailsLoading: boolean;
@@ -57,7 +56,6 @@ export function ContainerTable({
   onRefetch,
   onCheckAll,
   onUpdateSelected,
-  onScanOnly,
   onScanAndUpdate,
   activeDetailsId,
   isDetailsLoading,
@@ -73,7 +71,6 @@ export function ContainerTable({
   const isBusy = !!busy;
   const isCheckAllBusy = busy?.kind === "checkAll";
   const isUpdateSelectedBusy = busy?.kind === "updateSelected";
-  const isScanOnlyBusy = busy?.kind === "scanOnly";
   const isScanAndUpdateBusy = busy?.kind === "scanAndUpdate";
 
   async function handleReload() {
@@ -124,15 +121,14 @@ export function ContainerTable({
               </Button>
 
               <Button
-                onClick={onScanOnly}
-                disabled={loading || isBusy}
+                onClick={onCheckAll}
+                disabled={loading || isBusy || containers.length === 0}
                 type="button"
                 variant="secondary"
-                aria-busy={isScanOnlyBusy}
-                title={t("dashboard.manualScanTitle")}
+                aria-busy={isCheckAllBusy}
               >
-                {isScanOnlyBusy ? <LoaderCircle className="size-4 animate-spin" /> : null}
-                {t("dashboard.scan")}
+                {isCheckAllBusy ? <LoaderCircle className="size-4 animate-spin" /> : null}
+                {t("dashboard.checkAll")}
               </Button>
 
               <Button
@@ -145,17 +141,6 @@ export function ContainerTable({
               >
                 {isScanAndUpdateBusy ? <LoaderCircle className="size-4 animate-spin" /> : null}
                 {t("dashboard.scanAndEnqueue")}
-              </Button>
-
-              <Button
-                onClick={onCheckAll}
-                disabled={loading || isBusy || containers.length === 0}
-                type="button"
-                variant="secondary"
-                aria-busy={isCheckAllBusy}
-              >
-                {isCheckAllBusy ? <LoaderCircle className="size-4 animate-spin" /> : null}
-                {t("dashboard.checkAll")}
               </Button>
 
               <Button

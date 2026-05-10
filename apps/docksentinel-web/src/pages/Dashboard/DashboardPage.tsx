@@ -41,7 +41,6 @@ export function DashboardPage() {
     toggleOne,
     handleCheckAll,
     handleUpdateSelected,
-    handleScanOnly,
     handleScanAndUpdate,
     runUpdateCheckOne,
     handleUpdateOne,
@@ -113,7 +112,6 @@ export function DashboardPage() {
           onRefetch={refetch}
           onCheckAll={handleCheckAll}
           onUpdateSelected={handleUpdateSelected}
-          onScanOnly={handleScanOnly}
           onScanAndUpdate={handleScanAndUpdate}
           activeDetailsId={detailsId}
           isDetailsLoading={detailsQuery.isLoading}
