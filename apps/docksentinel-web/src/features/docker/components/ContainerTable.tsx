@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { LoaderCircle, RefreshCcw } from "lucide-react";
+import { CircleArrowUp, LoaderCircle, RefreshCcw, TriangleAlert } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { Badge } from "../../../shared/components/ui/Badge";
 import { Button } from "../../../shared/components/ui/Button";
@@ -19,6 +19,16 @@ import {
   TableRow,
 } from "../../../components/ui/table";
 import { ActionBar } from "@/components/product/action-bar";
+import { cn } from "../../../shared/lib/utils/cn";
+
+type UpdateVisualState =
+  | "blocked"
+  | "idle"
+  | "checking"
+  | "error"
+  | "available"
+  | "upToDate"
+  | "checked";
 
 interface ContainerTableProps {
   containers: DockerContainer[];
@@ -83,20 +93,51 @@ export function ContainerTable({
     }
   }
 
-  function renderUpdateBadge(name: string, labels: Record<string, string>) {
+  function getUpdateVisualState(name: string, labels: Record<string, string>): UpdateVisualState {
     const allow = getAllowAutoUpdateFromLabels(labels);
     const st = checks[name];
 
-    if (!allow) return <Badge tone="gray">{t("common.states.autoUpdateOff")}</Badge>;
-    if (!st || st.status === "idle")
-      return <Badge tone="gray">{t("common.states.notChecked")}</Badge>;
-    if (st.status === "checking") return <Badge tone="blue">{t("common.states.checking")}</Badge>;
-    if (st.status === "error") return <Badge tone="red">{t("toast.error")}</Badge>;
+    if (!allow) return "blocked";
+    if (!st || st.status === "idle") return "idle";
+    if (st.status === "checking") return "checking";
+    if (st.status === "error") return "error";
 
-    if (st.result.hasUpdate === true)
-      return <Badge tone="yellow">{t("common.states.updateAvailable")}</Badge>;
-    if (st.result.hasUpdate === false)
-      return <Badge tone="green">{t("common.states.upToDate")}</Badge>;
+    if (st.result.hasUpdate === true) return "available";
+    if (st.result.hasUpdate === false) return "upToDate";
+    return "checked";
+  }
+
+  function renderUpdateBadge(state: UpdateVisualState) {
+    if (state === "blocked") return <Badge tone="gray">{t("common.states.autoUpdateOff")}</Badge>;
+    if (state === "idle") return <Badge tone="gray">{t("common.states.notChecked")}</Badge>;
+    if (state === "checking") {
+      return (
+        <Badge tone="blue" className="gap-1.5">
+          <LoaderCircle className="size-3.5 animate-spin" />
+          {t("common.states.checking")}
+        </Badge>
+      );
+    }
+    if (state === "error") {
+      return (
+        <Badge tone="red" className="gap-1.5">
+          <TriangleAlert className="size-3.5" />
+          {t("toast.error")}
+        </Badge>
+      );
+    }
+    if (state === "available") {
+      return (
+        <Badge
+          tone="yellow"
+          className="gap-1.5 border-amber-500/55 bg-amber-400/20 px-3 py-1.5 font-semibold text-amber-800 shadow-[0_0_0_1px_rgba(245,158,11,0.14)] dark:border-amber-300/55 dark:bg-amber-300/18 dark:text-amber-100"
+        >
+          <CircleArrowUp className="size-3.5" />
+          {t("common.states.updateAvailable")}
+        </Badge>
+      );
+    }
+    if (state === "upToDate") return <Badge tone="green">{t("common.states.upToDate")}</Badge>;
     return <Badge tone="gray">{t("common.states.checked")}</Badge>;
   }
 
@@ -204,9 +245,16 @@ export function ContainerTable({
             const isUpdating = !!updatingNames[c.name];
             const isChecking = checkState?.status === "checking";
             const isOpeningDetails = activeDetailsId === c.id && isDetailsLoading;
+            const updateState = getUpdateVisualState(c.name, c.labels);
 
             return (
-              <TableRow key={c.id}>
+              <TableRow
+                key={c.id}
+                className={cn(
+                  updateState === "available" && "bg-amber-500/5 hover:bg-amber-500/8",
+                  isUpdating && "bg-primary/6 hover:bg-primary/10",
+                )}
+              >
                 <TableCell>
                   <div className="flex justify-center">
                     <Checkbox
@@ -248,8 +296,19 @@ export function ContainerTable({
                   <div className="text-xs text-muted-foreground">{c.status}</div>
                 </TableCell>
 
-                <TableCell className="text-left">
-                  {renderUpdateBadge(c.name, c.labels)}
+                <TableCell
+                  className={cn(
+                    "text-left",
+                    updateState === "available" && "border-l-2 border-l-amber-500/70 bg-amber-500/8",
+                    isUpdating && "border-l-2 border-l-primary/70 bg-primary/8",
+                  )}
+                >
+                  {renderUpdateBadge(updateState)}
+                  {isUpdating && (
+                    <div className="mt-1 text-[11px] font-medium text-primary">
+                      {t("common.actions.updating")}
+                    </div>
+                  )}
                   {checkState?.status === "error" && (
                     <div className="mt-1 text-[11px] text-red-500">
                       {checkState.error}
@@ -290,6 +349,7 @@ export function ContainerTable({
                       disabled={isBusy || !allowAutoUpdate || isUpdating}
                       type="button"
                       aria-busy={isUpdating}
+                      className="min-w-24"
                     >
                       {isUpdating ? (
                         <>
