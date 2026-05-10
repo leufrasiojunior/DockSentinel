@@ -1,12 +1,8 @@
 process.env.DOCKSENTINEL_SECRET = "CHANGE_ME_CHANGE_ME_CHANGE_ME_32CHARS_MIN"
-
-
-
 import { Test, TestingModule } from "@nestjs/testing";
 import { INestApplication } from "@nestjs/common";
 import request from "supertest";
-import { AppModule } from "../src/app.module";
-import cookieParser from "cookie-parser";
+import { createTestApp } from "./create-test-app";
 
 
 
@@ -21,19 +17,8 @@ describe("App (e2e)", () => {
   let app: INestApplication;
 
   beforeAll(async () => {
-    /**
-     * Cria o app Nest completo (AppModule) para testar endpoints reais.
-     */
-    const moduleFixture: TestingModule = await Test.createTestingModule({
-      imports: [AppModule],
-    }).compile();
-
-    app = moduleFixture.createNestApplication();
-    app.use(cookieParser(process.env.DOCKSENTINEL_SECRET))
-
-
-    // Inicializa o app (mas não precisa fazer listen numa porta real)
-    await app.init();
+    const created = await createTestApp()
+    app = created.app
   });
 
 afterAll(async () => {

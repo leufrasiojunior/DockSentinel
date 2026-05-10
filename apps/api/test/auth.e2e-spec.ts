@@ -10,8 +10,8 @@ process.env.DOCKSENTINEL_SECRET = "CHANGE_ME_CHANGE_ME_CHANGE_ME_32CHARS_MIN"
 import { Test, TestingModule } from "@nestjs/testing"
 import { INestApplication } from "@nestjs/common"
 import request from "supertest"
-import cookieParser from "cookie-parser"
-import { AppModule } from "../src/app.module"
+import { PrismaService } from "../src/prisma/prisma.service"
+import { createTestApp } from "./create-test-app"
 
 /**
  * E2E de autenticação:
@@ -20,28 +20,25 @@ import { AppModule } from "../src/app.module"
  */
 describe("Auth (e2e)", () => {
   let app: INestApplication
+  let prisma: PrismaService
 
   beforeAll(async () => {
-    /**
-     * IMPORTANTE:
-     * ConfigModule lê as variáveis ANTES / DURANTE o bootstrap do AppModule.
-     * Então setamos process.env antes do Test.createTestingModule(...).compile().
-     */
+    const created = await createTestApp()
+    app = created.app
+    prisma = created.moduleFixture.get(PrismaService)
+  })
 
-    const moduleFixture: TestingModule = await Test.createTestingModule({
-      imports: [AppModule],
-    }).compile()
+  beforeEach(async () => {
+    await prisma.client.globalSettings.upsert({
+      where: { id: 1 },
+      create: { id: 1, authMode: "none", defaultLocale: "pt-BR" },
+      update: { authMode: "none", defaultLocale: "pt-BR" },
+    })
 
-    app = moduleFixture.createNestApplication()
-
-    /**
-     * No e2e o main.ts NÃO roda.
-     * Então precisamos aplicar cookie-parser aqui também,
-     * senão req.signedCookies não vai existir.
-     */
-    app.use(cookieParser(process.env.DOCKSENTINEL_SECRET))
-
-    await app.init()
+    await request(app.getHttpServer())
+      .put("/settings")
+      .send({ authMode: "password", adminPassword: "MyStrongPass123" })
+      .expect(200)
   })
 
 afterAll(async () => {

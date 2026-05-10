@@ -9,12 +9,27 @@ import {
   getContainerDetails,
   type DockerContainer,
 } from "../api/docker";
-import { scanAndEnqueue } from "../../updates/api/updates";
+import { scanAndEnqueue, type ScanResult, type ScanResultOk } from "../../updates/api/updates";
 import { useToast } from "../../../shared/components/ui/ToastProvider";
 import { useConfirm } from "../../../shared/components/ui/ConfirmProvider";
 import { type CheckState, type ContainerDetails, type BusyState } from "../types";
 import { formatList } from "../../../i18n/format";
 import { useEnvironmentRoute } from "../../environments/hooks/useEnvironmentRoute";
+
+function isCompletedScanResult(result: ScanResult): result is ScanResultOk {
+  return typeof (result as { hasUpdate?: unknown }).hasUpdate === "boolean";
+}
+
+function getErrorMessage(error: unknown, fallback: string) {
+  if (error instanceof Error && error.message) return error.message;
+  if (typeof error === "object" && error !== null && "message" in error) {
+    const maybeMessage = (error as { message?: unknown }).message;
+    if (typeof maybeMessage === "string" && maybeMessage.length > 0) {
+      return maybeMessage;
+    }
+  }
+  return fallback;
+}
 
 export function useContainers() {
   const { t } = useTranslation();
@@ -110,33 +125,75 @@ export function useContainers() {
       return next;
     });
 
-    const results = await Promise.allSettled(
-      containers.map((c) => updateCheck(environmentId, c.name)),
-    );
+    try {
+      const result = await scanAndEnqueue(environmentId, "scan_only");
+      const checkedAt = new Date().toISOString();
+      const resultByName = new Map(result.results.map((item) => [item.name, item]));
 
-    setChecks((prev) => {
-      const next = { ...prev };
-      results.forEach((r, i) => {
-        const name = containers[i]?.name;
-        if (!name) return;
+      setChecks((prev) => {
+        const next = { ...prev };
+        for (const container of containers) {
+          const item = resultByName.get(container.name);
+          if (!item) {
+            next[container.name] = {
+              status: "error",
+              error: t("containers.updateCheckError"),
+            };
+            continue;
+          }
 
-        if (r.status === "fulfilled") {
-          next[name] = {
-            status: "done",
-            result: r.value,
-            checkedAt: new Date().toISOString(),
-          };
-        } else {
-          next[name] = {
-            status: "error",
-            error: (r.reason as any)?.message ?? t("containers.updateCheckError"),
-          };
+          if (isCompletedScanResult(item)) {
+            next[container.name] = {
+              status: "done",
+              result: item,
+              checkedAt,
+            };
+          } else {
+            next[container.name] = {
+              status: "error",
+              error: item.error || t("containers.updateCheckError"),
+            };
+          }
         }
+        return next;
       });
-      return next;
-    });
 
-    setBusy(null);
+      const updateCount = result.results.filter(
+        (item) => isCompletedScanResult(item) && item.hasUpdate,
+      ).length;
+      const errorCount = result.results.filter((item) => !isCompletedScanResult(item)).length;
+      const message =
+        errorCount > 0
+          ? t("containers.checkAllPartialError", {
+              count: result.scanned,
+              updates: updateCount,
+              errors: errorCount,
+            })
+          : t("containers.checkAllSuccess", {
+              count: result.scanned,
+              updates: updateCount,
+            });
+
+      if (errorCount > 0) {
+        toast.error(message, t("containers.updateCheckTitle"));
+      } else {
+        toast.success(message, t("containers.updateCheckTitle"));
+      }
+
+      await qc.invalidateQueries({ queryKey: ["docker", "containers", environmentId] });
+    } catch (error: unknown) {
+      const message = getErrorMessage(error, t("containers.updateCheckError"));
+      setChecks((prev) => {
+        const next = { ...prev };
+        for (const container of containers) {
+          next[container.name] = { status: "error", error: message };
+        }
+        return next;
+      });
+      toast.error(message, t("containers.updateCheckTitle"));
+    } finally {
+      setBusy(null);
+    }
   }
 
   async function handleUpdateSelected() {
@@ -208,33 +265,6 @@ export function useContainers() {
 
     await qc.invalidateQueries({ queryKey: ["docker", "containers", environmentId] });
     setBusy(null);
-  }
-
-  async function handleScanOnly() {
-    if (busy) return;
-
-    setBusy({ kind: "scanOnly", progressText: t("dashboard.busy.scanOnly") });
-    try {
-      const result = await scanAndEnqueue(environmentId, "scan_only");
-      toast.success(t("containers.scanDone"), t("containers.scanTitle"));
-
-      if (result && typeof result === "object") {
-        const keys = Object.keys(result);
-        if (keys.length > 0) {
-          toast.info(
-            t("containers.scanResponse", { keys: keys.slice(0, 6).join(", ") }),
-            t("containers.scanTitle"),
-          );
-        }
-      }
-
-      await qc.invalidateQueries({ queryKey: ["docker", "containers", environmentId] });
-    } catch (e: any) {
-      const msg = e?.message ?? t("containers.scanError");
-      toast.error(msg, t("containers.scanTitle"));
-    } finally {
-      setBusy(null);
-    }
   }
 
   async function handleScanAndUpdate() {
@@ -320,7 +350,6 @@ export function useContainers() {
     toggleOne,
     handleCheckAll,
     handleUpdateSelected,
-    handleScanOnly,
     handleScanAndUpdate,
     runUpdateCheckOne,
     handleUpdateOne,

@@ -34,13 +34,19 @@ export class EnvironmentNotificationsController {
   }
 
   @Post(":id/read")
-  async markRead(@Param("id") id: string) {
-    return this.notifications.markRead(id)
+  async markRead(
+    @Param("environmentId") environmentId: string,
+    @Param("id") id: string,
+  ) {
+    return this.notifications.markReadForEnvironment(environmentId, id)
   }
 
   @Post(":id/unread")
-  async markUnread(@Param("id") id: string) {
-    return this.notifications.markUnread(id)
+  async markUnread(
+    @Param("environmentId") environmentId: string,
+    @Param("id") id: string,
+  ) {
+    return this.notifications.markUnreadForEnvironment(environmentId, id)
   }
 
   @Post("read-all")
@@ -49,16 +55,20 @@ export class EnvironmentNotificationsController {
   }
 
   @Delete(":id")
-  async deleteOne(@Param("id") id: string) {
-    return this.notifications.deleteOne(id)
+  async deleteOne(
+    @Param("environmentId") environmentId: string,
+    @Param("id") id: string,
+  ) {
+    return this.notifications.deleteOneForEnvironment(environmentId, id)
   }
 
   @Post("delete-many")
   @ApiBody({ type: DeleteNotificationsDto })
   async deleteMany(
+    @Param("environmentId") environmentId: string,
     @Body(new ZodValidationPipe(deleteNotificationsSchema))
     body: DeleteNotificationsDto,
   ) {
-    return this.notifications.deleteMany(body.ids)
+    return this.notifications.deleteManyForEnvironment(environmentId, body.ids)
   }
 }

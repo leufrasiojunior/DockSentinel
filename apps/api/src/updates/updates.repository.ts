@@ -1,5 +1,5 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
-import { PrismaService } from 'src/prisma/prisma.service';
+import { PrismaService } from '../prisma/prisma.service';
 import type { Prisma } from '@prisma/client';
 import type { ContainerUpdateResult } from '../docker/docker-update.service';
 import { JobsQuery } from './dto/updates.dto';
@@ -38,9 +38,14 @@ export class UpdatesRepository {
     return { total, items }
   }
 
-  async getJobOrThrow(id: string) {
+  async getJobOrThrow(id: string, environmentId?: string) {
     const job = await this.prisma.client.updateJob.findUnique({ where: { id } })
-    if (!job) throw new NotFoundException(t('updates.jobNotFound', { id }))
+    if (!job || (environmentId && job.environmentId !== environmentId)) {
+      throw new NotFoundException({
+        message: t('updates.jobNotFound', { id }),
+        code: 'UPDATE_JOB_NOT_FOUND',
+      })
+    }
     return job
   }
 

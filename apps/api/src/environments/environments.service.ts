@@ -1,5 +1,7 @@
 import {
+  BadGatewayException,
   BadRequestException,
+  HttpException,
   Inject,
   Injectable,
   Logger,
@@ -44,6 +46,7 @@ type AgentSetupStatusPayload = {
 }
 type SetupPhase = "waiting_for_agent" | "waiting_for_token" | "ready_to_complete" | "blocked"
 type SetupBlockingReason = "agent_already_paired"
+type TranslationParams = Record<string, string | number | boolean | null | undefined>
 
 @Injectable()
 export class EnvironmentsService implements OnModuleInit {
@@ -97,7 +100,7 @@ export class EnvironmentsService implements OnModuleInit {
     if (limit > 0) {
       const count = await this.repo.countRemote()
       if (count >= limit) {
-        throw new BadRequestException(`Remote environment limit reached (${limit})`)
+        throw this.badRequest("environment.limitReached", { limit }, "REMOTE_ENVIRONMENT_LIMIT_REACHED")
       }
     }
 
@@ -129,7 +132,7 @@ export class EnvironmentsService implements OnModuleInit {
   async updateRemoteEnvironment(id: string, patch: UpdateRemoteEnvironmentInput) {
     const current = await this.getEnvironmentOrThrow(id)
     if (current.kind !== "remote") {
-      throw new BadRequestException("Only remote environments can be updated")
+      throw this.badRequest("environment.remoteUpdateOnly", undefined, "REMOTE_ENVIRONMENT_REQUIRED")
     }
 
     const nextName = patch.name?.trim() ?? current.name
@@ -156,7 +159,7 @@ export class EnvironmentsService implements OnModuleInit {
   async rotateRemoteToken(id: string) {
     const current = await this.getEnvironmentOrThrow(id)
     if (current.kind !== "remote") {
-      throw new BadRequestException("Only remote environments can rotate token")
+      throw this.badRequest("environment.remoteRotateOnly", undefined, "REMOTE_ENVIRONMENT_REQUIRED")
     }
 
     let nextState: EnvironmentRotationState = "ready_to_pair"
@@ -168,8 +171,13 @@ export class EnvironmentsService implements OnModuleInit {
           method: "POST",
         })
       } catch (error: unknown) {
-        throw new BadRequestException(
-          `Failed to put agent into rotation mode: ${this.getErrorMessage(error)}`,
+        this.logger.warn(
+          `Failed to prepare remote rotation env=${current.id}: ${this.getErrorMessage(error)}`,
+        )
+        throw this.badGateway(
+          "environment.remoteRotationPrepareFailed",
+          undefined,
+          "REMOTE_AGENT_ROTATION_PREPARE_FAILED",
         )
       }
 
@@ -194,7 +202,7 @@ export class EnvironmentsService implements OnModuleInit {
   async getRemoteSetupStatus(id: string): Promise<RemoteEnvironmentSetupStatusDto> {
     const current = await this.getEnvironmentOrThrow(id)
     if (current.kind !== "remote") {
-      throw new BadRequestException("Only remote environments have setup status")
+      throw this.badRequest("environment.remoteSetupStatusOnly", undefined, "REMOTE_ENVIRONMENT_REQUIRED")
     }
 
     const setupUrl = this.buildSetupUrl(current.baseUrl)
@@ -206,7 +214,7 @@ export class EnvironmentsService implements OnModuleInit {
         readyToComplete: false,
         setupUrl,
         blockingReason: null,
-        lastError: "Remote environment is missing baseUrl",
+        lastError: t("environment.remoteBaseUrlMissing"),
       }
     }
 
@@ -224,9 +232,7 @@ export class EnvironmentsService implements OnModuleInit {
 
       let nextLastError: string | null = null
       if (blockingReason === "agent_already_paired") {
-        nextLastError =
-          `This agent is already paired with another DockSentinel environment. ` +
-          `Rotate the token in the original environment or clear the agent local state to pair it here.`
+        nextLastError = t("environment.remoteAgentAlreadyPaired")
       }
 
       let environment = current
@@ -273,7 +279,7 @@ export class EnvironmentsService implements OnModuleInit {
   async completeRemoteSetup(id: string) {
     const current = await this.getEnvironmentOrThrow(id)
     if (current.kind !== "remote") {
-      throw new BadRequestException("Only remote environments can complete setup")
+      throw this.badRequest("environment.remoteSetupCompleteOnly", undefined, "REMOTE_ENVIRONMENT_REQUIRED")
     }
 
     if (!current.pendingBootstrapTokenEnc) {
@@ -283,17 +289,17 @@ export class EnvironmentsService implements OnModuleInit {
         }
       }
 
-      throw new BadRequestException("This environment does not have a pending setup token")
+      throw this.badRequest("environment.setupTokenMissing", undefined, "REMOTE_SETUP_TOKEN_MISSING")
     }
 
     const status = await this.getRemoteSetupStatus(id)
     if (!status.readyToComplete) {
-      throw new BadRequestException("The agent setup is not ready to complete yet")
+      throw this.badRequest("environment.setupNotReady", undefined, "REMOTE_SETUP_NOT_READY")
     }
 
     const currentAgain = await this.getEnvironmentOrThrow(id)
     if (currentAgain.kind !== "remote" || !currentAgain.baseUrl || !currentAgain.pendingBootstrapTokenEnc) {
-      throw new BadRequestException("This environment does not have a pending setup token")
+      throw this.badRequest("environment.setupTokenMissing", undefined, "REMOTE_SETUP_TOKEN_MISSING")
     }
 
     const nextCredential = this.generateAgentToken()
@@ -310,9 +316,16 @@ export class EnvironmentsService implements OnModuleInit {
         },
       )
     } catch (error: unknown) {
-      const message = `Failed to complete agent setup: ${this.getErrorMessage(error)}`
+      const message = t("environment.remoteSetupCompleteFailed")
       await this.emitSetupFailureNotification(currentAgain, message)
-      throw new BadRequestException(message)
+      this.logger.warn(
+        `Failed to complete remote setup env=${currentAgain.id}: ${this.getErrorMessage(error)}`,
+      )
+      throw this.badGateway(
+        "environment.remoteSetupCompleteFailed",
+        undefined,
+        "REMOTE_AGENT_SETUP_COMPLETE_FAILED",
+      )
     }
 
     let info: AgentInfoDto | null = null
@@ -344,15 +357,21 @@ export class EnvironmentsService implements OnModuleInit {
   async reportRemoteSetupTimeout(id: string, input: RemoteEnvironmentSetupTimeoutInput) {
     const current = await this.getEnvironmentOrThrow(id)
     if (current.kind !== "remote") {
-      throw new BadRequestException("Only remote environments can report setup timeout")
+      throw this.badRequest(
+        "environment.remoteSetupTimeoutOnly",
+        undefined,
+        "REMOTE_ENVIRONMENT_REQUIRED",
+      )
     }
 
     const flow = input.flow === "rotation" ? "rotation" : "install"
-    const suffix = input.lastError?.trim() ? ` Last error: ${input.lastError.trim()}` : ""
+    const suffix = input.lastError?.trim()
+      ? t("environment.lastErrorSuffix", { error: input.lastError.trim() })
+      : ""
     const message =
       flow === "rotation"
-        ? `Agent rotation timed out after 2 minutes for environment "${current.name}".${suffix}`
-        : `Agent setup timed out after 2 minutes for environment "${current.name}".${suffix}`
+        ? t("environment.rotationTimeout", { name: current.name, details: suffix })
+        : t("environment.setupTimeout", { name: current.name, details: suffix })
 
     await this.emitSetupFailureNotification(current, message)
 
@@ -374,7 +393,8 @@ export class EnvironmentsService implements OnModuleInit {
     })
 
     if (!result) {
-      throw new BadRequestException(`Failed to reach environment "${id}"`)
+      const environment = await this.getEnvironmentOrThrow(id)
+      throw this.badRequest("environment.testFailed", { name: environment.name }, "ENVIRONMENT_UNREACHABLE")
     }
 
     return result
@@ -390,7 +410,7 @@ export class EnvironmentsService implements OnModuleInit {
   async deleteRemoteEnvironment(id: string) {
     const current = await this.getEnvironmentOrThrow(id)
     if (current.id === LOCAL_ENVIRONMENT_ID || current.kind !== "remote") {
-      throw new BadRequestException("Local environment cannot be deleted")
+      throw this.badRequest("environment.deleteLocalForbidden", undefined, "LOCAL_ENVIRONMENT_DELETE_FORBIDDEN")
     }
 
     await this.schedulerRepo.deleteEnvironmentConfig(id)
@@ -421,7 +441,7 @@ export class EnvironmentsService implements OnModuleInit {
   normalizeBaseUrl(raw: string) {
     let value = raw.trim()
     if (!value) {
-      throw new BadRequestException("baseUrl is required")
+      throw this.badRequest("environment.baseUrlRequired", undefined, "INVALID_BASE_URL")
     }
     if (!/^[a-z]+:\/\//i.test(value)) {
       value = `http://${value}`
@@ -431,19 +451,27 @@ export class EnvironmentsService implements OnModuleInit {
     try {
       url = new URL(value)
     } catch {
-      throw new BadRequestException(this.buildInvalidBaseUrlMessage(raw, value))
+      throw this.badRequest(
+        "environment.baseUrlInvalid",
+        { value: raw, examples: this.baseUrlExamples() },
+        "INVALID_BASE_URL",
+      )
     }
 
     if (url.protocol !== "http:" && url.protocol !== "https:") {
-      throw new BadRequestException(
-        `Invalid baseUrl "${raw}": only http:// or https:// are supported. ${this.baseUrlExamples()}`,
+      throw this.badRequest(
+        "environment.baseUrlProtocolUnsupported",
+        { value: raw, examples: this.baseUrlExamples() },
+        "INVALID_BASE_URL",
       )
     }
 
     const hostError = this.validateHostname(url.hostname)
     if (hostError) {
-      throw new BadRequestException(
-        `Invalid baseUrl "${raw}": ${hostError}. ${this.baseUrlExamples()}`,
+      throw this.badRequest(
+        "environment.baseUrlInvalid",
+        { value: raw, examples: `${hostError}. ${this.baseUrlExamples()}` },
+        "INVALID_BASE_URL",
       )
     }
 
@@ -480,17 +508,23 @@ export class EnvironmentsService implements OnModuleInit {
   private buildInvalidBaseUrlMessage(raw: string, normalized: string) {
     const inferred = this.inferHostError(normalized)
     if (inferred) {
-      return `Invalid baseUrl "${raw}": ${inferred}. ${this.baseUrlExamples()}`
+      return t("environment.baseUrlInvalid", {
+        value: raw,
+        examples: `${inferred}. ${this.baseUrlExamples()}`,
+      })
     }
 
-    return `Invalid baseUrl "${raw}": use a valid host or URL. ${this.baseUrlExamples()}`
+    return t("environment.baseUrlInvalid", {
+      value: raw,
+      examples: this.baseUrlExamples(),
+    })
   }
 
   private inferHostError(value: string) {
     const withoutProtocol = value.replace(/^[a-z]+:\/\//i, "")
     const hostPort = withoutProtocol.split("/")[0] ?? ""
     if (!hostPort) {
-      return "host is missing"
+      return t("environment.baseUrlHostMissing")
     }
 
     if (hostPort.startsWith("[") && hostPort.includes("]")) {
@@ -504,7 +538,7 @@ export class EnvironmentsService implements OnModuleInit {
   private validateHostname(hostname: string) {
     const host = hostname.trim()
     if (!host) {
-      return "host is missing"
+      return t("environment.baseUrlHostMissing")
     }
 
     if (!/^\d+(?:\.\d+)+$/.test(host)) {
@@ -513,13 +547,13 @@ export class EnvironmentsService implements OnModuleInit {
 
     const octets = host.split(".")
     if (octets.length !== 4) {
-      return `IPv4 addresses must have exactly 4 blocks, but "${host}" has ${octets.length}`
+      return t("environment.baseUrlIpv4Blocks", { host, count: octets.length })
     }
 
     for (const octet of octets) {
       const value = Number(octet)
       if (!Number.isInteger(value) || value < 0 || value > 255) {
-        return `IPv4 block "${octet}" is out of range (0-255)`
+        return t("environment.baseUrlIpv4Range", { block: octet })
       }
     }
 
@@ -527,7 +561,7 @@ export class EnvironmentsService implements OnModuleInit {
   }
 
   private baseUrlExamples() {
-    return "Examples: 192.168.3.148, http://192.168.3.148:45873, https://docker.example.com:45873"
+    return t("environment.baseUrlExamples")
   }
 
   private buildInstallCommand() {
@@ -553,14 +587,14 @@ export class EnvironmentsService implements OnModuleInit {
   private async assertUniqueRemoteName(name: string, exceptId?: string) {
     const existing = await this.repo.findByName(name)
     if (existing && existing.id !== exceptId) {
-      throw new BadRequestException(`Environment name already exists: ${name}`)
+      throw this.badRequest("environment.nameExists", { name }, "ENVIRONMENT_NAME_CONFLICT")
     }
   }
 
   private async assertUniqueRemoteBaseUrl(baseUrl: string, exceptId?: string) {
     const existing = await this.repo.findRemoteByBaseUrl(baseUrl)
     if (existing && existing.id !== exceptId) {
-      throw new BadRequestException(`Environment URL already exists: ${baseUrl}`)
+      throw this.badRequest("environment.urlExists", { baseUrl }, "ENVIRONMENT_URL_CONFLICT")
     }
   }
 
@@ -590,6 +624,16 @@ export class EnvironmentsService implements OnModuleInit {
   }
 
   private getErrorMessage(error: unknown) {
+    if (error instanceof HttpException) {
+      const response = error.getResponse()
+      if (typeof response === "string") return response
+      if (response && typeof response === "object") {
+        const maybeMessage = (response as { message?: unknown }).message
+        if (typeof maybeMessage === "string" && maybeMessage.length > 0) {
+          return maybeMessage
+        }
+      }
+    }
     if (error instanceof Error) return error.message
     return String(error)
   }
@@ -623,14 +667,14 @@ export class EnvironmentsService implements OnModuleInit {
     }
 
     if (!environment.baseUrl) {
-      const message = "Remote environment is missing baseUrl"
+      const message = t("environment.remoteBaseUrlMissing")
       await this.repo.updateHealth(environment.id, {
         lastError: message,
         connectivityStatus: "offline",
       })
 
       if (options.throwOnFailure) {
-        throw new BadRequestException(message)
+        throw this.badRequest("environment.remoteBaseUrlMissing", undefined, "REMOTE_ENVIRONMENT_BASE_URL_MISSING")
       }
 
       return null
@@ -641,14 +685,18 @@ export class EnvironmentsService implements OnModuleInit {
         return null
       }
 
-      const message = "Remote environment is missing an active credential"
+      const message = t("environment.remoteCredentialMissing")
       await this.repo.updateHealth(environment.id, {
         lastError: message,
         connectivityStatus: "offline",
       })
 
       if (options.throwOnFailure) {
-        throw new BadRequestException(message)
+        throw this.badRequest(
+          "environment.remoteCredentialMissing",
+          undefined,
+          "REMOTE_ENVIRONMENT_CREDENTIAL_MISSING",
+        )
       }
 
       return null
@@ -693,7 +741,15 @@ export class EnvironmentsService implements OnModuleInit {
       }
 
       if (options.throwOnFailure) {
-        throw new BadRequestException(`Failed to reach environment "${updated.name}": ${message}`)
+        if (error instanceof HttpException && error.getStatus() >= 500) {
+          throw error
+        }
+
+        throw this.badRequest(
+          "environment.testFailed",
+          { name: updated.name },
+          "ENVIRONMENT_UNREACHABLE",
+        )
       }
 
       return null
@@ -702,7 +758,11 @@ export class EnvironmentsService implements OnModuleInit {
 
   private getRemoteAccess(environment: NonNullable<EnvironmentRow>) {
     if (!environment.baseUrl || !environment.agentTokenEnc) {
-      throw new BadRequestException("Remote environment is missing baseUrl or active credential")
+      throw this.badRequest(
+        "environment.remoteAccessMissing",
+        undefined,
+        "REMOTE_ENVIRONMENT_ACCESS_MISSING",
+      )
     }
 
     return {
@@ -719,11 +779,30 @@ export class EnvironmentsService implements OnModuleInit {
   }
 
   private async fetchAgentSetupStatus(baseUrl: string): Promise<AgentSetupStatusPayload> {
-    const response = await fetch(`${baseUrl}/agent/v1/setup/status`)
+    let response: Response
+    try {
+      response = await fetch(`${baseUrl}/agent/v1/setup/status`)
+    } catch (error: unknown) {
+      this.logger.warn(
+        `Failed to fetch remote setup status ${baseUrl}: ${error instanceof Error ? error.message : String(error)}`,
+      )
+      throw this.badGateway(
+        "environment.remoteAgentUnavailable",
+        undefined,
+        "REMOTE_AGENT_UNAVAILABLE",
+      )
+    }
 
     if (!response.ok) {
       const body = await response.text().catch(() => "")
-      throw new Error(body || `HTTP ${response.status}`)
+      this.logger.warn(
+        `Remote setup status returned HTTP ${response.status} for ${baseUrl}: ${body.slice(0, 500)}`,
+      )
+      throw this.badGateway(
+        "environment.remoteAgentHttpError",
+        { status: response.status },
+        "REMOTE_AGENT_REQUEST_FAILED",
+      )
     }
 
     const contentType = response.headers.get("content-type") ?? ""
@@ -827,25 +906,63 @@ export class EnvironmentsService implements OnModuleInit {
     token: string,
     init?: { method?: "GET" | "POST"; body?: unknown },
   ): Promise<T> {
-    const response = await fetch(`${baseUrl}${path}`, {
-      method: init?.method ?? "GET",
-      headers: {
-        Authorization: `Bearer ${token}`,
-        ...(init?.body === undefined ? {} : { "Content-Type": "application/json" }),
-      },
-      body: init?.body === undefined ? undefined : JSON.stringify(init.body),
-    })
+    let response: Response
+    try {
+      response = await fetch(`${baseUrl}${path}`, {
+        method: init?.method ?? "GET",
+        headers: {
+          Authorization: `Bearer ${token}`,
+          ...(init?.body === undefined ? {} : { "Content-Type": "application/json" }),
+        },
+        body: init?.body === undefined ? undefined : JSON.stringify(init.body),
+      })
+    } catch (error: unknown) {
+      this.logger.warn(
+        `Failed remote agent request ${baseUrl}${path}: ${error instanceof Error ? error.message : String(error)}`,
+      )
+      throw this.badGateway(
+        "environment.remoteAgentUnavailable",
+        undefined,
+        "REMOTE_AGENT_UNAVAILABLE",
+      )
+    }
 
     if (!response.ok) {
       const body = await response.text().catch(() => "")
-      throw new Error(body || `HTTP ${response.status}`)
+      this.logger.warn(
+        `Remote agent request returned HTTP ${response.status} for ${baseUrl}${path}: ${body.slice(0, 500)}`,
+      )
+      throw this.badGateway(
+        "environment.remoteAgentHttpError",
+        { status: response.status },
+        "REMOTE_AGENT_REQUEST_FAILED",
+      )
     }
 
     const contentType = response.headers.get("content-type") ?? ""
     if (!contentType.includes("application/json")) {
-      return undefined as T
+      this.logger.warn(`Remote agent returned invalid content-type for ${baseUrl}${path}: ${contentType}`)
+      throw this.badGateway(
+        "environment.remoteAgentInvalidResponse",
+        undefined,
+        "REMOTE_AGENT_INVALID_RESPONSE",
+      )
     }
 
     return (await response.json()) as T
+  }
+
+  private badRequest(key: string, params?: TranslationParams, code?: string) {
+    return new BadRequestException({
+      message: t(key, params),
+      ...(code ? { code } : {}),
+    })
+  }
+
+  private badGateway(key: string, params?: TranslationParams, code?: string) {
+    return new BadGatewayException({
+      message: t(key, params),
+      ...(code ? { code } : {}),
+    })
   }
 }

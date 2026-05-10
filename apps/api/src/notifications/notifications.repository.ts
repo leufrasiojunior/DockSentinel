@@ -6,13 +6,18 @@ import { t } from "../i18n/translate"
 export class NotificationsRepository {
   constructor(private readonly prisma: PrismaService) {}
 
-  private async ensureExists(id: string) {
+  private async ensureExists(id: string, environmentId?: string) {
     const existing = await this.prisma.client.notificationEvent.findUnique({
       where: { id },
-      select: { id: true, readAt: true },
+      select: { id: true, readAt: true, environmentId: true },
     })
 
-    if (!existing) throw new NotFoundException(t("notifications.notFound", { id }))
+    if (!existing || (environmentId && existing.environmentId !== environmentId)) {
+      throw new NotFoundException({
+        message: t("notifications.notFound", { id }),
+        code: "NOTIFICATION_NOT_FOUND",
+      })
+    }
     return existing
   }
 
@@ -52,12 +57,13 @@ export class NotificationsRepository {
 
     const after = await this.prisma.client.notificationEvent.findUnique({
       where: { id: params.afterId },
-      select: { createdAt: true, id: true },
+      select: { createdAt: true, id: true, environmentId: true },
     })
 
     // Se o cursor não existir mais (limpeza/retenção), volta para últimas N.
-    if (!after) {
+    if (!after || after.environmentId !== params.environmentId) {
       return this.prisma.client.notificationEvent.findMany({
+        where: { environmentId: params.environmentId },
         orderBy: [{ createdAt: "desc" }, { id: "desc" }],
         take,
       })
@@ -80,8 +86,8 @@ export class NotificationsRepository {
     })
   }
 
-  async markRead(id: string) {
-    const existing = await this.ensureExists(id)
+  async markRead(id: string, environmentId?: string) {
+    const existing = await this.ensureExists(id, environmentId)
     if (existing.readAt) return { ok: true as const }
 
     await this.prisma.client.notificationEvent.update({
@@ -91,8 +97,8 @@ export class NotificationsRepository {
     return { ok: true as const }
   }
 
-  async markUnread(id: string) {
-    const existing = await this.ensureExists(id)
+  async markUnread(id: string, environmentId?: string) {
+    const existing = await this.ensureExists(id, environmentId)
     if (!existing.readAt) return { ok: true as const }
 
     await this.prisma.client.notificationEvent.update({
@@ -111,8 +117,8 @@ export class NotificationsRepository {
     return { ok: true as const, affected: result.count }
   }
 
-  async deleteOne(id: string) {
-    await this.ensureExists(id)
+  async deleteOne(id: string, environmentId?: string) {
+    await this.ensureExists(id, environmentId)
 
     await this.prisma.client.notificationEvent.delete({
       where: { id },
@@ -121,13 +127,14 @@ export class NotificationsRepository {
     return { ok: true as const }
   }
 
-  async deleteMany(ids: string[]) {
+  async deleteMany(ids: string[], environmentId?: string) {
     const uniqueIds = Array.from(new Set(ids.map((value) => value.trim()).filter(Boolean)))
 
     if (uniqueIds.length === 0) return { ok: true as const, affected: 0 }
 
     const result = await this.prisma.client.notificationEvent.deleteMany({
       where: {
+        ...(environmentId ? { environmentId } : {}),
         id: {
           in: uniqueIds,
         },

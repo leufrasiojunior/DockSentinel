@@ -40,14 +40,23 @@ export class UpdatesSchedulerController {
     @Body(new ZodValidationPipe(schedulerPatchSchema))
     body: UpdateSchedulerConfigPatchDto,
   ) {
-    // body já validado pelo ZodValidationPipe
     return this.scheduler.updateConfig(LOCAL_ENVIRONMENT_ID, body);
   }
 
-  @Get('scheduler')
+  @Get('status')
   @ApiOperation({ summary: 'Obter configuração + status em runtime (DB)' })
   @ApiOkResponse({ description: 'Status completo do scheduler.', type: SchedulerStatusDto })
   async getScheduler() {
+    return this.scheduler.getStatus();
+  }
+
+  @Get('scheduler')
+  @ApiOperation({
+    summary: 'Deprecated: use GET /updates/scheduler/status',
+    deprecated: true,
+  })
+  @ApiOkResponse({ description: 'Status completo do scheduler.', type: SchedulerStatusDto })
+  async getSchedulerLegacy() {
     return this.scheduler.getStatus();
   }
 }

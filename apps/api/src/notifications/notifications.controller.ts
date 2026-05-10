@@ -50,7 +50,7 @@ export class NotificationsController {
   @ApiOkResponse({ type: OkResponseDto })
   @ApiNotFoundResponse({ description: "Notificação não encontrada." })
   async markRead(@Param("id") id: string) {
-    return this.notifications.markRead(id)
+    return this.notifications.markReadForEnvironment(LOCAL_ENVIRONMENT_ID, id)
   }
 
   @Post(":id/unread")
@@ -59,7 +59,7 @@ export class NotificationsController {
   @ApiOkResponse({ type: OkResponseDto })
   @ApiNotFoundResponse({ description: "Notificação não encontrada." })
   async markUnread(@Param("id") id: string) {
-    return this.notifications.markUnread(id)
+    return this.notifications.markUnreadForEnvironment(LOCAL_ENVIRONMENT_ID, id)
   }
 
   @Post("read-all")
@@ -75,7 +75,7 @@ export class NotificationsController {
   @ApiOkResponse({ type: OkResponseDto })
   @ApiNotFoundResponse({ description: "Notificação não encontrada." })
   async deleteOne(@Param("id") id: string) {
-    return this.notifications.deleteOne(id)
+    return this.notifications.deleteOneForEnvironment(LOCAL_ENVIRONMENT_ID, id)
   }
 
   @Post("delete-many")
@@ -86,6 +86,6 @@ export class NotificationsController {
     @Body(new ZodValidationPipe(deleteNotificationsSchema))
     body: DeleteNotificationsDto,
   ) {
-    return this.notifications.deleteMany(body.ids)
+    return this.notifications.deleteManyForEnvironment(LOCAL_ENVIRONMENT_ID, body.ids)
   }
 }

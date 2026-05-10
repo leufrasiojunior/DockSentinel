@@ -1,5 +1,5 @@
 import { Injectable, Logger } from '@nestjs/common';
-import { type ContainerUpdateCheck } from 'src/docker/docker-update.service';
+import { type ContainerUpdateCheck } from '../docker/docker-update.service';
 import { UpdatesRepository } from './updates.repository';
 import { UpdatesWorkerService } from './updates.worker.service';
 import { UpdatesSchedulerRepository } from './updates.scheduler.repository';
@@ -151,6 +151,12 @@ export class UpdatesOrchestratorService {
 
     const errored = results.filter((r) => 'error' in r).length;
     const hasAnyError = errored > 0;
+    const errorSummaries = results
+      .filter((r): r is Extract<ScanResult, { error: string }> => 'error' in r)
+      .map((r) => ({
+        container: r.name,
+        message: r.error,
+      }));
     const scannedImages = results.map((r) => {
       if ('error' in r) return `${r.name} (erro)`;
       const image = r.imageRef ?? 'n/a';
@@ -180,6 +186,7 @@ export class UpdatesOrchestratorService {
           errors: errored,
           scannedImages,
           updateCandidates,
+          errorSummaries,
         }, undefined, {
           environmentId: input.environmentId,
           environmentName,
@@ -212,6 +219,7 @@ export class UpdatesOrchestratorService {
         errors: errored,
         scannedImages,
         updateCandidates,
+        errorSummaries,
       }, undefined, {
         environmentId: input.environmentId,
         environmentName,

@@ -1,23 +1,14 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { INestApplication } from '@nestjs/common';
 import request from 'supertest';
-import cookieParser from 'cookie-parser';
-import { AppModule } from '../src/app.module';
+import { createTestApp } from './create-test-app';
 
 describe('Setup route removal (e2e)', () => {
   let app: INestApplication;
 
   beforeAll(async () => {
-    const moduleFixture: TestingModule = await Test.createTestingModule({
-      imports: [AppModule],
-    }).compile();
-
-    app = moduleFixture.createNestApplication();
-
-    // ✅ importante: cookie-parser com o MESMO secret do app
-    app.use(cookieParser(process.env.DOCKSENTINEL_SECRET));
-
-    await app.init();
+    const created = await createTestApp();
+    app = created.app;
   });
 
   afterAll(async () => {

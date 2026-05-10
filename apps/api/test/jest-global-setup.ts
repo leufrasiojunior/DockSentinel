@@ -1,7 +1,6 @@
-// apps/api/test/jest-global-setup.ts
-import { execSync } from "node:child_process"
-import { rmSync, mkdirSync } from "node:fs"
-import { resolve } from "node:path"
+import Database from "better-sqlite3"
+import { mkdirSync, readdirSync, readFileSync, rmSync } from "node:fs"
+import { join, resolve } from "node:path"
 
 export default async function globalSetup() {
   // 1) Aponta E2E para um DB isolado
@@ -14,9 +13,22 @@ export default async function globalSetup() {
   // 3) Zera o DB pra ficar determinístico
   rmSync(e2eDbPath, { force: true })
 
-  // 4) Aplica migrations no DB de E2E
-  execSync("npx prisma migrate deploy", {
-    stdio: "inherit",
-    env: process.env,
-  })
+  // 4) Aplica as migrations SQL diretamente no SQLite de E2E
+  const db = new Database(e2eDbPath)
+  const migrationsDir = resolve(process.cwd(), "prisma", "migrations")
+  const migrationDirs = readdirSync(migrationsDir)
+    .filter((entry) => entry !== "migration_lock.toml")
+    .sort()
+
+  try {
+    db.pragma("foreign_keys = ON")
+
+    for (const migrationDir of migrationDirs) {
+      const sqlPath = join(migrationsDir, migrationDir, "migration.sql")
+      const sql = readFileSync(sqlPath, "utf8")
+      db.exec(sql)
+    }
+  } finally {
+    db.close()
+  }
 }

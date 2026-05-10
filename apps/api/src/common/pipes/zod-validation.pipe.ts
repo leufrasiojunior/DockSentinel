@@ -10,16 +10,18 @@ export class ZodValidationPipe implements PipeTransform {
     let v = value;
 
     if (typeof v === "string") {
-    try {
-      v = JSON.parse(v);
-    } catch {
-      // deixa cair no Zod com erro mais claro
+      try {
+        v = JSON.parse(v);
+      } catch {
+        // deixa cair no Zod com erro mais claro
+      }
     }
-  }
-    const parsed = this.schema.safeParse(value);
+
+    const parsed = this.schema.safeParse(v);
     if (!parsed.success) {
       throw new BadRequestException({
         message: t("validation.failed"),
+        code: "VALIDATION_FAILED",
         issues: parsed.error.issues,
       });
     }
