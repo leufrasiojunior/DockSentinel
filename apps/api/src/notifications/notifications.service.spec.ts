@@ -17,6 +17,7 @@ describe("NotificationsService", () => {
         notificationsEmailEnabled: false,
         notificationLevel: "all",
       }),
+      getCachedDefaultLocale: jest.fn().mockReturnValue("pt-BR"),
       getDefaultLocale: jest.fn().mockResolvedValue("pt-BR"),
       getRawSettings: jest.fn(),
     } as unknown as SettingsService
@@ -58,6 +59,7 @@ describe("NotificationsService", () => {
         smtpFromName: "DockSentinel",
         smtpFromEmail: "no-reply@example.com",
       }),
+      getCachedDefaultLocale: jest.fn().mockReturnValue("pt-BR"),
       getDefaultLocale: jest.fn().mockResolvedValue("pt-BR"),
       getRawSettings: jest.fn().mockResolvedValue({ smtpPasswordEnc: "enc" }),
     } as unknown as SettingsService
@@ -94,6 +96,7 @@ describe("NotificationsService", () => {
         notificationsEmailEnabled: true,
         notificationLevel: "errors_only",
       }),
+      getCachedDefaultLocale: jest.fn().mockReturnValue("pt-BR"),
       getDefaultLocale: jest.fn().mockResolvedValue("pt-BR"),
       getRawSettings: jest.fn(),
     } as unknown as SettingsService

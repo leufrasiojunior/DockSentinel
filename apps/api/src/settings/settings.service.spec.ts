@@ -104,4 +104,34 @@ describe("SettingsService (unit)", () => {
 
     expect(repo.upsert).not.toHaveBeenCalled()
   })
+
+  it("should cache default locale after initialization", async () => {
+    const repo: Pick<SettingsRepository, "get" | "upsert"> = {
+      get: jest.fn().mockResolvedValue({
+        id: 1,
+        authMode: "none",
+        defaultLocale: "en-US",
+      }),
+      upsert: jest.fn(),
+    }
+
+    const crypto = new CryptoService()
+    const config = {
+      get: jest.fn().mockReturnValue("none"),
+      getOrThrow: jest.fn().mockReturnValue("none"),
+    } as unknown as ConfigService<Env>
+    const svc = new SettingsService(
+      repo as SettingsRepository,
+      crypto,
+      config,
+      { send: jest.fn() } as unknown as MailService,
+    )
+
+    await svc.initializeDefaultLocaleCache()
+    const locale = await svc.getDefaultLocale()
+
+    expect(locale).toBe("en-US")
+    expect(svc.getCachedDefaultLocale()).toBe("en-US")
+    expect(repo.get).toHaveBeenCalledTimes(1)
+  })
 })

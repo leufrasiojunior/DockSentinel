@@ -1,5 +1,5 @@
 import { Injectable, Logger } from '@nestjs/common';
-import { type ContainerUpdateCheck } from 'src/docker/docker-update.service';
+import { type ContainerUpdateCheck } from '../docker/docker-update.service';
 import { UpdatesRepository } from './updates.repository';
 import { UpdatesWorkerService } from './updates.worker.service';
 import { UpdatesSchedulerRepository } from './updates.scheduler.repository';

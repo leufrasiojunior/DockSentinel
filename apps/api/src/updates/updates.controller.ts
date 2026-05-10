@@ -1,4 +1,4 @@
-import { BadRequestException, Body, Controller, Get, Param, Post, Put, Query } from '@nestjs/common';
+import { Body, Controller, Get, Param, Post, Put, Query } from '@nestjs/common';
 import {
   ApiAcceptedResponse,
   ApiBadRequestResponse,
@@ -13,7 +13,6 @@ import {
   ApiTags,
 } from '@nestjs/swagger';
 import { UpdatesRepository } from './updates.repository';
-import { UpdatesWorkerService } from './updates.worker.service';
 import { ZodValidationPipe } from '../common/pipes/zod-validation.pipe';
 
 import {
@@ -40,21 +39,18 @@ import {
 } from './dto/scan-and-enqueue.dto';
 import { SchedulerConfigResponseDto } from './dto/scheduler-status.dto';
 import { OkResponseDto } from '../common/dto/ok-response.dto';
-import { t } from '../i18n/translate';
 import {
   LOCAL_ENVIRONMENT_ID,
-  LOCAL_ENVIRONMENT_NAME,
 } from '../environments/environment.constants';
+import { UpdatesRequestService } from './updates-request.service';
 
 @ApiTags('Updates')
 @ApiExtraModels(ScanResultOkDto, ScanResultErrorDto)
 @Controller('updates')
 export class UpdatesController {
   constructor(
-    private readonly repo: UpdatesRepository,
-    private readonly worker: UpdatesWorkerService,
+    private readonly updates: UpdatesRequestService,
     private readonly scheduler: UpdatesSchedulerService,
-    private readonly orchestrator: UpdatesOrchestratorService,
   ) {}
 
   @Post('enqueue')
@@ -66,20 +62,7 @@ export class UpdatesController {
   })
   @ApiBadRequestResponse({ description: 'Dados inválidos.' })
   async enqueue(@Body(new ZodValidationPipe(enqueueSchema)) body: EnqueueDto) {
-    const result = await this.repo.enqueueMany([
-      {
-        environmentId: LOCAL_ENVIRONMENT_ID,
-        environmentName: LOCAL_ENVIRONMENT_NAME,
-        ...body,
-      },
-    ]);
-
-    // 🔥 fire-and-forget (NÃO await)
-    this.worker.kick().catch((err) => {
-      console.error('[UpdatesWorker] kick failed', err);
-    });
-
-    return result;
+    return this.updates.enqueue(LOCAL_ENVIRONMENT_ID, body);
   }
 
   @Post('batch')
@@ -91,20 +74,7 @@ export class UpdatesController {
   })
   @ApiBadRequestResponse({ description: 'Dados inválidos.' })
   async batch(@Body(new ZodValidationPipe(batchSchema)) body: BatchDto) {
-    const result = await this.repo.enqueueMany(
-      (body.items ?? []).map((item) => ({
-        environmentId: LOCAL_ENVIRONMENT_ID,
-        environmentName: LOCAL_ENVIRONMENT_NAME,
-        ...item,
-      })),
-    );
-
-    // 🔥 fire-and-forget (NÃO await)
-    this.worker.kick().catch((err) => {
-      console.error('[UpdatesWorker] kick failed', err);
-    });
-
-    return result;
+    return this.updates.batch(LOCAL_ENVIRONMENT_ID, body);
   }
 
   // ✅ Observabilidade (lista)
@@ -123,7 +93,7 @@ export class UpdatesController {
   async listJobs(
     @Query(new ZodValidationPipe(jobsQuerySchema)) query: JobsQuery,
   ) {
-    return this.repo.listJobs(query);
+    return this.updates.listJobs(LOCAL_ENVIRONMENT_ID, query);
   }
 
   // ✅ Observabilidade (detalhe)
@@ -133,7 +103,7 @@ export class UpdatesController {
   @ApiOkResponse({ description: 'Detalhes do job.', type: UpdateJobDto })
   @ApiNotFoundResponse({ description: 'Job não encontrado.' })
   async getJob(@Param('id') id: string) {
-    return this.repo.getJobOrThrow(id);
+    return this.updates.getJob(LOCAL_ENVIRONMENT_ID, id);
   }
 
   // (Opcional) útil pra debug manual
@@ -144,10 +114,7 @@ export class UpdatesController {
     type: OkResponseDto,
   })
   async kick() {
-    this.worker.kick().catch((err) => {
-      console.error('[UpdatesWorker] kick failed', err);
-    });
-    return { ok: true };
+    return this.updates.kick();
   }
 
   /**
@@ -159,7 +126,10 @@ export class UpdatesController {
    * - Dispara worker.kick() sem await (assíncrono)
    */
   @Get('scheduler')
-  @ApiOperation({ summary: 'Obter configuração do scheduler (DB)' })
+  @ApiOperation({
+    summary: 'Deprecated: use GET /updates/scheduler/config',
+    deprecated: true,
+  })
   @ApiOkResponse({
     description: 'Configuração atual.',
     type: SchedulerConfigResponseDto,
@@ -170,7 +140,8 @@ export class UpdatesController {
 
   @Put('scheduler')
   @ApiOperation({
-    summary: 'Atualizar configuração do scheduler (DB) e aplicar imediatamente',
+    summary: 'Deprecated: use PATCH /updates/scheduler/config',
+    deprecated: true,
   })
   @ApiBody({ type: SchedulerConfigDto })
   @ApiOkResponse({
@@ -204,29 +175,6 @@ export class UpdatesController {
       updateLabelKey: string;
     }>,
   ) {
-    // ✅ 1) body vazio ou não enviado -> usa DB
-    if (!body || Object.keys(body).length === 0) {
-      return this.orchestrator.scanAndEnqueueFromDb();
-    }
-
-    // ✅ 2) valida o mode se veio (evita "string qualquer" no Postman)
-    if (
-      body.mode &&
-      body.mode !== 'scan_only' &&
-      body.mode !== 'scan_and_update'
-    ) {
-      throw new BadRequestException(
-        t('updates.invalidMode', { value: String(body.mode) }),
-      );
-    }
-
-    // ✅ 3) override manual (útil pra Postman)
-    // - mode default: scan_only
-    // - updateLabelKey default: docksentinel.update
-    return this.orchestrator.scanAndEnqueue({
-      environmentId: 'local',
-      mode: body.mode ?? 'scan_only',
-      updateLabelKey: body.updateLabelKey?.trim() || 'docksentinel.update',
-    });
+    return this.updates.scanAndEnqueue(LOCAL_ENVIRONMENT_ID, body);
   }
 }

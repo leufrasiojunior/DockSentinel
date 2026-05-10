@@ -18,7 +18,7 @@ import {
   ApiTags,
   getSchemaPath,
 } from '@nestjs/swagger';
-import { ZodValidationPipe } from 'src/common/pipes/zod-validation.pipe';
+import { ZodValidationPipe } from '../common/pipes/zod-validation.pipe';
 import { recreateBodySchema } from './docker.schema';
 import { RecreateDto } from './dto/recreate.dto';
 import { updateBodySchema, UpdateDto } from './dto/update.dto';

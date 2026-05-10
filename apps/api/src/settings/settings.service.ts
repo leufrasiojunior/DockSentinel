@@ -25,6 +25,7 @@ const isAppLocale = (value: unknown): value is AppLocale =>
 export class SettingsService {
   private readonly logger = new Logger(SettingsService.name)
   private defaultLocaleCache: AppLocale = DEFAULT_LOCALE
+  private defaultLocaleInitialized = false
 
   constructor(
     private readonly repo: SettingsRepository,
@@ -40,7 +41,7 @@ export class SettingsService {
   async getSafeSettings() {
     const row = await this.repo.get()
     const defaultLocale = isAppLocale(row?.defaultLocale) ? row.defaultLocale : DEFAULT_LOCALE
-    this.defaultLocaleCache = defaultLocale
+    this.updateDefaultLocaleCache(defaultLocale)
 
     return {
       authMode: isAuthMode(row?.authMode) ? row.authMode : "none",
@@ -72,15 +73,28 @@ export class SettingsService {
     return this.repo.get()
   }
 
-  async getDefaultLocale(): Promise<AppLocale> {
+  getCachedDefaultLocale(): AppLocale {
+    return this.defaultLocaleCache
+  }
+
+  async initializeDefaultLocaleCache(): Promise<AppLocale> {
     try {
       const row = await this.repo.get()
-      const defaultLocale = isAppLocale(row?.defaultLocale) ? row.defaultLocale : this.defaultLocaleCache
-      this.defaultLocaleCache = defaultLocale
+      const defaultLocale = isAppLocale(row?.defaultLocale) ? row.defaultLocale : DEFAULT_LOCALE
+      this.updateDefaultLocaleCache(defaultLocale)
       return defaultLocale
     } catch {
+      this.defaultLocaleInitialized = true
       return this.defaultLocaleCache
     }
+  }
+
+  async getDefaultLocale(): Promise<AppLocale> {
+    if (!this.defaultLocaleInitialized) {
+      await this.initializeDefaultLocaleCache()
+    }
+
+    return this.defaultLocaleCache
   }
 
   /**
@@ -211,7 +225,7 @@ export class SettingsService {
 
     await this.repo.upsert(patch)
     if (patch.defaultLocale) {
-      this.defaultLocaleCache = patch.defaultLocale
+      this.updateDefaultLocaleCache(patch.defaultLocale)
     }
 
     // devolve o “safe settings” atualizado
@@ -294,6 +308,11 @@ export class SettingsService {
   private validateLocale(value: unknown): AppLocale {
     const locale = normalizeLocale(value)
     return locale ?? DEFAULT_LOCALE
+  }
+
+  private updateDefaultLocaleCache(locale: AppLocale) {
+    this.defaultLocaleCache = locale
+    this.defaultLocaleInitialized = true
   }
 
   private validateEnvironmentHealthcheckInterval(value: unknown) {

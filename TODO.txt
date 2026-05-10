@@ -1,2 +1,9 @@
+
 Back
 Verificar rotas duplicadas
+
+verificar a pouicao de notificacoes ao checar todos os containers
+adicionar mais um estado quando for atualizar. 
+alterar de disponivel para atualizando quando pedir o update.
+adicionar uma notificacao, conforme a config de notificacao ativa, no app principal e agente,
+quando algum contrainer der erro)

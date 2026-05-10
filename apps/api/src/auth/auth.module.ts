@@ -3,7 +3,7 @@ import { AuthController } from "./auth.controller"
 import { SettingsModule } from "../settings/settings.module"
 import { AuthService } from "./auth.service"
 import { SessionService } from "./session.service"
-import { CryptoService } from "src/crypto/crypto.service"
+import { CryptoService } from "../crypto/crypto.service"
 
 @Module({
   imports: [SettingsModule],

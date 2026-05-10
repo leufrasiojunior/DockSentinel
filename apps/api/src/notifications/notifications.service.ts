@@ -57,8 +57,16 @@ export class NotificationsService {
     return this.repo.markRead(id)
   }
 
+  async markReadForEnvironment(environmentId: string, id: string) {
+    return this.repo.markRead(id, environmentId)
+  }
+
   async markUnread(id: string) {
     return this.repo.markUnread(id)
+  }
+
+  async markUnreadForEnvironment(environmentId: string, id: string) {
+    return this.repo.markUnread(id, environmentId)
   }
 
   async markAllRead(environmentId?: string) {
@@ -69,8 +77,16 @@ export class NotificationsService {
     return this.repo.deleteOne(id)
   }
 
+  async deleteOneForEnvironment(environmentId: string, id: string) {
+    return this.repo.deleteOne(id, environmentId)
+  }
+
   async deleteMany(ids: string[]) {
     return this.repo.deleteMany(ids)
+  }
+
+  async deleteManyForEnvironment(environmentId: string, ids: string[]) {
+    return this.repo.deleteMany(ids, environmentId)
   }
 
   async cleanupExpiredBySettings() {
@@ -422,6 +438,6 @@ export class NotificationsService {
     const currentLocale = getCurrentLocale()
     if (currentLocale) return currentLocale
 
-    return this.settings.getDefaultLocale()
+    return this.settings.getCachedDefaultLocale()
   }
 }
