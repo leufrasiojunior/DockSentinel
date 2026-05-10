@@ -18,6 +18,11 @@ type NotificationEnvironmentContext = {
   environmentName?: string
 }
 
+type ScanErrorSummary = {
+  container?: string
+  message: string
+}
+
 @Injectable()
 export class NotificationsService {
   private readonly logger = new Logger(NotificationsService.name)
@@ -145,16 +150,23 @@ export class NotificationsService {
     environment?: NotificationEnvironmentContext,
   ) {
     const resolvedLocale = await this.resolveLocale(locale)
-    const scanMeta = this.extractScanMeta(payload)
+    const scanMeta = this.extractScanMeta(payload, resolvedLocale)
 
     await this.emit({
       type: "scan_info",
       level: "info",
-      title: t("notifications.scanInfoTitle", { mode: scanMeta.mode }, resolvedLocale),
+      title: t(
+        scanMeta.mode === "scan_and_update"
+          ? "notifications.scanUpdateInfoTitle"
+          : "notifications.scanInfoTitle",
+        undefined,
+        resolvedLocale,
+      ),
       message: t(
-        "notifications.scanInfoMessage",
+        scanMeta.mode === "scan_and_update"
+          ? "notifications.scanUpdateInfoMessage"
+          : "notifications.scanInfoMessage",
         {
-          mode: scanMeta.mode,
           scanned: scanMeta.scanned,
           queued: scanMeta.queued,
           updates: scanMeta.updates,
@@ -173,23 +185,33 @@ export class NotificationsService {
     environment?: NotificationEnvironmentContext,
   ) {
     const resolvedLocale = await this.resolveLocale(locale)
-    const scanMeta = this.extractScanMeta(payload)
+    const scanMeta = this.extractScanMeta(payload, resolvedLocale)
+    const firstError = scanMeta.firstError
+      ? t(
+          "notifications.scanErrorFirstError",
+          {
+            container: scanMeta.firstError.container ?? t("notifications.unknownContainer", undefined, resolvedLocale),
+            message: scanMeta.firstError.message,
+          },
+          resolvedLocale,
+        )
+      : ""
+    const message = t(
+      "notifications.scanErrorMessage",
+      {
+        scanned: scanMeta.scanned,
+        queued: scanMeta.queued,
+        errors: scanMeta.errors,
+        updates: scanMeta.updates,
+      },
+      resolvedLocale,
+    )
 
     await this.emit({
       type: "scan_error",
       level: "error",
-      title: t("notifications.scanErrorTitle", { mode: scanMeta.mode }, resolvedLocale),
-      message: t(
-        "notifications.scanErrorMessage",
-        {
-          mode: scanMeta.mode,
-          scanned: scanMeta.scanned,
-          queued: scanMeta.queued,
-          errors: scanMeta.errors,
-          updates: scanMeta.updates,
-        },
-        resolvedLocale,
-      ),
+      title: t("notifications.scanErrorTitle", undefined, resolvedLocale),
+      message: firstError ? `${message} ${firstError}` : message,
       payload,
       locale: resolvedLocale,
       environment,
@@ -422,13 +444,68 @@ export class NotificationsService {
     ].join("")
   }
 
-  private extractScanMeta(payload?: GenericNotificationPayload) {
+  private extractScanMeta(payload?: GenericNotificationPayload, locale?: AppLocale) {
+    const firstError = this.extractFirstScanError(payload, locale)
     return {
       mode: typeof payload?.mode === "string" ? payload.mode : "scan_only",
       scanned: typeof payload?.scanned === "number" ? payload.scanned : 0,
       queued: typeof payload?.queued === "number" ? payload.queued : 0,
-      errors: typeof payload?.errors === "number" ? payload.errors : 1,
+      errors: typeof payload?.errors === "number" ? payload.errors : firstError ? 1 : 0,
       updates: Array.isArray(payload?.updateCandidates) ? payload.updateCandidates.length : 0,
+      firstError,
+    }
+  }
+
+  private extractFirstScanError(payload?: GenericNotificationPayload, locale?: AppLocale): ScanErrorSummary | null {
+    if (!payload) return null
+
+    if (Array.isArray(payload.errorSummaries)) {
+      for (const item of payload.errorSummaries) {
+        if (!item || typeof item !== "object") continue
+        const summary = item as { container?: unknown; message?: unknown }
+        if (typeof summary.message !== "string" || summary.message.trim().length === 0) continue
+
+        return {
+          container: typeof summary.container === "string" ? summary.container : undefined,
+          message: summary.message,
+        }
+      }
+    }
+
+    const container =
+      typeof payload.container === "string"
+        ? payload.container
+        : typeof payload.name === "string"
+          ? payload.name
+          : undefined
+
+    if (typeof payload.error === "string" && payload.error.trim().length > 0) {
+      return { container, message: payload.error }
+    }
+
+    if (typeof payload.reason === "string" && payload.reason.trim().length > 0) {
+      return { container, message: this.formatScanReason(payload.reason, locale) }
+    }
+
+    return null
+  }
+
+  private formatScanReason(reason: string, locale?: AppLocale) {
+    switch (reason) {
+      case "registry_auth_required":
+        return t("notifications.scanReason.registryAuthRequired", undefined, locale)
+      case "remote_digest_error":
+        return t("notifications.scanReason.remoteDigestError", undefined, locale)
+      case "remote_digest_not_found":
+        return t("notifications.scanReason.remoteDigestNotFound", undefined, locale)
+      case "local_image_missing":
+        return t("notifications.scanReason.localImageMissing", undefined, locale)
+      case "local_digest_error":
+        return t("notifications.scanReason.localDigestError", undefined, locale)
+      case "local_repo_digests_empty":
+        return t("notifications.scanReason.localRepoDigestsEmpty", undefined, locale)
+      default:
+        return reason
     }
   }
 
