@@ -1,5 +1,13 @@
 # Changelog
 
+## [2.7.0](https://github.com/leufrasiojunior/DockSentinel/compare/v2.6.0...v2.7.0) (2026-05-10)
+
+
+### Features
+
+* aprimorar exibição de estado de atualização com novos badges e … ([0c4a0be](https://github.com/leufrasiojunior/DockSentinel/commit/0c4a0be90f00ea90d87e04bf1193ac689aaac155))
+* aprimorar exibição de estado de atualização com novos badges e lógica de visualização ([9ed66ca](https://github.com/leufrasiojunior/DockSentinel/commit/9ed66ca6c66ada81c0ecb00ede2f132c6addb4f7))
+
 ## [2.6.0](https://github.com/leufrasiojunior/DockSentinel/compare/v2.5.2...v2.6.0) (2026-05-10)
 
 
