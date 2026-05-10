@@ -1,5 +1,20 @@
 # Changelog
 
+## [2.6.0](https://github.com/leufrasiojunior/DockSentinel/compare/v2.5.2...v2.6.0) (2026-05-10)
+
+
+### Features
+
+* atualizar assunto e conteúdo dos e-mails de notificação, melhorando a apresentação de falhas e informações de escaneamento ([0c94a07](https://github.com/leufrasiojunior/DockSentinel/commit/0c94a07bb7d47dd62b284a88234d7e5da5a4cc4c))
+* atualizar mensagens de notificação e melhorar tratamento de erros no serviço de notificações ([51cc50a](https://github.com/leufrasiojunior/DockSentinel/commit/51cc50a90d3be9921c8c09e225322a5b979f64f3))
+* enhance settings service with locale caching and initialization ([fceb2c8](https://github.com/leufrasiojunior/DockSentinel/commit/fceb2c86b853e4d2943636c553a2c8cb2d827f73))
+* simplificar ações do painel e melhorar checagem de containers ([f0bf1aa](https://github.com/leufrasiojunior/DockSentinel/commit/f0bf1aad1690044d9abcd9d56c6714c4c2c59d16))
+
+
+### Bug Fixes
+
+* improve error handling and response consistency ([fceb2c8](https://github.com/leufrasiojunior/DockSentinel/commit/fceb2c86b853e4d2943636c553a2c8cb2d827f73))
+
 ## [2.5.2](https://github.com/leufrasiojunior/DockSentinel/compare/v2.5.1...v2.5.2) (2026-03-27)
 
 
