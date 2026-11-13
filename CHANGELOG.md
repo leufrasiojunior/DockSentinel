@@ -1,5 +1,14 @@
 # Changelog
 
+## [2.8.0](https://github.com/leufrasiojunior/DockSentinel/compare/v2.7.0...v2.8.0) (2026-11-13)
+
+
+### Features
+
+* fix notification toast flood, support local images, add registry auth and unified home ([bfe5d7b](https://github.com/leufrasiojunior/DockSentinel/commit/bfe5d7bc3f19732881d5af29dda26890a93c4f17))
+* unified home, registry credentials, local-only images, toast fix and version check ([1222886](https://github.com/leufrasiojunior/DockSentinel/commit/122288608aef38b3cba0a80227e29fa751a221c6))
+* **updates:** add version update check for DockSentinel server and remote agents ([c85d597](https://github.com/leufrasiojunior/DockSentinel/commit/c85d59760d23a11e03c2910f12dbaebba1bd7385))
+
 ## [2.7.0](https://github.com/leufrasiojunior/DockSentinel/compare/v2.6.0...v2.7.0) (2026-05-10)
 
 
