@@ -252,7 +252,14 @@ export function useContainers() {
       try {
         await updateContainer(environmentId, c.name, { pull: true, force: false });
         toast.success(t("containers.updateTriggered", { name: c.name }), t("containers.updateTitle"));
-        await runUpdateCheckOne(c.name);
+        setChecks((prev) => ({
+          ...prev,
+          [c.name]: {
+            status: "done",
+            result: { hasUpdate: false, reason: "ok" },
+            checkedAt: new Date().toISOString(),
+          },
+        }));
       } catch (e: any) {
         const msg = e?.message ?? t("containers.updateError", { name: c.name });
         toast.error(msg, t("containers.updateTitle"));
@@ -316,7 +323,14 @@ export function useContainers() {
     try {
       await updateContainer(environmentId, name, { pull: true, force: false });
       toast.success(t("containers.updateTriggered", { name }), t("containers.updateTitle"));
-      await runUpdateCheckOne(name);
+      setChecks((prev) => ({
+        ...prev,
+        [name]: {
+          status: "done",
+          result: { hasUpdate: false, reason: "ok" },
+          checkedAt: new Date().toISOString(),
+        },
+      }));
     } catch (e: any) {
       toast.error(e?.message ?? t("containers.updateError", { name }), t("containers.updateTitle"));
     } finally {

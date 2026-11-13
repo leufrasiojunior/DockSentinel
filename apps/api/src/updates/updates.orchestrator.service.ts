@@ -149,17 +149,20 @@ export class UpdatesOrchestratorService {
       }
     }
 
-    const errored = results.filter((r) => 'error' in r).length;
-    const hasAnyError = errored > 0;
     const errorSummaries = results
-      .filter((r): r is Extract<ScanResult, { error: string }> => 'error' in r)
+      .filter((r): r is ScanResult & { error: string } => 'error' in r && typeof r.error === 'string' && r.error.length > 0)
       .map((r) => ({
         container: r.name,
         message: r.error,
       }));
+    const errored = errorSummaries.length;
+    const hasAnyError = errored > 0;
     const scannedImages = results.map((r) => {
-      if ('error' in r) return `${r.name} (erro)`;
-      const image = r.imageRef ?? 'n/a';
+      if ('error' in r && r.error) return `${r.name} (erro)`;
+      const image = 'imageRef' in r ? (r.imageRef ?? 'n/a') : 'n/a';
+      if ('reason' in r && r.reason === 'local_only') {
+        return `${r.name} => ${image} (local)`;
+      }
       return `${r.name} => ${image}`;
     });
     const updateCandidates: string[] = [];

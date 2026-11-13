@@ -1,14 +1,23 @@
-import { BadRequestException, Injectable, Logger } from "@nestjs/common"
+import { BadRequestException, Injectable, Logger, NotFoundException } from "@nestjs/common"
 import * as argon2 from "argon2"
-import { SettingsRepository } from "./settings.repository"
+import { SettingsRepository, type RegistryCredentialRow } from "./settings.repository"
 import { CryptoService } from "../crypto/crypto.service"
 import type { UpdateSettingsDto } from "./dto/update-settings.dto"
+import type {
+  CreateRegistryCredentialDto,
+  SafeRegistryCredentialDto,
+  UpdateRegistryCredentialDto,
+} from "./dto/registry-credential.dto"
 import { ConfigService } from "@nestjs/config"
 import { Env } from "../config/env.schema"
 import { MailService } from "../mail/mail.service"
 import type { SmtpTestDto } from "./dto/smtp-test.dto"
 import { DEFAULT_LOCALE, type AppLocale, normalizeLocale } from "../i18n/locale"
 import { t } from "../i18n/translate"
+import {
+  normalizeServerAddress,
+  type RegistryAuthEntry,
+} from "../docker/registry-auth.util"
 
 type AuthMode = Env["AUTH_MODE"]
 const isAuthMode = (value: unknown): value is AuthMode =>
@@ -326,5 +335,129 @@ export class SettingsService {
     }
 
     return minutes
+  }
+
+  private toSafeRegistry(row: RegistryCredentialRow): SafeRegistryCredentialDto {
+    return {
+      id: row.id,
+      name: row.name,
+      serverAddress: row.serverAddress,
+      username: row.username,
+      hasPassword: Boolean(row.passwordEnc),
+      enabled: Boolean(row.enabled),
+      createdAt: row.createdAt,
+      updatedAt: row.updatedAt,
+    }
+  }
+
+  async listRegistries(): Promise<SafeRegistryCredentialDto[]> {
+    const rows = await this.repo.listRegistries()
+    return rows.map((row) => this.toSafeRegistry(row))
+  }
+
+  async createRegistry(
+    dto: CreateRegistryCredentialDto,
+  ): Promise<SafeRegistryCredentialDto> {
+    const name = dto.name?.trim()
+    const rawServer = dto.serverAddress?.trim()
+    const username = dto.username?.trim()
+    const password = dto.password?.trim()
+
+    if (!name || !rawServer || !username || !password) {
+      throw new BadRequestException("Name, serverAddress, username and password are required")
+    }
+
+    const serverAddress = normalizeServerAddress(rawServer)
+    const existing = await this.repo.findRegistryByServerAddress(serverAddress)
+    if (existing) {
+      throw new BadRequestException(`Registry credential already exists for ${serverAddress}`)
+    }
+
+    const created = await this.repo.createRegistry({
+      name,
+      serverAddress,
+      username,
+      passwordEnc: this.crypto.encrypt(password),
+      enabled: dto.enabled ?? true,
+    })
+
+    return this.toSafeRegistry(created)
+  }
+
+  async updateRegistry(
+    id: string,
+    dto: UpdateRegistryCredentialDto,
+  ): Promise<SafeRegistryCredentialDto> {
+    const current = await this.repo.findRegistryById(id)
+    if (!current) {
+      throw new NotFoundException(`Registry credential not found: ${id}`)
+    }
+
+    const name = dto.name !== undefined ? dto.name.trim() : current.name
+    const serverAddress =
+      dto.serverAddress !== undefined
+        ? normalizeServerAddress(dto.serverAddress)
+        : current.serverAddress
+    const username =
+      dto.username !== undefined ? dto.username.trim() : current.username
+    const passwordEnc =
+      dto.password && dto.password.trim().length > 0
+        ? this.crypto.encrypt(dto.password.trim())
+        : current.passwordEnc
+    const enabled =
+      typeof dto.enabled === "boolean" ? dto.enabled : Boolean(current.enabled)
+
+    if (!name || !serverAddress || !username) {
+      throw new BadRequestException("Name, serverAddress and username cannot be empty")
+    }
+
+    if (serverAddress !== current.serverAddress) {
+      const conflict = await this.repo.findRegistryByServerAddress(serverAddress)
+      if (conflict && conflict.id !== id) {
+        throw new BadRequestException(`Registry credential already exists for ${serverAddress}`)
+      }
+    }
+
+    const updated = await this.repo.updateRegistry(id, {
+      name,
+      serverAddress,
+      username,
+      passwordEnc,
+      enabled,
+    })
+
+    return this.toSafeRegistry(updated)
+  }
+
+  async deleteRegistry(id: string): Promise<{ ok: true }> {
+    const current = await this.repo.findRegistryById(id)
+    if (!current) {
+      throw new NotFoundException(`Registry credential not found: ${id}`)
+    }
+    await this.repo.deleteRegistry(id)
+    return { ok: true as const }
+  }
+
+  async getEnabledRegistryAuthEntries(): Promise<RegistryAuthEntry[]> {
+    try {
+      const rows = await this.repo.listRegistries()
+      const entries: RegistryAuthEntry[] = []
+      for (const row of rows) {
+        if (!row.enabled || !row.passwordEnc) continue
+        try {
+          const password = this.crypto.decrypt(row.passwordEnc)
+          entries.push({
+            serveraddress: row.serverAddress,
+            username: row.username,
+            password,
+          })
+        } catch (err) {
+          this.logger.warn(`Failed to decrypt registry credential ${row.serverAddress}: ${err instanceof Error ? err.message : String(err)}`)
+        }
+      }
+      return entries
+    } catch {
+      return []
+    }
   }
 }

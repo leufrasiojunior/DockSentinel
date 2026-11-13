@@ -5,12 +5,16 @@ import { usePageVisibility } from "../hooks/usePageVisibility";
 import { useToast } from "../shared/components/ui/ToastProvider";
 import { useEnvironmentRoute } from "../features/environments/hooks/useEnvironmentRoute";
 
+const MAX_TOASTS_PER_POLL = 2;
+
 export function NotificationsBridge() {
   const toast = useToast();
   const visible = usePageVisibility();
   const { environmentId } = useEnvironmentRoute();
 
-  const seenRef = useRef<Set<string>>(new Set());
+  const seenByEnvRef = useRef<Map<string, Set<string>>>(new Map());
+  const initializedEnvsRef = useRef<Set<string>>(new Set());
+  const baselineTimeByEnvRef = useRef<Map<string, number>>(new Map());
 
   const query = useQuery({
     queryKey: ["notifications", environmentId, "in-app", "latest"],
@@ -20,24 +24,64 @@ export function NotificationsBridge() {
   });
 
   useEffect(() => {
-    const items = query.data?.items ?? [];
-    if (items.length === 0) return;
+    if (!query.isSuccess || !query.data) return;
 
-    const now = Date.now();
+    const items = query.data.items ?? [];
+    let seenSet = seenByEnvRef.current.get(environmentId);
+    if (!seenSet) {
+      seenSet = new Set<string>();
+      seenByEnvRef.current.set(environmentId, seenSet);
+    }
+
+    const maxItemEpoch = items.reduce((max, item) => {
+      const parsed = Date.parse(item.createdAt);
+      return Number.isFinite(parsed) && parsed > max ? parsed : max;
+    }, Date.now());
+
+    // Na primeira carga de cada ambiente, apenas indexamos o histórico existente
+    // sem disparar toasts na tela ao navegar entre ambientes.
+    if (!initializedEnvsRef.current.has(environmentId)) {
+      for (const item of items) {
+        seenSet.add(item.id);
+      }
+      initializedEnvsRef.current.add(environmentId);
+      baselineTimeByEnvRef.current.set(environmentId, maxItemEpoch);
+      return;
+    }
+
+    const baselineEpoch = baselineTimeByEnvRef.current.get(environmentId) ?? 0;
+    const freshUnread = [];
 
     for (const item of items) {
-      if (seenRef.current.has(item.id)) continue;
-      seenRef.current.add(item.id);
+      if (seenSet.has(item.id)) continue;
+      seenSet.add(item.id);
 
-      // No primeiro carregamento, só mostra itens recentes para evitar spam histórico.
+      if (item.readAt) continue;
+
       const createdAt = Date.parse(item.createdAt);
-      const isRecent = Number.isFinite(createdAt) ? now - createdAt <= 2 * 60 * 1000 : false;
-      if (!isRecent && seenRef.current.size <= items.length) continue;
+      // Ignora itens antigos que apenas entraram na janela de 25 após exclusão de outros
+      if (Number.isFinite(createdAt) && createdAt < baselineEpoch - 5_000) {
+        continue;
+      }
 
+      freshUnread.push(item);
+    }
+
+    if (maxItemEpoch > baselineEpoch) {
+      baselineTimeByEnvRef.current.set(environmentId, maxItemEpoch);
+    }
+
+    if (freshUnread.length === 0) return;
+
+    const toDisplay = freshUnread
+      .slice(0, MAX_TOASTS_PER_POLL)
+      .reverse();
+
+    for (const item of toDisplay) {
       if (item.level === "error") toast.error(item.message, item.title);
       else toast.success(item.message, item.title);
     }
-  }, [query.data, toast]);
+  }, [environmentId, query.data, query.isSuccess, toast]);
 
   return null;
 }

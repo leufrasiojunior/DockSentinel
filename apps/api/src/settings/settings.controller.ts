@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Post, Put } from '@nestjs/common';
+import { Body, Controller, Delete, Get, Param, Post, Put } from '@nestjs/common';
 import { SettingsService } from './settings.service';
 import { UpdateSettingsDto } from './dto/update-settings.dto';
 import {
@@ -11,6 +11,11 @@ import {
 import { SafeSettingsDto } from './dto/safe-settings.dto';
 import { OkResponseDto } from '../common/dto/ok-response.dto';
 import { SmtpTestDto } from './dto/smtp-test.dto';
+import {
+  CreateRegistryCredentialDto,
+  SafeRegistryCredentialDto,
+  UpdateRegistryCredentialDto,
+} from './dto/registry-credential.dto';
 
 /**
  * /settings:
@@ -59,5 +64,50 @@ export class SettingsController {
   @ApiBadRequestResponse({ description: 'Configuração SMTP inválida.' })
   async testSmtp(@Body() dto?: SmtpTestDto) {
     return this.settings.testSmtp(dto);
+  }
+
+  @Get('registries')
+  @ApiOperation({ summary: 'Listar credenciais de registries configuradas' })
+  @ApiOkResponse({
+    description: 'Lista de credenciais (sem senha em texto claro).',
+    type: [SafeRegistryCredentialDto],
+  })
+  async listRegistries() {
+    return this.settings.listRegistries();
+  }
+
+  @Post('registries')
+  @ApiOperation({ summary: 'Cadastrar nova credencial de registry' })
+  @ApiBody({ type: CreateRegistryCredentialDto })
+  @ApiOkResponse({
+    description: 'Credencial criada.',
+    type: SafeRegistryCredentialDto,
+  })
+  async createRegistry(@Body() dto: CreateRegistryCredentialDto) {
+    return this.settings.createRegistry(dto);
+  }
+
+  @Put('registries/:id')
+  @ApiOperation({ summary: 'Atualizar credencial de registry' })
+  @ApiBody({ type: UpdateRegistryCredentialDto })
+  @ApiOkResponse({
+    description: 'Credencial atualizada.',
+    type: SafeRegistryCredentialDto,
+  })
+  async updateRegistry(
+    @Param('id') id: string,
+    @Body() dto: UpdateRegistryCredentialDto,
+  ) {
+    return this.settings.updateRegistry(id, dto);
+  }
+
+  @Delete('registries/:id')
+  @ApiOperation({ summary: 'Remover credencial de registry' })
+  @ApiOkResponse({
+    description: 'Credencial removida.',
+    type: OkResponseDto,
+  })
+  async deleteRegistry(@Param('id') id: string) {
+    return this.settings.deleteRegistry(id);
   }
 }

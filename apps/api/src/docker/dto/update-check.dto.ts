@@ -40,7 +40,9 @@ export class ContainerUpdateCheckDto {
   @ApiProperty({
     description: 'Motivo/resumo do resultado da checagem',
     enum: [
+      'local_only',
       'registry_auth_required',
+      'registry_rate_limited',
       'remote_digest_error',
       'remote_digest_not_found',
       'local_image_missing',
@@ -51,7 +53,9 @@ export class ContainerUpdateCheckDto {
     example: 'ok',
   })
   reason!:
+    | 'local_only'
     | 'registry_auth_required'
+    | 'registry_rate_limited'
     | 'remote_digest_error'
     | 'remote_digest_not_found'
     | 'local_image_missing'

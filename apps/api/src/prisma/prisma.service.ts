@@ -32,6 +32,29 @@ export class PrismaService implements OnModuleInit, OnModuleDestroy {
 
   async onModuleInit() {
     await this.client.$connect()
+    await this.ensureRegistryCredentialTable()
+  }
+
+  private async ensureRegistryCredentialTable() {
+    try {
+      await this.client.$executeRawUnsafe(`
+        CREATE TABLE IF NOT EXISTS "RegistryCredential" (
+          "id" TEXT NOT NULL PRIMARY KEY,
+          "name" TEXT NOT NULL,
+          "serverAddress" TEXT NOT NULL,
+          "username" TEXT NOT NULL,
+          "passwordEnc" TEXT NOT NULL,
+          "enabled" BOOLEAN NOT NULL DEFAULT true,
+          "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+          "updatedAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
+        );
+      `)
+      await this.client.$executeRawUnsafe(`
+        CREATE UNIQUE INDEX IF NOT EXISTS "RegistryCredential_serverAddress_key" ON "RegistryCredential"("serverAddress");
+      `)
+    } catch {
+      // Ignora em bancos somente-leitura ou mocks
+    }
   }
 
   async onModuleDestroy() {

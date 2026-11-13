@@ -4,13 +4,16 @@ import {
   Injectable,
   Logger,
   NotFoundException,
+  Optional,
 } from "@nestjs/common"
 import { CryptoService } from "../crypto/crypto.service"
+import { encodeAgentRegistryAuthHeader } from "../docker/registry-auth.util"
 import { LOCAL_ENVIRONMENT_ID } from "../environments/environment.constants"
 import { EnvironmentsRepository } from "../environments/environments.repository"
 import type { RecreateDto } from "../docker/dto/recreate.dto"
 import type { UpdateDto } from "../docker/dto/update.dto"
 import { t } from "../i18n/translate"
+import { SettingsService } from "../settings/settings.service"
 
 @Injectable()
 export class RemoteRuntimeClientService {
@@ -19,7 +22,15 @@ export class RemoteRuntimeClientService {
   constructor(
     private readonly environmentsRepo: EnvironmentsRepository,
     private readonly crypto: CryptoService,
+    @Optional() private readonly settings?: SettingsService,
   ) {}
+
+  private async buildRegistryAuthHeaders(): Promise<Record<string, string>> {
+    if (!this.settings) return {}
+    const entries = await this.settings.getEnabledRegistryAuthEntries()
+    const encoded = encodeAgentRegistryAuthHeader(entries)
+    return encoded ? { "X-DockSentinel-Registry-Auth": encoded } : {}
+  }
 
   async listContainers(environmentId: string) {
     return this.request(environmentId, "/agent/v1/containers")
@@ -43,30 +54,36 @@ export class RemoteRuntimeClientService {
   }
 
   async updateCheck(environmentId: string, name: string) {
+    const extraHeaders = await this.buildRegistryAuthHeaders()
     return this.request(
       environmentId,
       `/agent/v1/containers/${encodeURIComponent(name)}/update-check`,
+      { headers: extraHeaders },
     )
   }
 
   async recreateContainer(environmentId: string, name: string, body: RecreateDto) {
+    const extraHeaders = await this.buildRegistryAuthHeaders()
     return this.request(
       environmentId,
       `/agent/v1/containers/${encodeURIComponent(name)}/recreate`,
       {
         method: "POST",
         body,
+        headers: extraHeaders,
       },
     )
   }
 
   async updateContainer(environmentId: string, name: string, body: UpdateDto) {
+    const extraHeaders = await this.buildRegistryAuthHeaders()
     return this.request(
       environmentId,
       `/agent/v1/containers/${encodeURIComponent(name)}/update`,
       {
         method: "POST",
         body,
+        headers: extraHeaders,
       },
     )
   }
@@ -74,7 +91,7 @@ export class RemoteRuntimeClientService {
   private async request(
     environmentId: string,
     path: string,
-    init?: { method?: "GET" | "POST"; body?: unknown },
+    init?: { method?: "GET" | "POST"; body?: unknown; headers?: Record<string, string> },
     options?: { syncHealth?: boolean },
   ) {
     const environment = await this.environmentsRepo.findById(environmentId)
@@ -105,6 +122,7 @@ export class RemoteRuntimeClientService {
         headers: {
           Authorization: `Bearer ${token}`,
           ...(init?.body === undefined ? {} : { "Content-Type": "application/json" }),
+          ...(init?.headers ?? {}),
         },
         body: init?.body === undefined ? undefined : JSON.stringify(init.body),
       })
@@ -128,7 +146,8 @@ export class RemoteRuntimeClientService {
     if (!response.ok) {
       const errorText = await response.text().catch(() => "")
       const safeMessage = t("environment.remoteAgentHttpError", { status: response.status })
-      if (options?.syncHealth !== false) {
+      const shouldMarkOffline = response.status === 401 || response.status >= 502
+      if (options?.syncHealth !== false && shouldMarkOffline) {
         await this.environmentsRepo.updateHealth(environment.id, {
           lastError: safeMessage,
           connectivityStatus: "offline",

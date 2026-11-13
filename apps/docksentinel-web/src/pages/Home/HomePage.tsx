@@ -8,17 +8,23 @@ import {
   Power,
   PowerOff,
   RefreshCcw,
+  Search,
   ShieldAlert,
   Wifi,
   WifiOff,
 } from "lucide-react";
 import { Link } from "react-router-dom";
+import { useTranslation } from "react-i18next";
 
 import { EmptyState } from "../../components/product/empty-state";
 import { PageHeader } from "../../components/product/page-header";
 import { Badge } from "../../components/ui/badge";
 import { Button } from "../../components/ui/button";
 import { Card } from "../../components/ui/card";
+import { Input } from "../../shared/components/ui/Input";
+import { ContainerDetailsModal } from "../../features/docker/components/ContainerDetailsModal";
+import { ContainerTable } from "../../features/docker/components/ContainerTable";
+import { useUnifiedContainers } from "../../features/docker/hooks/useUnifiedContainers";
 import {
   buildEnvironmentPath,
   listEnvironmentOverview,
@@ -59,6 +65,7 @@ function Metric({
 }
 
 function EnvironmentCard({ item }: { item: EnvironmentOverview }) {
+  const { t } = useTranslation();
   const { environment, connection, containers } = item;
   const isLocal = connection.mode === "local";
   const isUp = environment.status === "online";
@@ -86,16 +93,18 @@ function EnvironmentCard({ item }: { item: EnvironmentOverview }) {
                 <div className="flex flex-wrap items-center gap-2">
                   <Badge variant={isUp ? "success" : "destructive"} className="gap-1.5">
                     <StatusIcon className="size-3.5" />
-                    {isUp ? "UP" : "DOWN"}
+                    {isUp ? t("home.statusUp") : t("home.statusDown")}
                   </Badge>
-                  <Badge variant="outline">{isLocal ? "Local" : "Remote"}</Badge>
+                  <Badge variant="outline">
+                    {isLocal ? t("home.kindLocal") : t("home.kindRemote")}
+                  </Badge>
                 </div>
               </div>
             </div>
 
             <div className="rounded-2xl border border-border/60 bg-card/80 px-3 py-2 text-right">
               <div className="text-[0.7rem] font-semibold uppercase tracking-[0.14em] text-muted-foreground">
-                Agent
+                {t("home.agentLabel")}
               </div>
               <div className="mt-1 text-sm font-medium text-foreground">
                 {environment.agentVersion ?? "—"}
@@ -104,27 +113,27 @@ function EnvironmentCard({ item }: { item: EnvironmentOverview }) {
           </div>
 
           <div className="mt-4 text-sm text-muted-foreground">
-            {isLocal ? connection.label : `Remote - ${connection.label}`}
+            {isLocal ? connection.label : `${t("home.kindRemote")} - ${connection.label}`}
           </div>
         </div>
 
         <div className="space-y-4 p-6">
           <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-            <Metric label="Containers" value={containers.total} icon={Boxes} />
-            <Metric label="On" value={containers.running} icon={Power} />
-            <Metric label="Off" value={containers.stopped} icon={PowerOff} />
-            <Metric label="Health" value={containers.healthy} icon={HeartPulse} />
+            <Metric label={t("home.metricContainers")} value={containers.total} icon={Boxes} />
+            <Metric label={t("home.metricOn")} value={containers.running} icon={Power} />
+            <Metric label={t("home.metricOff")} value={containers.stopped} icon={PowerOff} />
+            <Metric label={t("home.metricHealth")} value={containers.healthy} icon={HeartPulse} />
           </div>
 
           {!containers.available ? (
             <div className="rounded-2xl border border-destructive/20 bg-destructive/10 px-4 py-3 text-sm text-destructive">
-              Data unavailable
+              {t("home.dataUnavailable")}
             </div>
           ) : null}
         </div>
 
         <div className="flex items-center justify-between border-t border-border/60 px-6 py-4 text-sm font-medium text-foreground">
-          <span>Open dashboard</span>
+          <span>{t("home.openDashboard")}</span>
           <ArrowRight className="size-4 transition-transform duration-200 group-hover:translate-x-0.5" />
         </div>
       </Card>
@@ -133,6 +142,7 @@ function EnvironmentCard({ item }: { item: EnvironmentOverview }) {
 }
 
 export function HomePage() {
+  const { t } = useTranslation();
   const overviewQuery = useQuery({
     queryKey: ["environments", "overview"],
     queryFn: listEnvironmentOverview,
@@ -140,56 +150,155 @@ export function HomePage() {
   });
 
   const items = overviewQuery.data ?? [];
+  const unified = useUnifiedContainers(items);
 
   return (
     <div className="space-y-6">
       <PageHeader
-        eyebrow="Home"
-        title="Home"
-        description="Select an environment to connect and continue to its dashboard."
-        actions={(
+        eyebrow={t("home.eyebrow")}
+        title={t("home.title")}
+        description={t("home.description")}
+        actions={
           <Button
             type="button"
             variant="outline"
-            onClick={() => overviewQuery.refetch()}
-            disabled={overviewQuery.isFetching}
+            onClick={() => unified.refetchAll()}
+            disabled={overviewQuery.isFetching || unified.loading}
           >
             <RefreshCcw className="size-4" />
-            Reload
+            {t("common.actions.reload")}
           </Button>
-        )}
+        }
       />
 
       {overviewQuery.isError ? (
         <EmptyState
-          title="Could not load environments"
+          title={t("home.loadErrorTitle")}
           description={errorMessage(
             overviewQuery.error,
-            "The environments overview is unavailable right now.",
+            t("home.loadErrorDescription"),
           )}
           icon={ShieldAlert}
-          actions={(
+          actions={
             <Button type="button" variant="primary" onClick={() => overviewQuery.refetch()}>
-              Retry
+              {t("common.actions.retry")}
             </Button>
-          )}
+          }
         />
       ) : null}
 
       {!overviewQuery.isError && items.length === 0 ? (
         <EmptyState
-          title="No environments found"
-          description="Create or restore an environment to start using DockSentinel."
+          title={t("home.emptyTitle")}
+          description={t("home.emptyDescription")}
           icon={HousePlug}
         />
       ) : null}
 
       {!overviewQuery.isError && items.length > 0 ? (
-        <div className="grid gap-4 xl:grid-cols-2">
-          {items.map((item) => (
-            <EnvironmentCard key={item.environment.id} item={item} />
-          ))}
-        </div>
+        <>
+          <div className="grid gap-4 xl:grid-cols-2">
+            {items.map((item) => (
+              <EnvironmentCard key={item.environment.id} item={item} />
+            ))}
+          </div>
+
+          {unified.busy ? (
+            <Card className="border-primary/15 bg-primary/8 px-5 py-4">
+              <div className="text-sm font-medium text-foreground">
+                {unified.busy.progressText}
+              </div>
+            </Card>
+          ) : null}
+
+          <div className="space-y-3 pt-2">
+            <div>
+              <h2 className="text-lg font-semibold tracking-tight text-foreground">
+                {t("home.unifiedSectionTitle")}
+              </h2>
+              <p className="text-sm text-muted-foreground">
+                {t("home.unifiedSectionSubtitle")}
+              </p>
+            </div>
+
+            <ContainerTable
+              containers={unified.containers}
+              loading={unified.loading || overviewQuery.isLoading}
+              selected={unified.selected}
+              allSelected={unified.allSelected}
+              onToggleAll={unified.toggleAll}
+              onToggleOne={unified.toggleOne}
+              onDetails={unified.setDetailsKey}
+              onCheck={unified.runUpdateCheckOne}
+              onUpdate={unified.handleUpdateOne}
+              onRefetch={unified.refetchAll}
+              onCheckAll={unified.handleCheckAll}
+              onUpdateSelected={unified.handleUpdateSelected}
+              onScanAndUpdate={unified.handleScanAndUpdate}
+              activeDetailsId={unified.detailsKey}
+              isDetailsLoading={unified.detailsQuery.isLoading}
+              updatingNames={unified.updatingNames}
+              checks={unified.checks}
+              busy={unified.busy}
+              anySelected={unified.anySelected}
+              selectedBlockedCount={unified.selectedBlocked.length}
+              showEnvironmentColumn
+              filterSlot={
+                <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant={unified.envFilter === "all" ? "primary" : "outline"}
+                      onClick={() => unified.setEnvFilter("all")}
+                    >
+                      {t("containers.filterAllEnvironments")}
+                    </Button>
+                    {items.map((envItem) => (
+                      <Button
+                        key={envItem.environment.id}
+                        type="button"
+                        size="sm"
+                        variant={
+                          unified.envFilter === envItem.environment.id
+                            ? "primary"
+                            : "outline"
+                        }
+                        onClick={() => unified.setEnvFilter(envItem.environment.id)}
+                      >
+                        {envItem.connection.mode === "local" ? (
+                          <HousePlug className="size-3.5" />
+                        ) : (
+                          <Globe className="size-3.5" />
+                        )}
+                        {envItem.environment.name}
+                      </Button>
+                    ))}
+                  </div>
+
+                  <div className="relative w-full sm:max-w-xs">
+                    <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
+                    <Input
+                      value={unified.searchQuery}
+                      onChange={(e) => unified.setSearchQuery(e.target.value)}
+                      placeholder={t("containers.searchPlaceholder")}
+                      className="pl-9"
+                    />
+                  </div>
+                </div>
+              }
+            />
+
+            <ContainerDetailsModal
+              detailsId={unified.detailsKey}
+              onClose={() => unified.setDetailsKey(null)}
+              isLoading={unified.detailsQuery.isLoading}
+              isError={unified.detailsQuery.isError}
+              error={unified.detailsQuery.error}
+              details={unified.detailsQuery.data}
+            />
+          </div>
+        </>
       ) : null}
     </div>
   );

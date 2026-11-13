@@ -5,7 +5,6 @@ import { RecreateDto } from "../docker/dto/recreate.dto"
 import { UpdateDto, updateBodySchema } from "../docker/dto/update.dto"
 import { recreateBodySchema } from "../docker/docker.schema"
 import { EnvironmentsService } from "../environments/environments.service"
-import { NotificationsService } from "../notifications/notifications.service"
 import { RuntimeService } from "../runtime/runtime.service"
 
 @ApiTags("Environment Docker")
@@ -13,7 +12,6 @@ import { RuntimeService } from "../runtime/runtime.service"
 export class EnvironmentDockerController {
   constructor(
     private readonly runtime: RuntimeService,
-    private readonly notifications: NotificationsService,
     private readonly environments: EnvironmentsService,
   ) {}
 
@@ -45,51 +43,8 @@ export class EnvironmentDockerController {
     @Param("environmentId") environmentId: string,
     @Param("name") name: string,
   ) {
-    const environmentName =
-      await this.environments.getEnvironmentNameOrThrow(environmentId)
-
-    try {
-      const result = await this.runtime.updateCheck(environmentId, name)
-
-      if (!result.canCheckRemote) {
-        await this.notifications.emitScanError(
-          {
-            mode: "manual_check",
-            scanned: 1,
-            errors: 1,
-            container: name,
-            imageRef: result.imageRef,
-            reason: result.reason,
-            scannedImages: [`${name} => ${result.imageRef}`],
-            updateCandidates: [],
-          },
-          undefined,
-          { environmentId, environmentName },
-        )
-      } else {
-        await this.notifications.emitScanInfo(
-          {
-            mode: "manual_check",
-            scanned: 1,
-            scannedImages: [`${name} => ${result.imageRef}`],
-            updateCandidates: result.hasUpdate ? [`${name} => ${result.imageRef}`] : [],
-          },
-          undefined,
-          { environmentId, environmentName },
-        )
-      }
-
-      return result
-    } catch (error: unknown) {
-      const message = error instanceof Error ? error.message : String(error)
-      await this.notifications.emitSystemError(
-        `Falha em update-check manual: ${name} -> ${message}`,
-        { container: name },
-        undefined,
-        { environmentId, environmentName },
-      )
-      throw error
-    }
+    await this.environments.getEnvironmentNameOrThrow(environmentId)
+    return this.runtime.updateCheck(environmentId, name)
   }
 
   @Post("containers/:name/recreate")

@@ -71,3 +71,65 @@ export async function updateSettings(body: UpdateSettingsBody): Promise<unknown>
 export async function testSmtp(body?: SmtpTestBody): Promise<{ ok: boolean }> {
   return http<{ ok: boolean }>("/api/settings/smtp/test", { method: "POST", body });
 }
+
+export type RegistryCredential = {
+  id: string;
+  name: string;
+  serverAddress: string;
+  username: string;
+  hasPassword: boolean;
+  enabled: boolean;
+  createdAt: string;
+  updatedAt: string;
+};
+
+export type CreateRegistryCredentialBody = {
+  name: string;
+  serverAddress: string;
+  username: string;
+  password: string;
+  enabled?: boolean;
+};
+
+export type UpdateRegistryCredentialBody = {
+  name?: string;
+  serverAddress?: string;
+  username?: string;
+  password?: string;
+  enabled?: boolean;
+};
+
+export async function listRegistries(): Promise<RegistryCredential[]> {
+  return http<RegistryCredential[]>("/api/settings/registries");
+}
+
+export async function createRegistry(
+  body: CreateRegistryCredentialBody,
+): Promise<RegistryCredential> {
+  return http<RegistryCredential>("/api/settings/registries", {
+    method: "POST",
+    body,
+  });
+}
+
+export async function updateRegistry(
+  id: string,
+  body: UpdateRegistryCredentialBody,
+): Promise<RegistryCredential> {
+  return http<RegistryCredential>(
+    `/api/settings/registries/${encodeURIComponent(id)}`,
+    {
+      method: "PUT",
+      body,
+    },
+  );
+}
+
+export async function deleteRegistry(id: string): Promise<{ ok: boolean }> {
+  return http<{ ok: boolean }>(
+    `/api/settings/registries/${encodeURIComponent(id)}`,
+    {
+      method: "DELETE",
+    },
+  );
+}

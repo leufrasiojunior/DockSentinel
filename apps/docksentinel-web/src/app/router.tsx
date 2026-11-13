@@ -34,6 +34,7 @@ export const router = createBrowserRouter([
       { path: "environments/:environmentId/notifications", element: <NotificationsPage /> },
       { path: "settings", element: <SettingsPage /> },
       { path: "settings/notifications", element: <SettingsPage /> },
+      { path: "settings/registries", element: <SettingsPage /> },
       { path: "settings/environments", element: <SettingsPage /> },
 
       // compatibilidade local legada

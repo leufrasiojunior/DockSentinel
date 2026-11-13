@@ -225,4 +225,44 @@ describe("Backend sanitization (e2e)", () => {
 
     expect(status.body).toEqual(legacyStatus.body)
   })
+
+  it("manages encrypted registry credentials without exposing plaintext passwords", async () => {
+    const createRes = await request(app.getHttpServer())
+      .post("/settings/registries")
+      .send({
+        name: "Docker Hub",
+        serverAddress: "https://index.docker.io/v1/",
+        username: "testuser",
+        password: "dckr_pat_secret_123",
+        enabled: true,
+      })
+      .expect(201)
+
+    expect(createRes.body).toMatchObject({
+      name: "Docker Hub",
+      serverAddress: "index.docker.io",
+      username: "testuser",
+      hasPassword: true,
+      enabled: true,
+    })
+    expect(createRes.body.password).toBeUndefined()
+    expect(createRes.body.passwordEnc).toBeUndefined()
+
+    const listRes = await request(app.getHttpServer())
+      .get("/settings/registries")
+      .expect(200)
+
+    expect(listRes.body).toHaveLength(1)
+    expect(listRes.body[0].id).toBe(createRes.body.id)
+
+    await request(app.getHttpServer())
+      .delete(`/settings/registries/${createRes.body.id}`)
+      .expect(200)
+
+    const emptyRes = await request(app.getHttpServer())
+      .get("/settings/registries")
+      .expect(200)
+
+    expect(emptyRes.body).toEqual([])
+  })
 })

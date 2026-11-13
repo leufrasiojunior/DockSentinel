@@ -1,4 +1,4 @@
-import { Boxes, LockKeyhole, Mail, ShieldAlert } from "lucide-react";
+import { Boxes, KeyRound, LockKeyhole, Mail, ShieldAlert } from "lucide-react";
 import { useMemo } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { useTranslation } from "react-i18next";
@@ -7,11 +7,12 @@ import { EmptyState } from "../../components/product/empty-state";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "../../components/ui/tabs";
 import { AuthSettings } from "../../features/settings/components/AuthSettings";
 import { NotificationSettings } from "../../features/settings/components/NotificationSettings";
+import { RegistrySettings } from "../../features/settings/components/RegistrySettings";
 import { useSettings } from "../../features/settings/hooks/useSettings";
 import { useConfirm } from "../../shared/components/ui/ConfirmProvider";
 import { EnvironmentsPage } from "../Environments/EnvironmentsPage";
 
-type SettingsTab = "auth" | "notifications" | "environments";
+type SettingsTab = "auth" | "notifications" | "registries" | "environments";
 
 export function SettingsPage() {
   const { t } = useTranslation();
@@ -65,6 +66,7 @@ export function SettingsPage() {
 
   const activeTab = useMemo<SettingsTab>(() => {
     if (location.pathname.startsWith("/settings/environments")) return "environments";
+    if (location.pathname.startsWith("/settings/registries")) return "registries";
     if (location.pathname.startsWith("/settings/notifications")) return "notifications";
     return "auth";
   }, [location.pathname]);
@@ -140,6 +142,10 @@ export function SettingsPage() {
               <Mail className="size-4" />
               {t("settings.tabs.notifications")}
             </TabsTrigger>
+            <TabsTrigger value="registries">
+              <KeyRound className="size-4" />
+              {t("settings.tabs.registries")}
+            </TabsTrigger>
             <TabsTrigger value="environments">
               <Boxes className="size-4" />
               {t("settings.tabs.environments")}
@@ -199,6 +205,10 @@ export function SettingsPage() {
               onTestSmtp={() => smtpTestMutation.mutate(undefined)}
               isTestingSmtp={smtpTestMutation.isPending}
             />
+          </TabsContent>
+
+          <TabsContent value="registries">
+            <RegistrySettings />
           </TabsContent>
 
           <TabsContent value="environments">
