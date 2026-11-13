@@ -1,4 +1,8 @@
-import { SettingsService } from "./settings.service"
+import {
+  SettingsService,
+  cleanSemverString,
+  isNewerSemver,
+} from "./settings.service"
 import { CryptoService } from "../crypto/crypto.service"
 import type { SettingsRepository, SettingsPatch } from "./settings.repository"
 import type { ConfigService } from "@nestjs/config"
@@ -133,5 +137,17 @@ describe("SettingsService (unit)", () => {
     expect(locale).toBe("en-US")
     expect(svc.getCachedDefaultLocale()).toBe("en-US")
     expect(repo.get).toHaveBeenCalledTimes(1)
+  })
+
+  it("should clean and compare semver versions accurately", () => {
+    expect(cleanSemverString("v1.2.3")).toBe("1.2.3")
+    expect(cleanSemverString("1.2.3")).toBe("1.2.3")
+    expect(cleanSemverString("invalid")).toBeNull()
+
+    expect(isNewerSemver("0.1.0", "0.2.0")).toBe(true)
+    expect(isNewerSemver("v1.0.3", "v1.0.4")).toBe(true)
+    expect(isNewerSemver("1.1.0", "1.1.0")).toBe(false)
+    expect(isNewerSemver("1.2.0", "1.1.9")).toBe(false)
+    expect(isNewerSemver("1.0.0", null)).toBe(false)
   })
 })

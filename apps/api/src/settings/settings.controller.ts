@@ -1,4 +1,4 @@
-import { Body, Controller, Delete, Get, Param, Post, Put } from '@nestjs/common';
+import { Body, Controller, Delete, Get, Param, Post, Put, Query } from '@nestjs/common';
 import { SettingsService } from './settings.service';
 import { UpdateSettingsDto } from './dto/update-settings.dto';
 import {
@@ -109,5 +109,14 @@ export class SettingsController {
   })
   async deleteRegistry(@Param('id') id: string) {
     return this.settings.deleteRegistry(id);
+  }
+
+  @Get('version-check')
+  @ApiOperation({
+    summary: 'Verificar novas versões do DockSentinel e do DockSentinelAgent no GitHub',
+  })
+  async checkSystemVersions(@Query('refresh') refresh?: string) {
+    const forceRefresh = refresh === 'true' || refresh === '1';
+    return this.settings.checkSystemVersions(forceRefresh);
   }
 }

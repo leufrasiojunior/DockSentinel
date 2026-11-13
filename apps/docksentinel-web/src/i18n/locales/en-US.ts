@@ -810,4 +810,17 @@ export const translationEnUs = {
     dataUnavailable: "Data unavailable",
     openDashboard: "Open environment dashboard",
   },
+  updatesCheck: {
+    checkNow: "Check for version updates",
+    checking: "Checking...",
+    upToDate: "Up to date",
+    upToDateToast: "DockSentinel v{{version}} is up to date.",
+    newServerVersionToast: "New DockSentinel version available: v{{version}}",
+    newServerVersionBanner: "New version available: v{{version}}",
+    viewRelease: "View release on GitHub",
+    updateAvailableBadge: "Update: v{{version}}",
+    agentOutdatedBadge: "Agent update: v{{version}}",
+    copyAgentUpdateCommand: "Copy Agent update command",
+    agentUpdateCommandCopied: "Agent update command copied.",
+  },
 } as const;

@@ -31,6 +31,11 @@ import {
   type EnvironmentOverview,
 } from "../../features/environments/api/environments";
 import { writeStoredEnvironmentId } from "../../features/environments/hooks/useEnvironmentRoute";
+import {
+  isAgentOutdated,
+  type SystemVersionCheck,
+} from "../../features/settings/api/settings";
+import { useVersionCheck } from "../../features/settings/hooks/useVersionCheck";
 
 function errorMessage(error: unknown, fallback: string) {
   if (typeof error === "object" && error !== null && "message" in error) {
@@ -64,7 +69,13 @@ function Metric({
   );
 }
 
-function EnvironmentCard({ item }: { item: EnvironmentOverview }) {
+function EnvironmentCard({
+  item,
+  versionCheck,
+}: {
+  item: EnvironmentOverview;
+  versionCheck: SystemVersionCheck | null;
+}) {
   const { t } = useTranslation();
   const { environment, connection, containers } = item;
   const isLocal = connection.mode === "local";
@@ -72,6 +83,13 @@ function EnvironmentCard({ item }: { item: EnvironmentOverview }) {
   const destination = buildEnvironmentPath(environment.id, "dashboard");
   const EnvironmentIcon = isLocal ? HousePlug : Globe;
   const StatusIcon = isUp ? Wifi : WifiOff;
+  const latestAvailable = isLocal
+    ? versionCheck?.server.hasUpdate
+      ? versionCheck.server.latestVersion
+      : null
+    : isAgentOutdated(environment.agentVersion, versionCheck?.agent.latestVersion)
+      ? versionCheck?.agent.latestVersion ?? null
+      : null;
 
   return (
     <Link
@@ -106,8 +124,17 @@ function EnvironmentCard({ item }: { item: EnvironmentOverview }) {
               <div className="text-[0.7rem] font-semibold uppercase tracking-[0.14em] text-muted-foreground">
                 {t("home.agentLabel")}
               </div>
-              <div className="mt-1 text-sm font-medium text-foreground">
-                {environment.agentVersion ?? "—"}
+              <div className="mt-1 flex flex-col items-end gap-1">
+                <span className="text-sm font-medium text-foreground">
+                  {environment.agentVersion ?? "—"}
+                </span>
+                {latestAvailable ? (
+                  <Badge variant="warning" className="text-[0.65rem] px-2 py-0.5">
+                    {t("updatesCheck.updateAvailableBadge", {
+                      version: latestAvailable,
+                    })}
+                  </Badge>
+                ) : null}
               </div>
             </div>
           </div>
@@ -151,6 +178,7 @@ export function HomePage() {
 
   const items = overviewQuery.data ?? [];
   const unified = useUnifiedContainers(items);
+  const { versionCheck } = useVersionCheck();
 
   return (
     <div className="space-y-6">
@@ -199,7 +227,11 @@ export function HomePage() {
         <>
           <div className="grid gap-4 xl:grid-cols-2">
             {items.map((item) => (
-              <EnvironmentCard key={item.environment.id} item={item} />
+              <EnvironmentCard
+                key={item.environment.id}
+                item={item}
+                versionCheck={versionCheck}
+              />
             ))}
           </div>
 

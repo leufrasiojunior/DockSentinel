@@ -817,4 +817,17 @@ export const translationPtBr = {
     dataUnavailable: "Dados indisponíveis",
     openDashboard: "Abrir painel do ambiente",
   },
+  updatesCheck: {
+    checkNow: "Verificar atualizações de versão",
+    checking: "Verificando...",
+    upToDate: "Atualizado",
+    upToDateToast: "DockSentinel v{{version}} está na versão mais recente.",
+    newServerVersionToast: "Nova versão do DockSentinel disponível: v{{version}}",
+    newServerVersionBanner: "Nova versão disponível: v{{version}}",
+    viewRelease: "Ver release no GitHub",
+    updateAvailableBadge: "Update: v{{version}}",
+    agentOutdatedBadge: "Update do Agent: v{{version}}",
+    copyAgentUpdateCommand: "Copiar comando de update do Agent",
+    agentUpdateCommandCopied: "Comando de atualização do Agent copiado.",
+  },
 } as const;

@@ -1,5 +1,7 @@
 import { BadRequestException, Injectable, Logger, NotFoundException } from "@nestjs/common"
 import * as argon2 from "argon2"
+import { readFileSync } from "node:fs"
+import { resolve } from "node:path"
 import { SettingsRepository, type RegistryCredentialRow } from "./settings.repository"
 import { CryptoService } from "../crypto/crypto.service"
 import type { UpdateSettingsDto } from "./dto/update-settings.dto"
@@ -25,6 +27,56 @@ const isAuthMode = (value: unknown): value is AuthMode =>
 const isAppLocale = (value: unknown): value is AppLocale =>
   value === "pt-BR" || value === "en-US"
 
+const VERSION_CHECK_CACHE_TTL_MS = 15 * 60 * 1000
+const SERVER_GITHUB_REPO = "leufrasiojunior/DockSentinel"
+const AGENT_GITHUB_REPO = "leufrasiojunior/DockSentinelAgent"
+const AGENT_UPDATE_COMMAND =
+  "docker pull leufrasiojunior/docksentinelagent:latest && docker rm -f docksentinel-agent >/dev/null 2>&1 || true && docker run -d --name docksentinel-agent --restart unless-stopped -p 45873:45873 -e PORT=45873 -v /var/run/docker.sock:/var/run/docker.sock -v /opt/docksentinel-agent:/var/lib/docksentinel-agent leufrasiojunior/docksentinelagent:latest"
+
+export type SystemVersionCheckResult = {
+  checkedAt: string
+  server: {
+    currentVersion: string
+    latestVersion: string | null
+    hasUpdate: boolean
+    releaseUrl: string
+  }
+  agent: {
+    latestVersion: string | null
+    releaseUrl: string
+    updateCommand: string
+  }
+}
+
+export function cleanSemverString(raw?: string | null): string | null {
+  if (!raw || typeof raw !== "string") return null
+  const cleaned = raw.trim().replace(/^v/i, "")
+  if (!/^\d+\.\d+\.\d+/.test(cleaned)) return null
+  return cleaned
+}
+
+export function isNewerSemver(
+  currentRaw?: string | null,
+  latestRaw?: string | null,
+): boolean {
+  const current = cleanSemverString(currentRaw)
+  const latest = cleanSemverString(latestRaw)
+  if (!current || !latest) return false
+
+  const curMatch = current.match(/^(\d+)\.(\d+)\.(\d+)/)
+  const latMatch = latest.match(/^(\d+)\.(\d+)\.(\d+)/)
+  if (!curMatch || !latMatch) return false
+
+  const curParts = [Number(curMatch[1]), Number(curMatch[2]), Number(curMatch[3])]
+  const latParts = [Number(latMatch[1]), Number(latMatch[2]), Number(latMatch[3])]
+
+  for (let i = 0; i < 3; i++) {
+    if (latParts[i] > curParts[i]) return true
+    if (latParts[i] < curParts[i]) return false
+  }
+  return false
+}
+
 /**
  * SettingsService:
  * - fonte da verdade das configs globais (DB)
@@ -35,6 +87,10 @@ export class SettingsService {
   private readonly logger = new Logger(SettingsService.name)
   private defaultLocaleCache: AppLocale = DEFAULT_LOCALE
   private defaultLocaleInitialized = false
+  private versionCheckCache: {
+    data: SystemVersionCheckResult
+    expiresAt: number
+  } | null = null
 
   constructor(
     private readonly repo: SettingsRepository,
@@ -459,5 +515,133 @@ export class SettingsService {
     } catch {
       return []
     }
+  }
+
+  private resolveCurrentServerVersion(): string {
+    const envVersion = process.env.APP_VERSION?.trim()
+    if (envVersion && envVersion !== "dev") {
+      return envVersion.replace(/^v/i, "")
+    }
+
+    const candidates = [
+      resolve(process.cwd(), "../../package.json"),
+      resolve(process.cwd(), "package.json"),
+    ]
+    for (const candidate of candidates) {
+      try {
+        const parsed = JSON.parse(readFileSync(candidate, "utf8")) as {
+          name?: string
+          version?: string
+        }
+        if (
+          parsed?.version &&
+          parsed.version !== "0.0.1" &&
+          parsed.version !== "0.0.0"
+        ) {
+          return parsed.version.trim().replace(/^v/i, "")
+        }
+      } catch {
+        // continua tentando
+      }
+    }
+
+    return process.env.npm_package_version?.trim() || "dev"
+  }
+
+  private async fetchGithubLatestRelease(repo: string): Promise<{
+    latestVersion: string | null
+    releaseUrl: string
+  }> {
+    const defaultUrl = `https://github.com/${repo}/releases`
+    const headers = {
+      Accept: "application/vnd.github+json",
+      "User-Agent": "DockSentinel-UpdateChecker",
+    }
+
+    try {
+      const response = await fetch(
+        `https://api.github.com/repos/${repo}/releases/latest`,
+        {
+          headers,
+          signal: AbortSignal.timeout(5000),
+        },
+      )
+
+      if (response.ok) {
+        const body = (await response.json()) as {
+          tag_name?: string
+          html_url?: string
+        }
+        return {
+          latestVersion: cleanSemverString(body.tag_name),
+          releaseUrl: body.html_url || defaultUrl,
+        }
+      }
+
+      if (response.status === 404) {
+        const tagsRes = await fetch(
+          `https://api.github.com/repos/${repo}/tags?per_page=1`,
+          {
+            headers,
+            signal: AbortSignal.timeout(5000),
+          },
+        )
+        if (tagsRes.ok) {
+          const tags = (await tagsRes.json()) as Array<{ name?: string }>
+          const latestTag = tags[0]?.name
+          return {
+            latestVersion: cleanSemverString(latestTag),
+            releaseUrl: latestTag
+              ? `https://github.com/${repo}/releases/tag/${latestTag}`
+              : defaultUrl,
+          }
+        }
+      }
+    } catch (error: unknown) {
+      this.logger.debug(
+        `Failed to fetch GitHub release for ${repo}: ${error instanceof Error ? error.message : String(error)}`,
+      )
+    }
+
+    return { latestVersion: null, releaseUrl: defaultUrl }
+  }
+
+  async checkSystemVersions(forceRefresh = false): Promise<SystemVersionCheckResult> {
+    const now = Date.now()
+    if (
+      !forceRefresh &&
+      this.versionCheckCache &&
+      this.versionCheckCache.expiresAt > now
+    ) {
+      return this.versionCheckCache.data
+    }
+
+    const currentServerVersion = this.resolveCurrentServerVersion()
+    const [serverRelease, agentRelease] = await Promise.all([
+      this.fetchGithubLatestRelease(SERVER_GITHUB_REPO),
+      this.fetchGithubLatestRelease(AGENT_GITHUB_REPO),
+    ])
+
+    const result: SystemVersionCheckResult = {
+      checkedAt: new Date().toISOString(),
+      server: {
+        currentVersion: currentServerVersion,
+        latestVersion: serverRelease.latestVersion,
+        hasUpdate: isNewerSemver(currentServerVersion, serverRelease.latestVersion),
+        releaseUrl: serverRelease.releaseUrl,
+      },
+      agent: {
+        latestVersion: agentRelease.latestVersion,
+        releaseUrl: agentRelease.releaseUrl,
+        updateCommand: AGENT_UPDATE_COMMAND,
+      },
+    }
+
+    this.versionCheckCache = {
+      data: result,
+      expiresAt: Date.now() + VERSION_CHECK_CACHE_TTL_MS,
+    }
+
+    return result
   }
 }

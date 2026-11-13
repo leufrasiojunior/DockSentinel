@@ -133,3 +133,54 @@ export async function deleteRegistry(id: string): Promise<{ ok: boolean }> {
     },
   );
 }
+
+export type SystemVersionCheck = {
+  checkedAt: string;
+  server: {
+    currentVersion: string;
+    latestVersion: string | null;
+    hasUpdate: boolean;
+    releaseUrl: string;
+  };
+  agent: {
+    latestVersion: string | null;
+    releaseUrl: string;
+    updateCommand: string;
+  };
+};
+
+export async function getSystemVersionCheck(
+  refresh = false,
+): Promise<SystemVersionCheck> {
+  return http<SystemVersionCheck>(
+    `/api/settings/version-check${refresh ? "?refresh=true" : ""}`,
+  );
+}
+
+function cleanSemver(raw?: string | null): string | null {
+  if (!raw || typeof raw !== "string") return null;
+  const cleaned = raw.trim().replace(/^v/i, "");
+  return /^\d+\.\d+\.\d+/.test(cleaned) ? cleaned : null;
+}
+
+export function isAgentOutdated(
+  currentVersion?: string | null,
+  latestVersion?: string | null,
+): boolean {
+  const cur = cleanSemver(currentVersion);
+  const lat = cleanSemver(latestVersion);
+  if (!cur || !lat || cur === lat) return false;
+
+  const parse = (v: string) =>
+    v
+      .split("-")[0]
+      .split(".")
+      .map((part) => Number.parseInt(part, 10) || 0);
+
+  const [cMaj = 0, cMin = 0, cPat = 0] = parse(cur);
+  const [lMaj = 0, lMin = 0, lPat = 0] = parse(lat);
+
+  if (lMaj !== cMaj) return lMaj > cMaj;
+  if (lMin !== cMin) return lMin > cMin;
+  return lPat > cPat;
+}
