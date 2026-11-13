@@ -10,20 +10,24 @@ import { NavLink, Outlet, useLocation, useNavigate } from "react-router-dom";
 import { useQueryClient } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
 import {
+  ArrowUpCircle,
   Bell,
   ChevronLeft,
   ChevronRight,
   Clock3,
+  ExternalLink,
   House,
   LayoutDashboard,
   LogOut,
   Menu,
+  RefreshCw,
   Settings2,
   TerminalSquare,
   type LucideIcon,
 } from "lucide-react";
 
 import { logout } from "../features/auth/api/auth";
+import { useVersionCheck } from "../features/settings/hooks/useVersionCheck";
 import { NotificationCenter } from "../features/notifications/components/NotificationCenter";
 import { Button } from "../components/ui/button";
 import {
@@ -117,6 +121,10 @@ function SidebarContent({
   navItems: NavItem[];
 }) {
   const { t } = useTranslation();
+  const { versionCheck, isRefreshing, refreshVersions } = useVersionCheck();
+  const hasServerUpdate = Boolean(
+    versionCheck?.server.hasUpdate && versionCheck.server.latestVersion,
+  );
 
   return (
     <>
@@ -160,18 +168,65 @@ function SidebarContent({
 
       <div className="mt-auto px-5 py-6">
         {!isCollapsed ? (
-          <div className="mb-4 border-white/8 p-4 text-sm text-sidebar-foreground/72">
-            <p className="mt-2 text-xs leading-relaxed text-sidebar-foreground/55">
-              {t("navigation.projectBlurb", { version: APP_VERSION })}{" "}
+          <div className="mb-4 space-y-2.5 border-white/8 p-3 text-sm text-sidebar-foreground/72">
+            {hasServerUpdate && versionCheck?.server.latestVersion ? (
               <a
-                href="https://github.com/leufrasiojunior/DockSentinel"
+                href={versionCheck.server.releaseUrl}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="text-primary hover:underline"
+                className="flex items-center justify-between gap-2 rounded-xl border border-amber-500/40 bg-amber-500/15 px-3 py-2 text-xs font-medium text-amber-300 transition-colors hover:bg-amber-500/25"
               >
-                GitHub
+                <span className="flex items-center gap-1.5 truncate">
+                  <ArrowUpCircle className="size-4 shrink-0 text-amber-400" />
+                  <span className="truncate">
+                    {t("updatesCheck.newServerVersionBanner", {
+                      version: versionCheck.server.latestVersion,
+                    })}
+                  </span>
+                </span>
+                <ExternalLink className="size-3.5 shrink-0 opacity-80" />
               </a>
-            </p>
+            ) : null}
+
+            <div className="flex items-start justify-between gap-2">
+              <p className="text-xs leading-relaxed text-sidebar-foreground/55">
+                {t("navigation.projectBlurb", { version: APP_VERSION })}{" "}
+                <a
+                  href="https://github.com/leufrasiojunior/DockSentinel"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-primary hover:underline"
+                >
+                  GitHub
+                </a>
+              </p>
+
+              <button
+                type="button"
+                onClick={() => refreshVersions()}
+                disabled={isRefreshing}
+                title={t("updatesCheck.checkNow")}
+                className="mt-0.5 flex size-6 shrink-0 items-center justify-center rounded-lg border border-white/10 bg-white/5 text-sidebar-foreground/70 transition-colors hover:bg-white/10 hover:text-sidebar-foreground disabled:opacity-50"
+              >
+                <RefreshCw
+                  className={cn("size-3.5", isRefreshing && "animate-spin")}
+                />
+              </button>
+            </div>
+          </div>
+        ) : hasServerUpdate && versionCheck?.server.latestVersion ? (
+          <div className="mb-3 flex justify-center">
+            <a
+              href={versionCheck.server.releaseUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              title={t("updatesCheck.newServerVersionBanner", {
+                version: versionCheck.server.latestVersion,
+              })}
+              className="flex size-10 items-center justify-center rounded-2xl border border-amber-500/40 bg-amber-500/15 text-amber-300 transition-colors hover:bg-amber-500/25"
+            >
+              <ArrowUpCircle className="size-4.5" />
+            </a>
           </div>
         ) : null}
 

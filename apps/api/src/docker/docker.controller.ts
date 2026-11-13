@@ -33,7 +33,6 @@ import {
   UpdateContainerNoopDto,
   UpdateContainerResultDto,
 } from './dto/update-result.dto';
-import { NotificationsService } from '../notifications/notifications.service';
 import { DockerOperationsService } from './docker-operations.service';
 
 @ApiTags('Docker')
@@ -50,7 +49,6 @@ export class DockerController {
   constructor(
     private readonly DockerService: DockerService,
     private readonly operations: DockerOperationsService,
-    private readonly notifications: NotificationsService,
   ) {}
 
   @Get('containers')
@@ -134,36 +132,7 @@ export class DockerController {
   })
   @ApiNotFoundResponse({ description: 'Container não encontrado.' })
   async updateCheck(@Param('name') name: string) {
-    try {
-      const result = await this.operations.updateCheck(name);
-      if (!result.canCheckRemote) {
-        await this.notifications.emitScanError({
-          mode: 'manual_check',
-          scanned: 1,
-          errors: 1,
-          container: name,
-          imageRef: result.imageRef,
-          reason: 'remote_digest_not_found',
-          scannedImages: [`${name} => ${result.imageRef}`],
-          updateCandidates: [],
-        });
-      }
-
-      await this.notifications.emitScanInfo({
-        mode: 'manual_check',
-        scanned: 1,
-        scannedImages: [`${name} => ${result.imageRef}`],
-        updateCandidates: result.hasUpdate ? [`${name} => ${result.imageRef}`] : [],
-      });
-
-      return result;
-    } catch (err: unknown) {
-      const msg = err instanceof Error ? err.message : String(err);
-      await this.notifications.emitSystemError(`Falha em update-check manual: ${name} -> ${msg}`, {
-        container: name,
-      });
-      throw err;
-    }
+    return this.operations.updateCheck(name);
   }
 
   @Post('containers/:name/update')

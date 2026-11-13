@@ -1,20 +1,81 @@
-import { BadRequestException, Injectable, Logger } from "@nestjs/common"
+import { BadRequestException, Injectable, Logger, NotFoundException } from "@nestjs/common"
 import * as argon2 from "argon2"
-import { SettingsRepository } from "./settings.repository"
+import { readFileSync } from "node:fs"
+import { resolve } from "node:path"
+import { SettingsRepository, type RegistryCredentialRow } from "./settings.repository"
 import { CryptoService } from "../crypto/crypto.service"
 import type { UpdateSettingsDto } from "./dto/update-settings.dto"
+import type {
+  CreateRegistryCredentialDto,
+  SafeRegistryCredentialDto,
+  UpdateRegistryCredentialDto,
+} from "./dto/registry-credential.dto"
 import { ConfigService } from "@nestjs/config"
 import { Env } from "../config/env.schema"
 import { MailService } from "../mail/mail.service"
 import type { SmtpTestDto } from "./dto/smtp-test.dto"
 import { DEFAULT_LOCALE, type AppLocale, normalizeLocale } from "../i18n/locale"
 import { t } from "../i18n/translate"
+import {
+  normalizeServerAddress,
+  type RegistryAuthEntry,
+} from "../docker/registry-auth.util"
 
 type AuthMode = Env["AUTH_MODE"]
 const isAuthMode = (value: unknown): value is AuthMode =>
   value === "none" || value === "password" || value === "totp" || value === "both"
 const isAppLocale = (value: unknown): value is AppLocale =>
   value === "pt-BR" || value === "en-US"
+
+const VERSION_CHECK_CACHE_TTL_MS = 15 * 60 * 1000
+const SERVER_GITHUB_REPO = "leufrasiojunior/DockSentinel"
+const AGENT_GITHUB_REPO = "leufrasiojunior/DockSentinelAgent"
+const AGENT_UPDATE_COMMAND =
+  "docker pull leufrasiojunior/docksentinelagent:latest && docker rm -f docksentinel-agent >/dev/null 2>&1 || true && docker run -d --name docksentinel-agent --restart unless-stopped -p 45873:45873 -e PORT=45873 -v /var/run/docker.sock:/var/run/docker.sock -v /opt/docksentinel-agent:/var/lib/docksentinel-agent leufrasiojunior/docksentinelagent:latest"
+
+export type SystemVersionCheckResult = {
+  checkedAt: string
+  server: {
+    currentVersion: string
+    latestVersion: string | null
+    hasUpdate: boolean
+    releaseUrl: string
+  }
+  agent: {
+    latestVersion: string | null
+    releaseUrl: string
+    updateCommand: string
+  }
+}
+
+export function cleanSemverString(raw?: string | null): string | null {
+  if (!raw || typeof raw !== "string") return null
+  const cleaned = raw.trim().replace(/^v/i, "")
+  if (!/^\d+\.\d+\.\d+/.test(cleaned)) return null
+  return cleaned
+}
+
+export function isNewerSemver(
+  currentRaw?: string | null,
+  latestRaw?: string | null,
+): boolean {
+  const current = cleanSemverString(currentRaw)
+  const latest = cleanSemverString(latestRaw)
+  if (!current || !latest) return false
+
+  const curMatch = current.match(/^(\d+)\.(\d+)\.(\d+)/)
+  const latMatch = latest.match(/^(\d+)\.(\d+)\.(\d+)/)
+  if (!curMatch || !latMatch) return false
+
+  const curParts = [Number(curMatch[1]), Number(curMatch[2]), Number(curMatch[3])]
+  const latParts = [Number(latMatch[1]), Number(latMatch[2]), Number(latMatch[3])]
+
+  for (let i = 0; i < 3; i++) {
+    if (latParts[i] > curParts[i]) return true
+    if (latParts[i] < curParts[i]) return false
+  }
+  return false
+}
 
 /**
  * SettingsService:
@@ -26,6 +87,10 @@ export class SettingsService {
   private readonly logger = new Logger(SettingsService.name)
   private defaultLocaleCache: AppLocale = DEFAULT_LOCALE
   private defaultLocaleInitialized = false
+  private versionCheckCache: {
+    data: SystemVersionCheckResult
+    expiresAt: number
+  } | null = null
 
   constructor(
     private readonly repo: SettingsRepository,
@@ -326,5 +391,257 @@ export class SettingsService {
     }
 
     return minutes
+  }
+
+  private toSafeRegistry(row: RegistryCredentialRow): SafeRegistryCredentialDto {
+    return {
+      id: row.id,
+      name: row.name,
+      serverAddress: row.serverAddress,
+      username: row.username,
+      hasPassword: Boolean(row.passwordEnc),
+      enabled: Boolean(row.enabled),
+      createdAt: row.createdAt,
+      updatedAt: row.updatedAt,
+    }
+  }
+
+  async listRegistries(): Promise<SafeRegistryCredentialDto[]> {
+    const rows = await this.repo.listRegistries()
+    return rows.map((row) => this.toSafeRegistry(row))
+  }
+
+  async createRegistry(
+    dto: CreateRegistryCredentialDto,
+  ): Promise<SafeRegistryCredentialDto> {
+    const name = dto.name?.trim()
+    const rawServer = dto.serverAddress?.trim()
+    const username = dto.username?.trim()
+    const password = dto.password?.trim()
+
+    if (!name || !rawServer || !username || !password) {
+      throw new BadRequestException("Name, serverAddress, username and password are required")
+    }
+
+    const serverAddress = normalizeServerAddress(rawServer)
+    const existing = await this.repo.findRegistryByServerAddress(serverAddress)
+    if (existing) {
+      throw new BadRequestException(`Registry credential already exists for ${serverAddress}`)
+    }
+
+    const created = await this.repo.createRegistry({
+      name,
+      serverAddress,
+      username,
+      passwordEnc: this.crypto.encrypt(password),
+      enabled: dto.enabled ?? true,
+    })
+
+    return this.toSafeRegistry(created)
+  }
+
+  async updateRegistry(
+    id: string,
+    dto: UpdateRegistryCredentialDto,
+  ): Promise<SafeRegistryCredentialDto> {
+    const current = await this.repo.findRegistryById(id)
+    if (!current) {
+      throw new NotFoundException(`Registry credential not found: ${id}`)
+    }
+
+    const name = dto.name !== undefined ? dto.name.trim() : current.name
+    const serverAddress =
+      dto.serverAddress !== undefined
+        ? normalizeServerAddress(dto.serverAddress)
+        : current.serverAddress
+    const username =
+      dto.username !== undefined ? dto.username.trim() : current.username
+    const passwordEnc =
+      dto.password && dto.password.trim().length > 0
+        ? this.crypto.encrypt(dto.password.trim())
+        : current.passwordEnc
+    const enabled =
+      typeof dto.enabled === "boolean" ? dto.enabled : Boolean(current.enabled)
+
+    if (!name || !serverAddress || !username) {
+      throw new BadRequestException("Name, serverAddress and username cannot be empty")
+    }
+
+    if (serverAddress !== current.serverAddress) {
+      const conflict = await this.repo.findRegistryByServerAddress(serverAddress)
+      if (conflict && conflict.id !== id) {
+        throw new BadRequestException(`Registry credential already exists for ${serverAddress}`)
+      }
+    }
+
+    const updated = await this.repo.updateRegistry(id, {
+      name,
+      serverAddress,
+      username,
+      passwordEnc,
+      enabled,
+    })
+
+    return this.toSafeRegistry(updated)
+  }
+
+  async deleteRegistry(id: string): Promise<{ ok: true }> {
+    const current = await this.repo.findRegistryById(id)
+    if (!current) {
+      throw new NotFoundException(`Registry credential not found: ${id}`)
+    }
+    await this.repo.deleteRegistry(id)
+    return { ok: true as const }
+  }
+
+  async getEnabledRegistryAuthEntries(): Promise<RegistryAuthEntry[]> {
+    try {
+      const rows = await this.repo.listRegistries()
+      const entries: RegistryAuthEntry[] = []
+      for (const row of rows) {
+        if (!row.enabled || !row.passwordEnc) continue
+        try {
+          const password = this.crypto.decrypt(row.passwordEnc)
+          entries.push({
+            serveraddress: row.serverAddress,
+            username: row.username,
+            password,
+          })
+        } catch (err) {
+          this.logger.warn(`Failed to decrypt registry credential ${row.serverAddress}: ${err instanceof Error ? err.message : String(err)}`)
+        }
+      }
+      return entries
+    } catch {
+      return []
+    }
+  }
+
+  private resolveCurrentServerVersion(): string {
+    const envVersion = process.env.APP_VERSION?.trim()
+    if (envVersion && envVersion !== "dev") {
+      return envVersion.replace(/^v/i, "")
+    }
+
+    const candidates = [
+      resolve(process.cwd(), "../../package.json"),
+      resolve(process.cwd(), "package.json"),
+    ]
+    for (const candidate of candidates) {
+      try {
+        const parsed = JSON.parse(readFileSync(candidate, "utf8")) as {
+          name?: string
+          version?: string
+        }
+        if (
+          parsed?.version &&
+          parsed.version !== "0.0.1" &&
+          parsed.version !== "0.0.0"
+        ) {
+          return parsed.version.trim().replace(/^v/i, "")
+        }
+      } catch {
+        // continua tentando
+      }
+    }
+
+    return process.env.npm_package_version?.trim() || "dev"
+  }
+
+  private async fetchGithubLatestRelease(repo: string): Promise<{
+    latestVersion: string | null
+    releaseUrl: string
+  }> {
+    const defaultUrl = `https://github.com/${repo}/releases`
+    const headers = {
+      Accept: "application/vnd.github+json",
+      "User-Agent": "DockSentinel-UpdateChecker",
+    }
+
+    try {
+      const response = await fetch(
+        `https://api.github.com/repos/${repo}/releases/latest`,
+        {
+          headers,
+          signal: AbortSignal.timeout(5000),
+        },
+      )
+
+      if (response.ok) {
+        const body = (await response.json()) as {
+          tag_name?: string
+          html_url?: string
+        }
+        return {
+          latestVersion: cleanSemverString(body.tag_name),
+          releaseUrl: body.html_url || defaultUrl,
+        }
+      }
+
+      if (response.status === 404) {
+        const tagsRes = await fetch(
+          `https://api.github.com/repos/${repo}/tags?per_page=1`,
+          {
+            headers,
+            signal: AbortSignal.timeout(5000),
+          },
+        )
+        if (tagsRes.ok) {
+          const tags = (await tagsRes.json()) as Array<{ name?: string }>
+          const latestTag = tags[0]?.name
+          return {
+            latestVersion: cleanSemverString(latestTag),
+            releaseUrl: latestTag
+              ? `https://github.com/${repo}/releases/tag/${latestTag}`
+              : defaultUrl,
+          }
+        }
+      }
+    } catch (error: unknown) {
+      this.logger.debug(
+        `Failed to fetch GitHub release for ${repo}: ${error instanceof Error ? error.message : String(error)}`,
+      )
+    }
+
+    return { latestVersion: null, releaseUrl: defaultUrl }
+  }
+
+  async checkSystemVersions(forceRefresh = false): Promise<SystemVersionCheckResult> {
+    const now = Date.now()
+    if (
+      !forceRefresh &&
+      this.versionCheckCache &&
+      this.versionCheckCache.expiresAt > now
+    ) {
+      return this.versionCheckCache.data
+    }
+
+    const currentServerVersion = this.resolveCurrentServerVersion()
+    const [serverRelease, agentRelease] = await Promise.all([
+      this.fetchGithubLatestRelease(SERVER_GITHUB_REPO),
+      this.fetchGithubLatestRelease(AGENT_GITHUB_REPO),
+    ])
+
+    const result: SystemVersionCheckResult = {
+      checkedAt: new Date().toISOString(),
+      server: {
+        currentVersion: currentServerVersion,
+        latestVersion: serverRelease.latestVersion,
+        hasUpdate: isNewerSemver(currentServerVersion, serverRelease.latestVersion),
+        releaseUrl: serverRelease.releaseUrl,
+      },
+      agent: {
+        latestVersion: agentRelease.latestVersion,
+        releaseUrl: agentRelease.releaseUrl,
+        updateCommand: AGENT_UPDATE_COMMAND,
+      },
+    }
+
+    this.versionCheckCache = {
+      data: result,
+      expiresAt: Date.now() + VERSION_CHECK_CACHE_TTL_MS,
+    }
+
+    return result
   }
 }

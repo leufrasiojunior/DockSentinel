@@ -53,6 +53,8 @@ import { formatDateTime } from "../../i18n/format";
 import { useConfirm } from "../../shared/components/ui/ConfirmProvider";
 import { useToast } from "../../shared/components/ui/ToastProvider";
 import { copyToClipboard } from "../../shared/lib/utils/copyToClipboard";
+import { isAgentOutdated } from "../../features/settings/api/settings";
+import { useVersionCheck } from "../../features/settings/hooks/useVersionCheck";
 
 type Drafts = Record<string, { name: string; baseUrl: string }>;
 type SetupFlow = "install" | "rotation";
@@ -153,6 +155,7 @@ export function EnvironmentsPage() {
   });
 
   const environments = environmentsQuery.data ?? [];
+  const { versionCheck } = useVersionCheck();
 
   const draftsByEnvironment = useMemo(() => {
     const next: Drafts = {};
@@ -695,13 +698,58 @@ export function EnvironmentsPage() {
                     <div className="mt-2 text-foreground">{fmt(environment.lastSeenAt)}</div>
                   </div>
                   <div className="rounded-2xl border border-border/60 bg-muted/20 p-4 text-sm">
-                    <div className="text-xs uppercase tracking-[0.16em] text-muted-foreground">
-                      {t("environments.versionsLabel")}
+                    <div className="flex flex-wrap items-center justify-between gap-2">
+                      <div className="text-xs uppercase tracking-[0.16em] text-muted-foreground">
+                        {t("environments.versionsLabel")}
+                      </div>
+                      {environment.kind === "remote" &&
+                      isAgentOutdated(
+                        environment.agentVersion,
+                        versionCheck?.agent.latestVersion,
+                      ) &&
+                      versionCheck?.agent.latestVersion ? (
+                        <Badge variant="warning">
+                          {t("updatesCheck.agentOutdatedBadge", {
+                            version: versionCheck.agent.latestVersion,
+                          })}
+                        </Badge>
+                      ) : environment.kind === "local" &&
+                        versionCheck?.server.hasUpdate &&
+                        versionCheck.server.latestVersion ? (
+                        <Badge variant="warning">
+                          {t("updatesCheck.updateAvailableBadge", {
+                            version: versionCheck.server.latestVersion,
+                          })}
+                        </Badge>
+                      ) : null}
                     </div>
                     <div className="mt-2 text-foreground">
                       Agent {environment.agentVersion ?? "—"} · Docker{" "}
                       {environment.dockerVersion ?? "—"}
                     </div>
+                    {environment.kind === "remote" &&
+                    isAgentOutdated(
+                      environment.agentVersion,
+                      versionCheck?.agent.latestVersion,
+                    ) &&
+                    versionCheck?.agent.updateCommand ? (
+                      <div className="mt-3">
+                        <Button
+                          type="button"
+                          size="xs"
+                          variant="outline"
+                          onClick={() =>
+                            copyText(
+                              versionCheck.agent.updateCommand,
+                              t("updatesCheck.agentUpdateCommandCopied"),
+                            )
+                          }
+                        >
+                          <Copy className="size-3.5" />
+                          {t("updatesCheck.copyAgentUpdateCommand")}
+                        </Button>
+                      </div>
+                    ) : null}
                   </div>
                 </div>
 

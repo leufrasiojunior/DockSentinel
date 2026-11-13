@@ -8,10 +8,11 @@ import { DockerDigestService } from "./docker-digest.service"
 import { DockerController } from "./docker.controller"
 import { DOCKER_CLIENT } from "./docker.constants"
 import { NotificationsModule } from "../notifications/notifications.module"
+import { SettingsModule } from "../settings/settings.module"
 import { DockerOperationsService } from "./docker-operations.service"
 
 @Module({
-  imports: [NotificationsModule],
+  imports: [NotificationsModule, SettingsModule],
   providers: [
     {
       provide: DOCKER_CLIENT,

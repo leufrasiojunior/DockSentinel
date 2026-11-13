@@ -1,8 +1,8 @@
-import { BadRequestException, Inject, Injectable } from "@nestjs/common"
+import { BadRequestException, Inject, Injectable, Optional } from "@nestjs/common"
 import Docker from "dockerode"
 import { t } from "../i18n/translate"
+import { SettingsService } from "../settings/settings.service"
 import { DOCKER_CLIENT } from "./docker.constants"
-import { DockerDigestService } from "./docker-digest.service"
 import { DockerUpdateService } from "./docker-update.service"
 import { RecreateDto } from "./dto/recreate.dto"
 import { UpdateDto } from "./dto/update.dto"
@@ -12,46 +12,17 @@ export class DockerOperationsService {
   constructor(
     @Inject(DOCKER_CLIENT) private readonly docker: Docker,
     private readonly updater: DockerUpdateService,
-    private readonly digests: DockerDigestService,
+    @Optional() private readonly settings?: SettingsService,
   ) {}
 
+  private async getAuthEntries() {
+    if (!this.settings) return []
+    return this.settings.getEnabledRegistryAuthEntries()
+  }
+
   async updateCheck(name: string) {
-    const c = this.docker.getContainer(name)
-    const inspect = await c.inspect()
-
-    const imageRef = inspect?.Config?.Image as string
-    const localImageId = inspect?.Image as string
-
-    const remoteDigest = await this.digests.getRemoteDigest(imageRef)
-
-    if (!remoteDigest) {
-      return {
-        container: name,
-        imageRef,
-        localImageId,
-        canCheckRemote: false,
-        canCheckLocal: true,
-        hasUpdate: false,
-        reason: "remote_digest_not_found" as const,
-      }
-    }
-
-    const img = this.docker.getImage(localImageId)
-    const imgInspect = await img.inspect()
-    const repoDigests: string[] = imgInspect?.RepoDigests ?? []
-    const hasUpdate = this.updater.hasUpdate(repoDigests, remoteDigest)
-
-    return {
-      container: name,
-      imageRef,
-      localImageId,
-      remoteDigest,
-      repoDigests,
-      canCheckRemote: true,
-      canCheckLocal: true,
-      hasUpdate,
-      reason: "ok" as const,
-    }
+    const authEntries = await this.getAuthEntries()
+    return this.updater.canUpdateContainer(name, authEntries)
   }
 
   async recreateContainer(name: string, body: RecreateDto) {
@@ -70,7 +41,8 @@ export class DockerOperationsService {
       throw new BadRequestException(t("docker.targetImageRequired"))
     }
 
-    const check = await this.updater.canUpdateContainer(name)
+    const authEntries = await this.getAuthEntries()
+    const check = await this.updater.canUpdateContainer(name, authEntries)
     const isChangingImage = targetFromBody && targetFromBody !== check.imageRef
 
     if (isChangingImage && !force) {
@@ -103,13 +75,15 @@ export class DockerOperationsService {
     return this.updater.recreateContainerWithImage(name, targetImage, {
       force,
       pull,
+      authEntries,
     })
   }
 
   async updateContainer(name: string, body: UpdateDto) {
     const force = body.force ?? false
     const pull = body.pull ?? true
-    const check = await this.updater.canUpdateContainer(name)
+    const authEntries = await this.getAuthEntries()
+    const check = await this.updater.canUpdateContainer(name, authEntries)
 
     if (!check.canCheckRemote) {
       if (!force) {
@@ -144,10 +118,18 @@ export class DockerOperationsService {
     const result = await this.updater.recreateContainerWithImage(
       name,
       targetImage,
-      { force, pull },
+      { force, pull, authEntries },
     )
 
-    const after = await this.updater.canUpdateContainer(name).catch(() => null)
+    const after =
+      result.status === "success"
+        ? {
+            ...check,
+            localImageId: result.new.localImageId,
+            hasUpdate: false,
+            reason: "ok" as const,
+          }
+        : null
 
     return {
       status: result.status,
