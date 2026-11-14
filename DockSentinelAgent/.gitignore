@@ -1,8 +1,0 @@
-node_modules/
-dist/
-coverage/
-DSA_DOCKER_BUILD/
-*.tsbuildinfo
-*.log
-.env
-.DS_Store
