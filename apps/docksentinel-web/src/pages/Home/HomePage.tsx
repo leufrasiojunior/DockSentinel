@@ -334,13 +334,13 @@ export function HomePage() {
           containers: stats.totalContainers,
         })}
         actions={
-          <div className="flex items-center gap-3">
+          <div className="flex flex-wrap items-center gap-2.5 sm:gap-3">
             <Button
               type="button"
               variant="highlight"
               onClick={() => unified.handleScanAndUpdate()}
               disabled={unified.busy !== null}
-              className="rounded-2xl px-5 h-10 gap-2"
+              className="rounded-2xl px-5 h-10 gap-2 shrink-0 font-medium text-xs sm:text-sm"
             >
               <Sparkles className="size-4 shrink-0 text-violet-600" />
               {t("home.checkAndUpdateAction")}
@@ -352,7 +352,7 @@ export function HomePage() {
               onClick={() => unified.refetchAll()}
               disabled={overviewQuery.isFetching || unified.loading}
               title={t("common.actions.reload")}
-              className="rounded-2xl size-10"
+              className="rounded-2xl size-10 shrink-0"
             >
               <RefreshCcw
                 className={cn(
