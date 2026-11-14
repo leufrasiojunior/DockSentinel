@@ -5,7 +5,8 @@ services:
       dockerfile: Dockerfile.dev
     container_name: docksentinel-dev
     ports:
-      - "5173:5173" # Frontend React (Vite com Hot Module Replacement / Live Reload)
+      - "8080:5173" # Frontend React com Live Reload (porta 8080 padrão)
+      - "5173:5173" # Frontend React com Live Reload (porta 5173 padrão do Vite)
       - "3000:3000" # Backend NestJS API & Swagger (/docs)
     environment:
       PORT: "3000"
