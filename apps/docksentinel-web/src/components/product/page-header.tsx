@@ -4,7 +4,7 @@ import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
 
 interface PageHeaderProps extends Omit<React.HTMLAttributes<HTMLDivElement>, "title"> {
-  title: string;
+  title: React.ReactNode;
   description?: React.ReactNode;
   eyebrow?: React.ReactNode;
   actions?: React.ReactNode;
@@ -23,7 +23,7 @@ function PageHeader({
   return (
     <div
       className={cn(
-        "lg:items-center flex flex-col gap-5 rounded-[2rem] border border-border/60 bg-card/70 p-6 shadow-[0_18px_60px_-40px_rgba(8,13,24,0.55)] backdrop-blur-sm lg:flex-row lg:justify-between ",
+        "lg:items-center flex flex-col gap-5 rounded-3xl border border-white/8 bg-card/85 p-6 shadow-xl backdrop-blur-xl lg:flex-row lg:justify-between",
         className,
       )}
       {...props}

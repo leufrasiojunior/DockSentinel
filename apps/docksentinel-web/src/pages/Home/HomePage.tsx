@@ -1,3 +1,4 @@
+import { useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
 import {
   ArrowRight,
@@ -10,6 +11,7 @@ import {
   RefreshCcw,
   Search,
   ShieldAlert,
+  Sparkles,
   Wifi,
   WifiOff,
 } from "lucide-react";
@@ -36,6 +38,7 @@ import {
   type SystemVersionCheck,
 } from "../../features/settings/api/settings";
 import { useVersionCheck } from "../../features/settings/hooks/useVersionCheck";
+import { cn } from "../../shared/lib/utils/cn";
 
 function errorMessage(error: unknown, fallback: string) {
   if (typeof error === "object" && error !== null && "message" in error) {
@@ -47,7 +50,86 @@ function errorMessage(error: unknown, fallback: string) {
   return fallback;
 }
 
-function Metric({
+type KpiTheme = "purple" | "emerald" | "cyan" | "slate";
+
+interface SystemKpiProps {
+  label: string;
+  value: number | string;
+  indicatorText: string;
+  badgeText?: string;
+  icon: typeof Boxes;
+  theme: KpiTheme;
+}
+
+function SystemKpiCard({
+  label,
+  value,
+  indicatorText,
+  badgeText = "LIVE DATA",
+  icon: Icon,
+  theme,
+}: SystemKpiProps) {
+  const themeStyles = {
+    purple: {
+      iconBox: "border-violet-500/35 bg-violet-600/20 text-violet-300 shadow-[0_0_20px_-3px_rgba(139,92,246,0.3)]",
+      badge: "border-violet-500/30 bg-violet-500/10 text-violet-300",
+      indicator: "text-violet-400 font-medium",
+    },
+    emerald: {
+      iconBox: "border-emerald-500/35 bg-emerald-500/20 text-emerald-300 shadow-[0_0_20px_-3px_rgba(16,185,129,0.3)]",
+      badge: "border-emerald-500/30 bg-emerald-500/10 text-emerald-300",
+      indicator: "text-emerald-400 font-medium",
+    },
+    cyan: {
+      iconBox: "border-cyan-500/35 bg-cyan-500/20 text-cyan-300 shadow-[0_0_20px_-3px_rgba(6,182,212,0.3)]",
+      badge: "border-cyan-500/30 bg-cyan-500/10 text-cyan-300",
+      indicator: "text-cyan-400 font-medium",
+    },
+    slate: {
+      iconBox: "border-slate-600/35 bg-slate-700/30 text-slate-300",
+      badge: "border-slate-600/30 bg-slate-600/10 text-slate-400",
+      indicator: "text-slate-400 font-medium",
+    },
+  }[theme];
+
+  return (
+    <Card className="relative overflow-hidden rounded-3xl border border-white/8 bg-card/90 p-5 shadow-lg backdrop-blur-xl transition-all duration-200 hover:-translate-y-0.5 hover:border-white/15">
+      <div className="flex items-start justify-between gap-3">
+        <div
+          className={cn(
+            "flex size-12 shrink-0 items-center justify-center rounded-2xl border p-2.5 transition-transform duration-200",
+            themeStyles.iconBox
+          )}
+        >
+          <Icon className="size-5 shrink-0" />
+        </div>
+        <span
+          className={cn(
+            "inline-flex items-center rounded-full border px-2 py-0.5 text-[0.62rem] font-bold uppercase tracking-[0.16em]",
+            themeStyles.badge
+          )}
+        >
+          {badgeText}
+        </span>
+      </div>
+
+      <div className="mt-5 space-y-1">
+        <div className="text-xs font-semibold uppercase tracking-[0.14em] text-muted-foreground/80">
+          {label}
+        </div>
+        <div className="text-3xl font-extrabold tracking-tight text-white font-sans">
+          {value}
+        </div>
+      </div>
+
+      <div className="mt-3 flex items-center gap-1.5 text-xs">
+        <span className={themeStyles.indicator}>{indicatorText}</span>
+      </div>
+    </Card>
+  );
+}
+
+function MetricMini({
   label,
   value,
   icon: Icon,
@@ -57,12 +139,12 @@ function Metric({
   icon: typeof Boxes;
 }) {
   return (
-    <div className="rounded-2xl border border-border/60 bg-muted/25 p-3">
-      <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.14em] text-muted-foreground">
-        <Icon className="size-3.5" />
-        {label}
+    <div className="rounded-2xl border border-white/6 bg-white/[0.03] p-3 transition-colors hover:bg-white/[0.05]">
+      <div className="flex items-center gap-1.5 text-[0.68rem] font-semibold uppercase tracking-[0.12em] text-muted-foreground/75">
+        <Icon className="size-3 shrink-0" />
+        <span className="truncate">{label}</span>
       </div>
-      <div className="mt-2 text-2xl font-semibold tracking-tight text-foreground">
+      <div className="mt-1.5 text-xl font-bold tracking-tight text-foreground">
         {value == null ? "—" : value}
       </div>
     </div>
@@ -97,39 +179,56 @@ function EnvironmentCard({
       onClick={() => writeStoredEnvironmentId(environment.id)}
       className="block group"
     >
-      <Card className="h-full overflow-hidden transition-all duration-200 group-hover:-translate-y-0.5 group-hover:border-primary/35 group-hover:shadow-[0_24px_80px_-44px_rgba(16,24,40,0.55)]">
-        <div className="border-b border-border/60 p-6">
+      <Card className="h-full overflow-hidden rounded-3xl border border-white/8 bg-card/85 transition-all duration-200 group-hover:-translate-y-1 group-hover:border-violet-500/40 group-hover:shadow-[0_24px_80px_-24px_rgba(139,92,246,0.25)]">
+        <div className="border-b border-white/8 p-6">
           <div className="flex items-start justify-between gap-4">
-            <div className="flex min-w-0 items-start gap-3">
-              <div className="flex size-12 shrink-0 items-center justify-center rounded-2xl border border-border/60 bg-muted/35 text-foreground">
+            <div className="flex min-w-0 items-start gap-3.5">
+              <div className="flex size-12 shrink-0 items-center justify-center rounded-2xl border border-white/10 bg-white/[0.04] text-violet-300 shadow-sm transition-colors group-hover:border-violet-500/30 group-hover:bg-violet-600/10">
                 <EnvironmentIcon className="size-5" />
               </div>
-              <div className="min-w-0 space-y-2">
-                <div className="truncate text-xl font-semibold tracking-tight text-foreground">
+              <div className="min-w-0 space-y-1.5">
+                <div className="truncate text-xl font-bold tracking-tight text-white group-hover:text-violet-200 transition-colors">
                   {environment.name}
                 </div>
                 <div className="flex flex-wrap items-center gap-2">
-                  <Badge variant={isUp ? "success" : "destructive"} className="gap-1.5">
-                    <StatusIcon className="size-3.5" />
+                  <Badge
+                    variant={isUp ? "success" : "destructive"}
+                    className="gap-1.5 font-semibold text-[0.68rem] tracking-wider"
+                  >
+                    <span className="relative flex size-2">
+                      <span
+                        className={cn(
+                          "absolute inline-flex h-full w-full rounded-full opacity-75",
+                          isUp ? "animate-ping bg-emerald-400" : "bg-rose-400"
+                        )}
+                      />
+                      <span
+                        className={cn(
+                          "relative inline-flex size-2 rounded-full",
+                          isUp ? "bg-emerald-500" : "bg-rose-500"
+                        )}
+                      />
+                    </span>
+                    <StatusIcon className="size-3" />
                     {isUp ? t("home.statusUp") : t("home.statusDown")}
                   </Badge>
-                  <Badge variant="outline">
+                  <Badge variant="outline" className="border-white/10 bg-white/[0.02] text-xs">
                     {isLocal ? t("home.kindLocal") : t("home.kindRemote")}
                   </Badge>
                 </div>
               </div>
             </div>
 
-            <div className="rounded-2xl border border-border/60 bg-card/80 px-3 py-2 text-right">
-              <div className="text-[0.7rem] font-semibold uppercase tracking-[0.14em] text-muted-foreground">
+            <div className="rounded-2xl border border-white/10 bg-white/[0.03] px-3.5 py-2 text-right">
+              <div className="text-[0.65rem] font-bold uppercase tracking-[0.16em] text-muted-foreground/80">
                 {t("home.agentLabel")}
               </div>
               <div className="mt-1 flex flex-col items-end gap-1">
-                <span className="text-sm font-medium text-foreground">
+                <span className="text-sm font-semibold text-white font-mono">
                   {environment.agentVersion ?? "—"}
                 </span>
                 {latestAvailable ? (
-                  <Badge variant="warning" className="text-[0.65rem] px-2 py-0.5">
+                  <Badge variant="warning" className="text-[0.62rem] px-2 py-0.5 font-semibold">
                     {t("updatesCheck.updateAvailableBadge", {
                       version: latestAvailable,
                     })}
@@ -139,29 +238,29 @@ function EnvironmentCard({
             </div>
           </div>
 
-          <div className="mt-4 text-sm text-muted-foreground">
-            {isLocal ? connection.label : `${t("home.kindRemote")} - ${connection.label}`}
+          <div className="mt-4 text-xs font-medium text-muted-foreground/80 font-mono">
+            {isLocal ? connection.label : `${t("home.kindRemote")} · ${connection.label}`}
           </div>
         </div>
 
         <div className="space-y-4 p-6">
-          <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-            <Metric label={t("home.metricContainers")} value={containers.total} icon={Boxes} />
-            <Metric label={t("home.metricOn")} value={containers.running} icon={Power} />
-            <Metric label={t("home.metricOff")} value={containers.stopped} icon={PowerOff} />
-            <Metric label={t("home.metricHealth")} value={containers.healthy} icon={HeartPulse} />
+          <div className="grid gap-3 grid-cols-2 xl:grid-cols-4">
+            <MetricMini label={t("home.metricContainers")} value={containers.total} icon={Boxes} />
+            <MetricMini label={t("home.metricOn")} value={containers.running} icon={Power} />
+            <MetricMini label={t("home.metricOff")} value={containers.stopped} icon={PowerOff} />
+            <MetricMini label={t("home.metricHealth")} value={containers.healthy} icon={HeartPulse} />
           </div>
 
           {!containers.available ? (
-            <div className="rounded-2xl border border-destructive/20 bg-destructive/10 px-4 py-3 text-sm text-destructive">
+            <div className="rounded-2xl border border-destructive/30 bg-destructive/10 px-4 py-3 text-xs text-destructive">
               {t("home.dataUnavailable")}
             </div>
           ) : null}
         </div>
 
-        <div className="flex items-center justify-between border-t border-border/60 px-6 py-4 text-sm font-medium text-foreground">
+        <div className="flex items-center justify-between border-t border-white/8 px-6 py-4 text-xs font-semibold text-violet-300 transition-colors group-hover:text-white">
           <span>{t("home.openDashboard")}</span>
-          <ArrowRight className="size-4 transition-transform duration-200 group-hover:translate-x-0.5" />
+          <ArrowRight className="size-4 transition-transform duration-200 group-hover:translate-x-1" />
         </div>
       </Card>
     </Link>
@@ -180,22 +279,89 @@ export function HomePage() {
   const unified = useUnifiedContainers(items);
   const { versionCheck } = useVersionCheck();
 
+  // Métricas agregadas de todos os ambientes
+  const stats = useMemo(() => {
+    let totalContainers = 0;
+    let totalRunning = 0;
+    let totalStopped = 0;
+    let totalHealthy = 0;
+    let onlineEnvs = 0;
+
+    for (const item of items) {
+      if (item.environment.status === "online") onlineEnvs++;
+      if (item.containers.available) {
+        totalContainers += item.containers.total ?? 0;
+        totalRunning += item.containers.running ?? 0;
+        totalStopped += item.containers.stopped ?? 0;
+        totalHealthy += item.containers.healthy ?? 0;
+      }
+    }
+
+    const healthPercent =
+      totalRunning > 0 ? Math.round((totalHealthy / totalRunning) * 100) : 100;
+
+    return {
+      totalContainers,
+      totalRunning,
+      totalStopped,
+      totalHealthy,
+      healthPercent,
+      onlineEnvs,
+    };
+  }, [items]);
+
   return (
-    <div className="space-y-6">
+    <div className="space-y-7">
       <PageHeader
-        eyebrow={t("home.eyebrow")}
-        title={t("home.title")}
-        description={t("home.description")}
+        eyebrow={
+          <div className="flex items-center gap-2">
+            <span className="relative flex size-2">
+              <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-violet-400 opacity-75" />
+              <span className="relative inline-flex size-2 rounded-full bg-violet-500" />
+            </span>
+            <span className="font-mono text-[0.68rem] font-bold tracking-widest text-violet-300">
+              DOCK SENTINEL · LIVE SYSTEM
+            </span>
+          </div>
+        }
+        title={
+          <span className="text-3xl font-extrabold tracking-tight sm:text-4xl">
+            System <span className="text-gradient-purple-cyan">Overview</span>
+          </span>
+        }
+        description={t("home.overviewSubtitle", {
+          online: stats.onlineEnvs,
+          containers: stats.totalContainers,
+        })}
         actions={
-          <Button
-            type="button"
-            variant="outline"
-            onClick={() => unified.refetchAll()}
-            disabled={overviewQuery.isFetching || unified.loading}
-          >
-            <RefreshCcw className="size-4" />
-            {t("common.actions.reload")}
-          </Button>
+          <div className="flex items-center gap-3">
+            <Button
+              type="button"
+              variant="highlight"
+              onClick={() => unified.handleScanAndUpdate()}
+              disabled={unified.busy !== null}
+              className="rounded-2xl px-5 h-10 gap-2"
+            >
+              <Sparkles className="size-4 shrink-0 text-violet-600" />
+              {t("home.checkAndUpdateAction")}
+            </Button>
+            <Button
+              type="button"
+              variant="glass"
+              size="icon"
+              onClick={() => unified.refetchAll()}
+              disabled={overviewQuery.isFetching || unified.loading}
+              title={t("common.actions.reload")}
+              className="rounded-2xl size-10"
+            >
+              <RefreshCcw
+                className={cn(
+                  "size-4 text-foreground",
+                  (overviewQuery.isFetching || unified.loading) && "animate-spin"
+                )}
+              />
+            </Button>
+          </div>
         }
       />
 
@@ -225,30 +391,76 @@ export function HomePage() {
 
       {!overviewQuery.isError && items.length > 0 ? (
         <>
-          <div className="grid gap-4 xl:grid-cols-2">
-            {items.map((item) => (
-              <EnvironmentCard
-                key={item.environment.id}
-                item={item}
-                versionCheck={versionCheck}
-              />
-            ))}
+          {/* Top 4 System KPI Cards */}
+          <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+            <SystemKpiCard
+              label={t("home.metricContainers")}
+              value={stats.totalContainers}
+              indicatorText={t("home.metricTotalSummary", { count: items.length })}
+              icon={Boxes}
+              theme="purple"
+            />
+            <SystemKpiCard
+              label={t("home.metricOn")}
+              value={stats.totalRunning}
+              indicatorText={t("home.metricHealthySummary", { percent: stats.healthPercent })}
+              icon={Power}
+              theme="emerald"
+            />
+            <SystemKpiCard
+              label={t("home.metricOff")}
+              value={stats.totalStopped}
+              indicatorText={stats.totalStopped === 0 ? "0 offline" : `${stats.totalStopped} offline`}
+              badgeText="STANDBY"
+              icon={PowerOff}
+              theme="slate"
+            />
+            <SystemKpiCard
+              label={t("home.metricHealth")}
+              value={stats.totalHealthy}
+              indicatorText={`${stats.onlineEnvs} / ${items.length} hosts online`}
+              icon={HeartPulse}
+              theme="cyan"
+            />
+          </div>
+
+          {/* Environment Cards Section */}
+          <div className="space-y-3 pt-1">
+            <div className="flex items-center justify-between">
+              <h2 className="text-base font-bold uppercase tracking-[0.12em] text-muted-foreground/80">
+                {t("home.environmentsSectionTitle")}
+              </h2>
+            </div>
+            <div className="grid gap-4 xl:grid-cols-2">
+              {items.map((item) => (
+                <EnvironmentCard
+                  key={item.environment.id}
+                  item={item}
+                  versionCheck={versionCheck}
+                />
+              ))}
+            </div>
           </div>
 
           {unified.busy ? (
-            <Card className="border-primary/15 bg-primary/8 px-5 py-4">
-              <div className="text-sm font-medium text-foreground">
+            <Card className="border-violet-500/30 bg-violet-600/10 px-5 py-4 rounded-3xl shadow-lg">
+              <div className="flex items-center gap-3 text-sm font-medium text-white">
+                <span className="relative flex size-2.5">
+                  <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-violet-400 opacity-75" />
+                  <span className="relative inline-flex size-2.5 rounded-full bg-violet-500" />
+                </span>
                 {unified.busy.progressText}
               </div>
             </Card>
           ) : null}
 
-          <div className="space-y-3 pt-2">
+          {/* Unified Containers Table Section */}
+          <div className="space-y-4 pt-3">
             <div>
-              <h2 className="text-lg font-semibold tracking-tight text-foreground">
+              <h2 className="text-xl font-bold tracking-tight text-white">
                 {t("home.unifiedSectionTitle")}
               </h2>
-              <p className="text-sm text-muted-foreground">
+              <p className="text-xs text-muted-foreground/80">
                 {t("home.unifiedSectionSubtitle")}
               </p>
             </div>
@@ -283,6 +495,7 @@ export function HomePage() {
                       size="sm"
                       variant={unified.envFilter === "all" ? "primary" : "outline"}
                       onClick={() => unified.setEnvFilter("all")}
+                      className="rounded-xl font-medium"
                     >
                       {t("containers.filterAllEnvironments")}
                     </Button>
@@ -297,6 +510,7 @@ export function HomePage() {
                             : "outline"
                         }
                         onClick={() => unified.setEnvFilter(envItem.environment.id)}
+                        className="rounded-xl font-medium gap-1.5"
                       >
                         {envItem.connection.mode === "local" ? (
                           <HousePlug className="size-3.5" />
@@ -314,7 +528,7 @@ export function HomePage() {
                       value={unified.searchQuery}
                       onChange={(e) => unified.setSearchQuery(e.target.value)}
                       placeholder={t("containers.searchPlaceholder")}
-                      className="pl-9"
+                      className="pl-9 rounded-xl border-white/10 bg-white/[0.03] focus:border-violet-500/50"
                     />
                   </div>
                 </div>

@@ -29,13 +29,13 @@ function SectionCard({
   ...props
 }: SectionCardProps) {
   return (
-    <Card className={cn("overflow-hidden", className)} {...props}>
-      <CardHeader className="border-b border-border/60">
+    <Card className={cn("overflow-hidden rounded-3xl border border-white/8 bg-card/90 shadow-xl backdrop-blur-xl", className)} {...props}>
+      <CardHeader className="border-b border-white/8 p-6">
         <div className="flex w-full flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
           <div className="min-w-0 space-y-1">
-            <CardTitle>{title}</CardTitle>
+            <CardTitle className="text-lg font-bold tracking-tight text-white">{title}</CardTitle>
             {description ? (
-              <CardDescription>{description}</CardDescription>
+              <CardDescription className="text-xs text-muted-foreground/80">{description}</CardDescription>
             ) : null}
           </div>
           {actions ? (
@@ -45,7 +45,7 @@ function SectionCard({
           ) : null}
         </div>
       </CardHeader>
-      <CardContent className={cn("space-y-4", contentClassName)}>
+      <CardContent className={cn("p-6 space-y-4", contentClassName)}>
         {children}
       </CardContent>
     </Card>

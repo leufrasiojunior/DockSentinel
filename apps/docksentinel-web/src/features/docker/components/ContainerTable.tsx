@@ -141,11 +141,21 @@ export function ContainerTable({
   }
 
   function renderUpdateBadge(state: UpdateVisualState) {
-    if (state === "blocked") return <Badge tone="gray">{t("common.states.autoUpdateOff")}</Badge>;
-    if (state === "idle") return <Badge tone="gray">{t("common.states.notChecked")}</Badge>;
+    if (state === "blocked")
+      return (
+        <Badge tone="gray" className="rounded-full text-[0.68rem]">
+          {t("common.states.autoUpdateOff")}
+        </Badge>
+      );
+    if (state === "idle")
+      return (
+        <Badge tone="gray" className="rounded-full text-[0.68rem]">
+          {t("common.states.notChecked")}
+        </Badge>
+      );
     if (state === "checking") {
       return (
-        <Badge tone="blue" className="gap-1.5">
+        <Badge tone="blue" className="gap-1.5 rounded-full text-[0.68rem]">
           <LoaderCircle className="size-3.5 animate-spin" />
           {t("common.states.checking")}
         </Badge>
@@ -153,7 +163,10 @@ export function ContainerTable({
     }
     if (state === "localOnly") {
       return (
-        <Badge tone="gray" className="gap-1.5">
+        <Badge
+          tone="gray"
+          className="gap-1.5 rounded-full text-[0.68rem] border-white/10 bg-white/5 text-slate-300"
+        >
           <HardDrive className="size-3.5" />
           {t("common.states.localImage")}
         </Badge>
@@ -161,7 +174,10 @@ export function ContainerTable({
     }
     if (state === "authRequired") {
       return (
-        <Badge tone="yellow" className="gap-1.5">
+        <Badge
+          tone="yellow"
+          className="gap-1.5 rounded-full text-[0.68rem] border-amber-500/30 bg-amber-500/15 text-amber-300"
+        >
           <KeyRound className="size-3.5" />
           {t("common.states.registryAuthRequired")}
         </Badge>
@@ -169,7 +185,10 @@ export function ContainerTable({
     }
     if (state === "rateLimited") {
       return (
-        <Badge tone="red" className="gap-1.5">
+        <Badge
+          tone="red"
+          className="gap-1.5 rounded-full text-[0.68rem] border-rose-500/30 bg-rose-500/15 text-rose-300"
+        >
           <TriangleAlert className="size-3.5" />
           {t("common.states.rateLimited")}
         </Badge>
@@ -177,7 +196,10 @@ export function ContainerTable({
     }
     if (state === "error") {
       return (
-        <Badge tone="red" className="gap-1.5">
+        <Badge
+          tone="red"
+          className="gap-1.5 rounded-full text-[0.68rem] border-rose-500/30 bg-rose-500/15 text-rose-300"
+        >
           <TriangleAlert className="size-3.5" />
           {t("toast.error")}
         </Badge>
@@ -187,33 +209,51 @@ export function ContainerTable({
       return (
         <Badge
           tone="yellow"
-          className="gap-1.5 border-amber-500/55 bg-amber-400/20 px-3 py-1.5 font-semibold text-amber-800 shadow-[0_0_0_1px_rgba(245,158,11,0.14)] dark:border-amber-300/55 dark:bg-amber-300/18 dark:text-amber-100"
+          className="gap-1.5 rounded-full border border-amber-400/40 bg-amber-400/15 px-3 py-1 text-[0.68rem] font-semibold text-amber-200 shadow-[0_0_16px_rgba(245,158,11,0.2)]"
         >
-          <CircleArrowUp className="size-3.5" />
+          <CircleArrowUp className="size-3.5 text-amber-400" />
           {t("common.states.updateAvailable")}
         </Badge>
       );
     }
-    if (state === "upToDate") return <Badge tone="green">{t("common.states.upToDate")}</Badge>;
-    return <Badge tone="gray">{t("common.states.checked")}</Badge>;
+    if (state === "upToDate")
+      return (
+        <Badge
+          tone="green"
+          className="gap-1.5 rounded-full text-[0.68rem] border-emerald-500/30 bg-emerald-500/15 text-emerald-300 font-semibold"
+        >
+          {t("common.states.upToDate")}
+        </Badge>
+      );
+    return (
+      <Badge tone="gray" className="rounded-full text-[0.68rem]">
+        {t("common.states.checked")}
+      </Badge>
+    );
   }
 
   return (
-    <Card className="overflow-hidden">
+    <Card className="overflow-hidden rounded-3xl border border-white/8 bg-card/90 shadow-xl backdrop-blur-xl">
       <CardHeader className="gap-4">
         <div className="flex w-full flex-col gap-4">
           <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
             <div className="min-w-0">
-              <div className="text-sm font-semibold tracking-[0.02em] text-foreground">
+              <div className="text-base font-bold tracking-tight text-white">
                 {t("containers.tableTitle", { count: containers.length })}
               </div>
-              <div className="mt-1 text-sm leading-relaxed text-muted-foreground">
+              <div className="mt-1 text-xs leading-relaxed text-muted-foreground/80">
                 {t("containers.tableSubtitle").split("docksentinel.update=false")[0]}
-                <span className="font-mono">docksentinel.update=false</span>.
+                <span className="font-mono text-violet-300/80">docksentinel.update=false</span>.
               </div>
             </div>
-            <ActionBar className="justify-end">
-              <Button onClick={handleReload} disabled={loading || isBusy || isRefreshing} type="button" variant="outline">
+            <ActionBar className="justify-end gap-2">
+              <Button
+                onClick={handleReload}
+                disabled={loading || isBusy || isRefreshing}
+                type="button"
+                variant="glass"
+                className="rounded-xl"
+              >
                 {isRefreshing ? <LoaderCircle className="size-4 animate-spin" /> : <RefreshCcw className="size-4" />}
                 {t("common.actions.reload")}
               </Button>
@@ -224,18 +264,20 @@ export function ContainerTable({
                 type="button"
                 variant="secondary"
                 aria-busy={isCheckAllBusy}
+                className="rounded-xl border border-white/8 bg-white/[0.04] text-foreground hover:bg-white/[0.08]"
               >
                 {isCheckAllBusy ? <LoaderCircle className="size-4 animate-spin" /> : null}
                 {t("dashboard.checkAll")}
               </Button>
 
               <Button
-                variant="primary"
+                variant="highlight"
                 onClick={onScanAndUpdate}
                 disabled={loading || isBusy}
                 type="button"
                 aria-busy={isScanAndUpdateBusy}
                 title={t("dashboard.scanAndEnqueueTitle")}
+                className="rounded-xl gap-2 font-semibold"
               >
                 {isScanAndUpdateBusy ? <LoaderCircle className="size-4 animate-spin" /> : null}
                 {t("dashboard.scanAndEnqueue")}
@@ -248,6 +290,7 @@ export function ContainerTable({
                 type="button"
                 aria-busy={isUpdateSelectedBusy}
                 title={selectedBlockedCount > 0 ? t("dashboard.selectedBlockedTitle") : undefined}
+                className="rounded-xl font-medium bg-violet-600 hover:bg-violet-500 shadow-md shadow-violet-600/20"
               >
                 {isUpdateSelectedBusy ? <LoaderCircle className="size-4 animate-spin" /> : null}
                 {t("dashboard.updateSelected")}
@@ -262,7 +305,7 @@ export function ContainerTable({
       <CardContent className="p-0">
         <Table>
           <TableHeader>
-            <TableRow>
+            <TableRow className="border-b border-white/8 hover:bg-transparent">
               <TableHead className="w-14">
                 <div className="flex justify-center">
                   <Checkbox
@@ -272,14 +315,14 @@ export function ContainerTable({
                   />
                 </div>
               </TableHead>
-              <TableHead className="text-left">{t("containers.columns.container")}</TableHead>
+              <TableHead className="text-left text-xs font-semibold uppercase tracking-wider text-muted-foreground/80">{t("containers.columns.container")}</TableHead>
               {showEnvironmentColumn ? (
-                <TableHead className="text-left">{t("containers.columns.environment")}</TableHead>
+                <TableHead className="text-left text-xs font-semibold uppercase tracking-wider text-muted-foreground/80">{t("containers.columns.environment")}</TableHead>
               ) : null}
-              <TableHead className="text-left">{t("containers.columns.image")}</TableHead>
-              <TableHead className="text-left">{t("containers.columns.state")}</TableHead>
-              <TableHead className="text-left">{t("containers.columns.update")}</TableHead>
-              <TableHead className="text-left">{t("containers.columns.actions")}</TableHead>
+              <TableHead className="text-left text-xs font-semibold uppercase tracking-wider text-muted-foreground/80">{t("containers.columns.image")}</TableHead>
+              <TableHead className="text-left text-xs font-semibold uppercase tracking-wider text-muted-foreground/80">{t("containers.columns.state")}</TableHead>
+              <TableHead className="text-left text-xs font-semibold uppercase tracking-wider text-muted-foreground/80">{t("containers.columns.update")}</TableHead>
+              <TableHead className="text-left text-xs font-semibold uppercase tracking-wider text-muted-foreground/80">{t("containers.columns.actions")}</TableHead>
             </TableRow>
           </TableHeader>
 
@@ -318,8 +361,9 @@ export function ContainerTable({
                 <TableRow
                   key={c.compositeKey ? `${c.compositeKey}:${c.id}` : c.id}
                   className={cn(
-                    updateState === "available" && "bg-amber-500/5 hover:bg-amber-500/8",
-                    isUpdating && "bg-primary/6 hover:bg-primary/10",
+                    "border-b border-white/5 transition-colors",
+                    updateState === "available" && "bg-amber-500/5 hover:bg-amber-500/10",
+                    isUpdating && "bg-violet-600/10 hover:bg-violet-600/15",
                   )}
                 >
                   <TableCell>
@@ -333,13 +377,13 @@ export function ContainerTable({
 
                   <TableCell className="text-left">
                     <div className="flex items-center gap-3">
-                      <div className="rounded-2xl border border-border/60 bg-muted/40 p-2">
+                      <div className="rounded-2xl border border-white/10 bg-white/[0.04] p-2.5 text-violet-300 shadow-sm">
                         <ContainerIcon imageRepo={img.repo} containerName={c.name} />
                       </div>
 
                       <div>
-                        <div className="font-medium text-foreground">{c.name}</div>
-                        <div className="text-xs text-muted-foreground font-mono truncate max-w-50">
+                        <div className="font-semibold text-white tracking-tight">{c.name}</div>
+                        <div className="text-xs text-muted-foreground/75 font-mono truncate max-w-50">
                           {c.id.slice(0, 12)}
                         </div>
                       </div>
@@ -350,7 +394,7 @@ export function ContainerTable({
                     <TableCell className="text-left">
                       <Badge
                         tone={c.environmentKind === "local" ? "blue" : "gray"}
-                        className="gap-1.5"
+                        className="gap-1.5 rounded-full text-xs"
                       >
                         {c.environmentKind === "local" ? (
                           <HousePlug className="size-3.5" />
@@ -363,12 +407,12 @@ export function ContainerTable({
                   ) : null}
 
                   <TableCell className="text-left">
-                    <div className="font-mono text-xs text-foreground truncate max-w-400px">
+                    <div className="font-mono text-xs text-slate-200 truncate max-w-400px">
                       {img.repo}
                     </div>
                     <div className="mt-1 flex items-center gap-2">
-                      <Badge tone="gray">{img.tag || t("common.states.noTag")}</Badge>
-                      {!allowAutoUpdate && <Badge tone="red">{t("containers.blocked")}</Badge>}
+                      <Badge tone="gray" className="rounded-full text-[0.68rem]">{img.tag || t("common.states.noTag")}</Badge>
+                      {!allowAutoUpdate && <Badge tone="red" className="rounded-full text-[0.68rem]">{t("containers.blocked")}</Badge>}
                     </div>
                   </TableCell>
 
@@ -376,31 +420,32 @@ export function ContainerTable({
                     <div className="font-medium text-foreground">
                       <StatusBadge value={c.state} />
                     </div>
-                    <div className="text-xs text-muted-foreground">{c.status}</div>
+                    <div className="text-xs text-muted-foreground/70 font-mono mt-0.5">{c.status}</div>
                   </TableCell>
 
                   <TableCell
                     className={cn(
                       "text-left",
                       updateState === "available" && "border-l-2 border-l-amber-500/70 bg-amber-500/8",
-                      isUpdating && "border-l-2 border-l-primary/70 bg-primary/8",
+                      isUpdating && "border-l-2 border-l-violet-500/70 bg-violet-600/10",
                     )}
                   >
                     {renderUpdateBadge(updateState)}
                     {isUpdating && (
-                      <div className="mt-1 text-[11px] font-medium text-primary">
+                      <div className="mt-1 text-[11px] font-medium text-violet-400 flex items-center gap-1">
+                        <LoaderCircle className="size-3 animate-spin" />
                         {t("common.actions.updating")}
                       </div>
                     )}
                     {checkState?.status === "error" && (
-                      <div className="mt-1 text-[11px] text-red-500">
+                      <div className="mt-1 text-[11px] text-rose-400">
                         {checkState.error}
                       </div>
                     )}
                     {checkState?.status === "done" &&
                       typeof checkState.result.error === "string" &&
                       checkState.result.error.length > 0 && (
-                        <div className="mt-1 text-[11px] text-red-500">
+                        <div className="mt-1 text-[11px] text-rose-400">
                           {checkState.result.error}
                         </div>
                       )}
@@ -410,11 +455,12 @@ export function ContainerTable({
                     <div className="flex flex-wrap gap-2">
                       <Button
                         size="sm"
-                        variant="outline"
+                        variant="glass"
                         onClick={() => onDetails(detailsKey)}
                         disabled={isBusy || isOpeningDetails}
                         type="button"
                         aria-busy={isOpeningDetails}
+                        className="rounded-xl text-xs"
                       >
                         {isOpeningDetails ? <LoaderCircle className="size-3.5 animate-spin" /> : null}
                         {t("common.actions.details")}
@@ -427,6 +473,7 @@ export function ContainerTable({
                         disabled={isBusy || isChecking}
                         type="button"
                         aria-busy={isChecking}
+                        className="rounded-xl text-xs border border-white/8 bg-white/[0.03] hover:bg-white/[0.08]"
                       >
                         {isChecking ? <LoaderCircle className="size-3.5 animate-spin" /> : null}
                         {t("common.actions.check")}
@@ -434,12 +481,12 @@ export function ContainerTable({
 
                       <Button
                         size="sm"
-                        variant="primary"
+                        variant="highlight"
                         onClick={() => onUpdate(rowKey)}
                         disabled={isBusy || !allowAutoUpdate || isUpdating || isLocalOnly}
                         type="button"
                         aria-busy={isUpdating}
-                        className="min-w-24"
+                        className="min-w-24 rounded-xl text-xs font-semibold"
                       >
                         {isUpdating ? (
                           <>
@@ -453,7 +500,7 @@ export function ContainerTable({
                     </div>
 
                     {!allowAutoUpdate && (
-                      <div className="mt-1 text-[11px] text-muted-foreground">
+                      <div className="mt-1 text-[11px] text-muted-foreground/75 font-mono">
                         {t("common.states.blockedByLabel")}
                       </div>
                     )}
