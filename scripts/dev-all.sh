@@ -1,4 +1,4 @@
-#!/usr/bin/env bash -X
+#!/usr/bin/env bash
 set -euo pipefail
 
 cleanup() {

@@ -26,6 +26,14 @@ export default defineConfig(({ mode }) => {
       ],
     },
     server: {
+      host: "0.0.0.0",
+      port: 5173,
+      watch: {
+        usePolling: true,
+      },
+      hmr: {
+        clientPort: Number(env.VITE_HMR_PORT || 5173),
+      },
       proxy: {
         "/api": {
           target: apiProxyTarget,

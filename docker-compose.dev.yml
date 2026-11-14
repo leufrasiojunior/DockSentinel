@@ -1,0 +1,31 @@
+services:
+  docksentinel-dev:
+    build:
+      context: .
+      dockerfile: Dockerfile.dev
+    container_name: docksentinel-dev
+    ports:
+      - "5173:5173" # Frontend React (Vite com Hot Module Replacement / Live Reload)
+      - "3000:3000" # Backend NestJS API & Swagger (/docs)
+    environment:
+      PORT: "3000"
+      LOG_LEVEL: "debug"
+      DATABASE_URL: "file:/data/docksentinel.db"
+      SCHEDULER_INTERVAL_MIN: "5"
+      DOCKSENTINEL_SECRET: "CHANGE_ME_CHANGE_ME_CHANGE_ME_32CHARS_MIN"
+      AUTO_MIGRATE: "true"
+      SWAGGER_ENABLED: "true"
+      CORS_ORIGINS: "*"
+      TZ: "America/Sao_Paulo"
+      CHOKIDAR_USEPOLLING: "true"
+      VITE_USE_POLLING: "true"
+    volumes:
+      - .:/app
+      - /app/node_modules
+      - /app/apps/api/node_modules
+      - /app/apps/docksentinel-web/node_modules
+      - docksentinel_dev_data:/data
+      - /var/run/docker.sock:/var/run/docker.sock
+
+volumes:
+  docksentinel_dev_data:
