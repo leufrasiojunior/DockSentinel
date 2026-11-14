@@ -8,18 +8,24 @@ import { cn } from "../../lib/utils/cn";
 
 type ToastKind = "success" | "error" | "info";
 
-type Toast = {
+export type ToastAction = {
+  label: string;
+  onClick: () => void;
+};
+
+export type Toast = {
   id: string;
   kind: ToastKind;
   title?: string;
   message: string;
+  action?: ToastAction;
 };
 
-type ToastContextValue = {
+export type ToastContextValue = {
   push: (t: Omit<Toast, "id">) => void;
-  success: (message: string, title?: string) => void;
-  error: (message: string, title?: string) => void;
-  info: (message: string, title?: string) => void;
+  success: (message: string, title?: string, action?: ToastAction) => void;
+  error: (message: string, title?: string, action?: ToastAction) => void;
+  info: (message: string, title?: string, action?: ToastAction) => void;
 };
 
 const ToastContext = createContext<ToastContextValue | null>(null);
@@ -46,15 +52,17 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
   const push = useCallback((t: Omit<Toast, "id">) => {
     const id = `${Date.now()}_${Math.random().toString(16).slice(2)}`;
     setToasts((prev) => [...prev, { ...t, id }]);
-    setTimeout(() => remove(id), 4500);
+    // Toasts with actionable buttons stay visible longer (8s vs 4.5s)
+    const timeoutMs = t.action ? 8500 : 4500;
+    setTimeout(() => remove(id), timeoutMs);
   }, [remove]);
 
   const api = useMemo<ToastContextValue>(
     () => ({
       push,
-      success: (message, title) => push({ kind: "success", message, title }),
-      error: (message, title) => push({ kind: "error", message, title }),
-      info: (message, title) => push({ kind: "info", message, title }),
+      success: (message, title, action) => push({ kind: "success", message, title, action }),
+      error: (message, title, action) => push({ kind: "error", message, title, action }),
+      info: (message, title, action) => push({ kind: "info", message, title, action }),
     }),
     [push],
   );
@@ -79,6 +87,20 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
                   </div>
                 </div>
                 <div className="mt-1 text-sm leading-relaxed opacity-90">{toastItem.message}</div>
+                {toastItem.action ? (
+                  <div className="mt-2.5">
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        toastItem.action?.onClick();
+                      }}
+                      className="inline-flex items-center gap-1.5 rounded-xl border border-current/25 bg-current/10 px-3 py-1.5 text-xs font-semibold tracking-wide transition-all hover:bg-current/20 active:scale-95 cursor-pointer shadow-sm"
+                    >
+                      {toastItem.action.label}
+                    </button>
+                  </div>
+                ) : null}
               </div>
 
               <button

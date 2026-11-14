@@ -24,6 +24,7 @@ export const translationPtBr = {
       back: "Voltar",
       retry: "Tentar novamente",
       copy: "Copiar",
+      copied: "Copiado!",
     },
     labels: {
       name: "Nome",
@@ -840,5 +841,10 @@ export const translationPtBr = {
     agentOutdatedBadge: "Update do Agent: v{{version}}",
     copyAgentUpdateCommand: "Copiar comando de update do Agent",
     agentUpdateCommandCopied: "Comando de atualização do Agent copiado.",
+    agentUpdateAvailableBadge: "Update do Agent",
+    agentUpdateToastTitle: "Atualização do Agente",
+    agentUpdateToastMessage: "Nova versão v{{version}} disponível para o(s) ambiente(s): {{environments}}",
+    agentUpdateNotificationDesc: "O nó remoto \"{{env}}\" está na versão {{current}} e pode ser atualizado para v{{latest}}.",
+    copyUpdateCommand: "Copiar comando de atualização",
   },
 } as const;

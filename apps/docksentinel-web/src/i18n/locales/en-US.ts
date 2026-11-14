@@ -24,6 +24,7 @@ export const translationEnUs = {
       back: "Back",
       retry: "Try again",
       copy: "Copy",
+      copied: "Copied!",
     },
     labels: {
       name: "Name",
@@ -833,5 +834,10 @@ export const translationEnUs = {
     agentOutdatedBadge: "Agent update: v{{version}}",
     copyAgentUpdateCommand: "Copy Agent update command",
     agentUpdateCommandCopied: "Agent update command copied.",
+    agentUpdateAvailableBadge: "Agent update",
+    agentUpdateToastTitle: "Agent update available",
+    agentUpdateToastMessage: "New version v{{version}} available for environment(s): {{environments}}",
+    agentUpdateNotificationDesc: "Remote node \"{{env}}\" is running version {{current}} and can be upgraded to v{{latest}}.",
+    copyUpdateCommand: "Copy update command",
   },
 } as const;
