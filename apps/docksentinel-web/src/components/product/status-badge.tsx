@@ -52,7 +52,31 @@ function StatusBadge({ value }: StatusBadgeProps) {
   const { t } = useTranslation();
   const normalized = normalize(value);
   const tr = (key: string) => t(key as never) as string;
-  return <Badge variant={resolveVariant(normalized)}>{translateStatusValue(normalized, tr)}</Badge>;
+  const isRunning = normalized.toLowerCase().includes("run");
+  const isUpdating =
+    normalized.toLowerCase().includes("progress") ||
+    normalized.toLowerCase().includes("checking") ||
+    normalized.toLowerCase().includes("tick");
+
+  return (
+    <Badge
+      variant={resolveVariant(normalized)}
+      className="gap-1.5 font-semibold text-[0.68rem] tracking-wider uppercase"
+    >
+      {isRunning ? (
+        <span className="relative flex size-2">
+          <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-400 opacity-75" />
+          <span className="relative inline-flex size-2 rounded-full bg-emerald-500" />
+        </span>
+      ) : isUpdating ? (
+        <span className="relative flex size-2">
+          <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-cyan-400 opacity-75" />
+          <span className="relative inline-flex size-2 rounded-full bg-cyan-500" />
+        </span>
+      ) : null}
+      {translateStatusValue(normalized, tr)}
+    </Badge>
+  );
 }
 
 export { StatusBadge };

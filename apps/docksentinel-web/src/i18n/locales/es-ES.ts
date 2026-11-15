@@ -28,6 +28,7 @@ export const translationEsEs = {
       back: "Volver",
       retry: "Reintentar",
       copy: "Copiar",
+      copied: "¡Copiado!",
     },
     labels: {
       name: "Nombre",
@@ -144,6 +145,11 @@ export const translationEsEs = {
     },
   },
   navigation: {
+    management: "Gestión",
+    diagnostics: "Diagnóstico y Sistema",
+    stableTag: "STABLE",
+    registries: "Registries",
+    daemonOnline: "Daemon Online",
     environments: "Environments",
     dashboard: "Panel",
     jobs: "Tareas",
@@ -813,6 +819,12 @@ export const translationEsEs = {
     metricHealth: "Saludables",
     dataUnavailable: "Datos no disponibles",
     openDashboard: "Abrir panel del entorno",
+    liveDataBadge: "LIVE DATA",
+    overviewSubtitle: "{{online}} Hosts Activos · {{containers}} Contenedores Monitorizados · Protección Activa",
+    checkAndUpdateAction: "Comprobar y actualizar",
+    metricTotalSummary: "{{count}} entornos",
+    metricHealthySummary: "{{percent}}% saludables",
+    metricUpdatesSummary: "{{count}} elegibles para actualización",
   },
   updatesCheck: {
     checkNow: "Comprobar actualizaciones de versión",
@@ -826,5 +838,10 @@ export const translationEsEs = {
     agentOutdatedBadge: "Update del Agent: v{{version}}",
     copyAgentUpdateCommand: "Copiar comando de actualización del Agent",
     agentUpdateCommandCopied: "Comando de actualización del Agent copiado.",
+    agentUpdateAvailableBadge: "Actualización del Agente",
+    agentUpdateToastTitle: "Actualización del Agente",
+    agentUpdateToastMessage: "Nueva versión v{{version}} disponible para el/los entorno(s): {{environments}}",
+    agentUpdateNotificationDesc: "El nodo remoto \"{{env}}\" ejecuta la versión {{current}} y se puede actualizar a v{{latest}}.",
+    copyUpdateCommand: "Copiar comando de actualización",
   },
 } as const;

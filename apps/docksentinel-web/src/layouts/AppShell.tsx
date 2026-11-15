@@ -12,15 +12,17 @@ import { useTranslation } from "react-i18next";
 import {
   ArrowUpCircle,
   Bell,
+  Boxes,
   ChevronLeft,
   ChevronRight,
   Clock3,
   ExternalLink,
   House,
-  LayoutDashboard,
+  KeyRound,
   LogOut,
   Menu,
   RefreshCw,
+  Server,
   Settings2,
   TerminalSquare,
   type LucideIcon,
@@ -78,6 +80,12 @@ type NavItem = {
   icon: LucideIcon;
 };
 
+type NavSection = {
+  id: string;
+  title: string;
+  items: NavItem[];
+};
+
 function SidebarLink({ to, label, icon: Icon, isCollapsed, onNavigate }: SidebarLinkProps) {
   return (
     <NavLink
@@ -87,21 +95,32 @@ function SidebarLink({ to, label, icon: Icon, isCollapsed, onNavigate }: Sidebar
       title={isCollapsed ? label : undefined}
       className={({ isActive }) =>
         cn(
-          "group flex items-center gap-3 rounded-2xl px-3 py-3 text-sm font-medium transition-all duration-200",
+          "group flex items-center gap-3 rounded-2xl px-3 py-2.5 text-sm font-medium transition-all duration-200",
           isCollapsed ? "justify-center px-0" : "px-3",
           isActive
-            ? "border border-sidebar-border/80 bg-sidebar-accent text-sidebar-foreground shadow-[0_12px_24px_-18px_rgba(7,10,18,0.7)]"
-            : "text-sidebar-foreground/72 hover:bg-sidebar-accent/60 hover:text-sidebar-foreground"
+            ? "border border-violet-500/40 bg-gradient-to-r from-violet-600/20 via-violet-600/12 to-transparent text-white shadow-[0_0_24px_-4px_rgba(139,92,246,0.35)] font-semibold"
+            : "text-slate-400 hover:bg-white/[0.05] hover:text-slate-100 border border-transparent"
         )
       }
     >
-      <div className="flex size-10 shrink-0 items-center justify-center rounded-2xl border border-white/8 bg-white/5">
-        <Icon className="h-4.5 w-4.5 shrink-0" />
-      </div>
-      {!isCollapsed && (
-        <div className="min-w-0">
-          <div className="truncate text-sm font-medium">{label}</div>
-        </div>
+      {({ isActive }) => (
+        <>
+          <div
+            className={cn(
+              "flex size-9 shrink-0 items-center justify-center rounded-xl border transition-all duration-200",
+              isActive
+                ? "border-violet-400/40 bg-violet-600/25 text-violet-300 shadow-sm"
+                : "border-white/5 bg-white/[0.04] text-slate-400 group-hover:border-white/10 group-hover:bg-white/8 group-hover:text-slate-200"
+            )}
+          >
+            <Icon className="size-4 shrink-0" />
+          </div>
+          {!isCollapsed && (
+            <div className="min-w-0">
+              <div className="truncate text-sm">{label}</div>
+            </div>
+          )}
+        </>
       )}
     </NavLink>
   );
@@ -112,13 +131,13 @@ function SidebarContent({
   onToggleCollapse,
   onLogout,
   onNavigate,
-  navItems,
+  navSections,
 }: {
   isCollapsed: boolean;
   onToggleCollapse: () => void;
   onLogout: () => void;
   onNavigate?: () => void;
-  navItems: NavItem[];
+  navSections: NavSection[];
 }) {
   const { t } = useTranslation();
   const { versionCheck, isRefreshing, refreshVersions } = useVersionCheck();
@@ -130,51 +149,97 @@ function SidebarContent({
     <>
       <button
         onClick={onToggleCollapse}
-        className="absolute -right-3 top-8 z-50 hidden h-7 w-7 items-center justify-center rounded-full border border-sidebar-border bg-sidebar text-sidebar-foreground shadow-md transition-colors hover:bg-sidebar-accent lg:flex"
+        className="absolute -right-3 top-8 z-50 hidden size-7 items-center justify-center rounded-full border border-sidebar-border bg-sidebar text-sidebar-foreground shadow-md transition-colors hover:bg-sidebar-accent lg:flex"
         title={isCollapsed ? t("navigation.expand") : t("navigation.collapse")}
         type="button"
       >
         {isCollapsed ? <ChevronRight size={14} /> : <ChevronLeft size={14} />}
       </button>
 
+      {/* Top Header / Branding */}
       <div className="px-5 py-6">
         <div className={cn("flex items-center gap-3 overflow-hidden", isCollapsed && "justify-center")}>
-          <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl border border-white/10 bg-white/95 p-2 shadow-sm">
-            <img src={logo} alt="DockSentinel" className="h-full w-full object-contain" />
+          <div className="flex size-12 shrink-0 items-center justify-center rounded-2xl border border-violet-400/30 bg-gradient-to-br from-violet-600 to-indigo-800 p-2 shadow-lg shadow-violet-500/20">
+            <img src={logo} alt="DockSentinel" className="h-full w-full object-contain filter drop-shadow" />
           </div>
 
           {!isCollapsed ? (
-            <div className="min-w-0">
-              <div className="truncate text-lg font-semibold tracking-tight text-sidebar-foreground">DockSentinel</div>
+            <div className="min-w-0 space-y-1">
+              <div className="truncate text-lg font-bold tracking-tight text-white">
+                DockSentinel
+              </div>
+              <div className="flex items-center gap-1.5">
+                <span className="inline-flex items-center rounded-full border border-violet-500/30 bg-violet-500/10 px-2 py-0.5 text-[0.62rem] font-semibold uppercase tracking-wider text-violet-300 font-mono">
+                  v{APP_VERSION} {t("navigation.stableTag")}
+                </span>
+              </div>
             </div>
           ) : null}
         </div>
       </div>
 
+      {/* Navigation Sections */}
       <div className="flex-1 overflow-y-auto px-3 pb-6">
-        <nav className="space-y-1.5">
-          {navItems.map((item) => (
-            <SidebarLink
-              key={item.to}
-              to={item.to}
-              label={item.label}
-              icon={item.icon}
-              isCollapsed={isCollapsed}
-              onNavigate={onNavigate}
-            />
+        <nav className="space-y-4">
+          {navSections.map((section) => (
+            <div key={section.id} className="space-y-1">
+              {!isCollapsed ? (
+                <div className="px-3 pt-2 pb-1 text-[0.65rem] font-bold uppercase tracking-[0.2em] text-muted-foreground/60">
+                  {section.title}
+                </div>
+              ) : (
+                <div className="my-2 h-px bg-white/5" />
+              )}
+              {section.items.map((item) => (
+                <SidebarLink
+                  key={item.to}
+                  to={item.to}
+                  label={item.label}
+                  icon={item.icon}
+                  isCollapsed={isCollapsed}
+                  onNavigate={onNavigate}
+                />
+              ))}
+            </div>
           ))}
         </nav>
       </div>
 
-      <div className="mt-auto px-5 py-6">
+      {/* Sidebar Footer */}
+      <div className="mt-auto px-4 py-5 space-y-3 border-t border-sidebar-border/60">
         {!isCollapsed ? (
-          <div className="mb-4 space-y-2.5 border-white/8 p-3 text-sm text-sidebar-foreground/72">
+          <>
+            {/* Host Status & Version Refresh Card */}
+            <div className="flex items-center justify-between gap-3 rounded-2xl border border-white/8 bg-white/[0.03] p-3 text-xs">
+              <div className="flex items-center gap-2.5 min-w-0">
+                <span className="relative flex size-2.5 shrink-0">
+                  <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-400 opacity-75" />
+                  <span className="relative inline-flex size-2.5 rounded-full bg-emerald-500" />
+                </span>
+                <div className="min-w-0">
+                  <div className="truncate font-semibold text-foreground">Docker Engine</div>
+                  <div className="truncate text-[0.68rem] text-muted-foreground">{t("navigation.daemonOnline")}</div>
+                </div>
+              </div>
+
+              <button
+                type="button"
+                onClick={() => refreshVersions()}
+                disabled={isRefreshing}
+                title={t("updatesCheck.checkNow")}
+                className="flex size-7 shrink-0 items-center justify-center rounded-xl border border-white/10 bg-white/5 text-muted-foreground transition-colors hover:bg-white/10 hover:text-foreground disabled:opacity-50"
+              >
+                <RefreshCw className={cn("size-3.5", isRefreshing && "animate-spin")} />
+              </button>
+            </div>
+
+            {/* Server Update Banner */}
             {hasServerUpdate && versionCheck?.server.latestVersion ? (
               <a
                 href={versionCheck.server.releaseUrl}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="flex items-center justify-between gap-2 rounded-xl border border-amber-500/40 bg-amber-500/15 px-3 py-2 text-xs font-medium text-amber-300 transition-colors hover:bg-amber-500/25"
+                className="flex items-center justify-between gap-2 rounded-2xl border border-amber-500/40 bg-amber-500/15 px-3 py-2 text-xs font-medium text-amber-300 transition-colors hover:bg-amber-500/25"
               >
                 <span className="flex items-center gap-1.5 truncate">
                   <ArrowUpCircle className="size-4 shrink-0 text-amber-400" />
@@ -187,35 +252,9 @@ function SidebarContent({
                 <ExternalLink className="size-3.5 shrink-0 opacity-80" />
               </a>
             ) : null}
-
-            <div className="flex items-start justify-between gap-2">
-              <p className="text-xs leading-relaxed text-sidebar-foreground/55">
-                {t("navigation.projectBlurb", { version: APP_VERSION })}{" "}
-                <a
-                  href="https://github.com/leufrasiojunior/DockSentinel"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="text-primary hover:underline"
-                >
-                  GitHub
-                </a>
-              </p>
-
-              <button
-                type="button"
-                onClick={() => refreshVersions()}
-                disabled={isRefreshing}
-                title={t("updatesCheck.checkNow")}
-                className="mt-0.5 flex size-6 shrink-0 items-center justify-center rounded-lg border border-white/10 bg-white/5 text-sidebar-foreground/70 transition-colors hover:bg-white/10 hover:text-sidebar-foreground disabled:opacity-50"
-              >
-                <RefreshCw
-                  className={cn("size-3.5", isRefreshing && "animate-spin")}
-                />
-              </button>
-            </div>
-          </div>
+          </>
         ) : hasServerUpdate && versionCheck?.server.latestVersion ? (
-          <div className="mb-3 flex justify-center">
+          <div className="flex justify-center">
             <a
               href={versionCheck.server.releaseUrl}
               target="_blank"
@@ -233,14 +272,14 @@ function SidebarContent({
         <Button
           variant="ghost"
           className={cn(
-            "w-full justify-center rounded-2xl border border-white/10 bg-white/7 text-sidebar-foreground hover:bg-white/12 hover:text-sidebar-foreground",
+            "w-full justify-center rounded-2xl border border-white/8 bg-white/[0.04] text-sidebar-foreground hover:bg-white/10 hover:text-white transition-all",
             !isCollapsed && "justify-start px-4",
           )}
           onClick={onLogout}
           type="button"
           title={isCollapsed ? t("navigation.logout") : undefined}
         >
-          <LogOut className="size-4.5" />
+          <LogOut className="size-4" />
           {!isCollapsed ? <span>{t("navigation.logout")}</span> : null}
         </Button>
       </div>
@@ -263,48 +302,76 @@ export function AppShell() {
     [location.pathname],
   );
 
-  const navItems = useMemo<NavItem[]>(() => {
+  const navSections = useMemo<NavSection[]>(() => {
     const dashboardPath = buildEnvironmentPath(activeEnvironmentId, "dashboard");
     return [
       {
-        to: "/home",
-        label: "Home",
-        icon: House,
+        id: "management",
+        title: t("navigation.management"),
+        items: [
+          {
+            to: "/home",
+            label: "Home",
+            icon: House,
+          },
+          {
+            to: dashboardPath,
+            label: t("navigation.dashboard"),
+            icon: Boxes,
+          },
+          {
+            to: buildEnvironmentPath(activeEnvironmentId, "jobs"),
+            label: t("navigation.jobs"),
+            icon: TerminalSquare,
+          },
+          {
+            to: buildEnvironmentPath(activeEnvironmentId, "scheduler"),
+            label: t("navigation.scheduler"),
+            icon: Clock3,
+          },
+        ],
       },
       {
-        to: dashboardPath,
-        label: t("navigation.dashboard"),
-        icon: LayoutDashboard,
-      },
-      {
-        to: buildEnvironmentPath(activeEnvironmentId, "jobs"),
-        label: t("navigation.jobs"),
-        icon: TerminalSquare,
-      },
-      {
-        to: buildEnvironmentPath(activeEnvironmentId, "scheduler"),
-        label: t("navigation.scheduler"),
-        icon: Clock3,
-      },
-      {
-        to: buildEnvironmentPath(activeEnvironmentId, "notifications"),
-        label: t("navigation.notifications"),
-        icon: Bell,
-      },
-      {
-        to: "/settings",
-        label: t("navigation.settings"),
-        icon: Settings2,
+        id: "diagnostics",
+        title: t("navigation.diagnostics"),
+        items: [
+          {
+            to: buildEnvironmentPath(activeEnvironmentId, "notifications"),
+            label: t("navigation.notifications"),
+            icon: Bell,
+          },
+          {
+            to: "/settings/registries",
+            label: t("navigation.registries"),
+            icon: KeyRound,
+          },
+          {
+            to: "/settings/environments",
+            label: t("navigation.environments"),
+            icon: Server,
+          },
+          {
+            to: "/settings",
+            label: t("navigation.settings"),
+            icon: Settings2,
+          },
+        ],
       },
     ];
   }, [activeEnvironmentId, i18n.resolvedLanguage, t]);
 
+  const allNavItems = useMemo(
+    () => navSections.flatMap((section) => section.items),
+    [navSections]
+  );
+
   const currentNav = useMemo(() => {
     return (
-      navItems.find((item) => location.pathname === item.to || location.pathname.startsWith(`${item.to}/`)) ??
-      navItems[0]
+      allNavItems.find(
+        (item) => location.pathname === item.to || location.pathname.startsWith(`${item.to}/`)
+      ) ?? allNavItems[0]
     );
-  }, [location.pathname, navItems]);
+  }, [allNavItems, location.pathname]);
   const currentTitle = useMemo(() => currentNav.label, [currentNav.label]);
 
   useEffect(() => {
@@ -414,7 +481,7 @@ export function AppShell() {
             isCollapsed={isCollapsed}
             onToggleCollapse={() => setIsCollapsed((current) => !current)}
             onLogout={handleLogout}
-            navItems={navItems}
+            navSections={navSections}
           />
 
           {!isCollapsed ? (
@@ -457,7 +524,7 @@ export function AppShell() {
                         isCollapsed={false}
                         onToggleCollapse={() => undefined}
                         onLogout={handleLogout}
-                        navItems={navItems}
+                        navSections={navSections}
                         onNavigate={() => setMobileOpen(false)}
                       />
                     </div>

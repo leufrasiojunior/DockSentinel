@@ -26,6 +26,10 @@ const buttonVariants = cva(
         link: "h-auto rounded-none px-0 py-0 text-primary underline-offset-4 hover:text-primary/80 hover:underline",
         subtle:
           "border-border/60 bg-muted/55 text-foreground hover:-translate-y-0.5 hover:bg-muted/80",
+        highlight:
+          "bg-white text-slate-950 font-semibold shadow-[0_0_28px_-6px_rgba(255,255,255,0.45)] hover:bg-slate-100 hover:shadow-[0_0_36px_-4px_rgba(255,255,255,0.6)] hover:-translate-y-0.5 border border-white/60",
+        glass:
+          "border border-white/10 bg-white/[0.05] text-foreground backdrop-blur-md hover:bg-white/10 hover:border-white/20 hover:-translate-y-0.5 shadow-sm",
       },
       size: {
         default: "h-10 px-4 py-2",

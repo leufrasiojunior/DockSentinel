@@ -24,6 +24,7 @@ export const translationEnUs = {
       back: "Back",
       retry: "Try again",
       copy: "Copy",
+      copied: "Copied!",
     },
     labels: {
       name: "Name",
@@ -140,6 +141,11 @@ export const translationEnUs = {
     },
   },
   navigation: {
+    management: "Management",
+    diagnostics: "Diagnostics & System",
+    stableTag: "STABLE",
+    registries: "Registries",
+    daemonOnline: "Daemon Online",
     environments: "Environments",
     dashboard: "Dashboard",
     jobs: "Jobs",
@@ -809,6 +815,12 @@ export const translationEnUs = {
     metricHealth: "Healthy",
     dataUnavailable: "Data unavailable",
     openDashboard: "Open environment dashboard",
+    liveDataBadge: "LIVE DATA",
+    overviewSubtitle: "{{online}} Active Hosts · {{containers}} Monitored Containers · Active Guard",
+    checkAndUpdateAction: "Check and update",
+    metricTotalSummary: "{{count}} environments",
+    metricHealthySummary: "{{percent}}% healthy",
+    metricUpdatesSummary: "{{count}} eligible for update",
   },
   updatesCheck: {
     checkNow: "Check for version updates",
@@ -822,5 +834,10 @@ export const translationEnUs = {
     agentOutdatedBadge: "Agent update: v{{version}}",
     copyAgentUpdateCommand: "Copy Agent update command",
     agentUpdateCommandCopied: "Agent update command copied.",
+    agentUpdateAvailableBadge: "Agent update",
+    agentUpdateToastTitle: "Agent update available",
+    agentUpdateToastMessage: "New version v{{version}} available for environment(s): {{environments}}",
+    agentUpdateNotificationDesc: "Remote node \"{{env}}\" is running version {{current}} and can be upgraded to v{{latest}}.",
+    copyUpdateCommand: "Copy update command",
   },
 } as const;
