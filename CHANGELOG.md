@@ -1,5 +1,20 @@
 # Changelog
 
+## [2.9.0](https://github.com/leufrasiojunior/DockSentinel/compare/v2.8.0...v2.9.0) (2026-11-15)
+
+
+### Features
+
+* **dev:** add docker live-reload dev environment with vite hmr ([fdd27b4](https://github.com/leufrasiojunior/DockSentinel/commit/fdd27b42b6f2545087a7d59151e506e40c18fd81))
+* **dev:** bind port 8080 to dev vite server for seamless access ([a081d29](https://github.com/leufrasiojunior/DockSentinel/commit/a081d29c7dbc62d865143d099514c0105e66174a))
+* **notifications:** add agent update notification with 1-click copy update command ([e303780](https://github.com/leufrasiojunior/DockSentinel/commit/e3037804d82ae148f46b7c5379b4f446929d3f09))
+* **ui:** implement modern SaaS layout redesign based on reference mockup ([a642ad2](https://github.com/leufrasiojunior/DockSentinel/commit/a642ad223b206d8f7433769425795c78d83801ee))
+
+
+### Bug Fixes
+
+* **ui:** responsive action buttons against resizable sidebar ([a33520b](https://github.com/leufrasiojunior/DockSentinel/commit/a33520bab17c26e0699add41321a91b713361406))
+
 ## [2.8.0](https://github.com/leufrasiojunior/DockSentinel/compare/v2.7.0...v2.8.0) (2026-11-13)
 
 
