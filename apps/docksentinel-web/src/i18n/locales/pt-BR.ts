@@ -24,6 +24,7 @@ export const translationPtBr = {
       back: "Voltar",
       retry: "Tentar novamente",
       copy: "Copiar",
+      copied: "Copiado!",
     },
     labels: {
       name: "Nome",
@@ -140,6 +141,11 @@ export const translationPtBr = {
     },
   },
   navigation: {
+    management: "Gerenciamento",
+    diagnostics: "Diagnósticos & Sistema",
+    stableTag: "STABLE",
+    registries: "Registries",
+    daemonOnline: "Daemon Online",
     environments: "Environments",
     dashboard: "Painel",
     jobs: "Tarefas",
@@ -816,6 +822,12 @@ export const translationPtBr = {
     metricHealth: "Saudáveis",
     dataUnavailable: "Dados indisponíveis",
     openDashboard: "Abrir painel do ambiente",
+    liveDataBadge: "LIVE DATA",
+    overviewSubtitle: "{{online}} Hosts Ativos · {{containers}} Containers Monitorados · Proteção Ativa",
+    checkAndUpdateAction: "Checar e atualizar",
+    metricTotalSummary: "{{count}} ambientes",
+    metricHealthySummary: "{{percent}}% saudáveis",
+    metricUpdatesSummary: "{{count}} elegíveis para update",
   },
   updatesCheck: {
     checkNow: "Verificar atualizações de versão",
@@ -829,5 +841,10 @@ export const translationPtBr = {
     agentOutdatedBadge: "Update do Agent: v{{version}}",
     copyAgentUpdateCommand: "Copiar comando de update do Agent",
     agentUpdateCommandCopied: "Comando de atualização do Agent copiado.",
+    agentUpdateAvailableBadge: "Update do Agent",
+    agentUpdateToastTitle: "Atualização do Agente",
+    agentUpdateToastMessage: "Nova versão v{{version}} disponível para o(s) ambiente(s): {{environments}}",
+    agentUpdateNotificationDesc: "O nó remoto \"{{env}}\" está na versão {{current}} e pode ser atualizado para v{{latest}}.",
+    copyUpdateCommand: "Copiar comando de atualização",
   },
 } as const;
