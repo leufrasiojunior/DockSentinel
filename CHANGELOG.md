@@ -1,5 +1,20 @@
 # Changelog
 
+## [3.0.0](https://github.com/leufrasiojunior/DockSentinel/compare/v2.8.0...v3.0.0) (2026-11-15)
+
+
+### 🚀 Major Highlights
+
+* **ui:** complete modern SaaS layout redesign based on reference mockup with Obsidian Dark theme (`#0b0f19`), live KPI metrics, and categorized navigation ([a642ad2](https://github.com/leufrasiojunior/DockSentinel/commit/a642ad223b206d8f7433769425795c78d83801ee))
+* **dev:** docker live-reload development environment with Vite HMR on port 8080 ([fdd27b4](https://github.com/leufrasiojunior/DockSentinel/commit/fdd27b42b6f2545087a7d59151e506e40c18fd81), [a081d29](https://github.com/leufrasiojunior/DockSentinel/commit/a081d29c7dbc62d865143d099514c0105e66174a))
+* **notifications:** agent update notification with 1-click copy update command ([e303780](https://github.com/leufrasiojunior/DockSentinel/commit/e3037804d82ae148f46b7c5379b4f446929d3f09))
+* **cleanup:** removal of legacy DockSentinelAgent folder in favor of standalone submodule ([d75a8b3](https://github.com/leufrasiojunior/DockSentinel/commit/d75a8b387e002a20fcce2775fba1897c5553e1eb))
+
+
+### Bug Fixes
+
+* **ui:** responsive action buttons against resizable sidebar ([a33520b](https://github.com/leufrasiojunior/DockSentinel/commit/a33520bab17c26e0699add41321a91b713361406))
+
 ## [2.8.0](https://github.com/leufrasiojunior/DockSentinel/compare/v2.7.0...v2.8.0) (2026-11-13)
 
 
